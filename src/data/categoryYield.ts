@@ -1,7 +1,9 @@
 // Category-average cooking yields, used ONLY as a last-resort fallback when an
-// ingredient has no published factor for a method.
-// Source: USDA Agriculture Handbook 102, Food Yields Summarized by Different
-// Stages of Preparation. Values are category means and are labelled
+// ingredient has no published factor for a method. These values are the brief's
+// starting estimates and have not yet been independently cross-checked against
+// their intended source. Task 9's golden-value regression suite will verify them.
+// Source (intended): USDA Agriculture Handbook 102, Food Yields Summarized by
+// Different Stages of Preparation. Values are category means and are labelled
 // 'categoryDefault' in the UI so the user knows they are rough.
 import type { Category, CookMethod } from '../core/types';
 
