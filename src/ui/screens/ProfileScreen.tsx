@@ -33,8 +33,10 @@ function validate(d: Draft, currentYear: number): string | null {
   if (!Number.isInteger(year) || year < 1900 || year > currentYear - 10) {
     return `Please enter a birth year between 1900 and ${currentYear - 10}`;
   }
-  if (Number(d.heightCm) < 80 || Number(d.heightCm) > 250) return 'Please enter a height between 80cm and 250cm';
-  if (Number(d.weightKg) < 20 || Number(d.weightKg) > 400) return 'Please enter a weight between 20kg and 400kg';
+  const heightCm = Number(d.heightCm);
+  if (!Number.isFinite(heightCm) || heightCm < 80 || heightCm > 250) return 'Please enter a height between 80cm and 250cm';
+  const weightKg = Number(d.weightKg);
+  if (!Number.isFinite(weightKg) || weightKg < 20 || weightKg > 400) return 'Please enter a weight between 20kg and 400kg';
   const sessions = Number(d.sessionsPerWeek);
   if (!Number.isFinite(sessions) || sessions < 0 || sessions > 21) return 'Please enter between 0 and 21 sessions per week';
   return null;

@@ -60,4 +60,58 @@ describe('ProfileScreen', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(await db.profiles.count()).toBe(1);
   });
+
+  it('rejects a height just below the lower bound (79cm)', async () => {
+    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
+    fill();
+    fireEvent.change(screen.getByLabelText(/height/i), { target: { value: '79' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/height/i);
+  });
+
+  it('accepts a height at the lower bound (80cm)', async () => {
+    const onSaved = vi.fn();
+    render(<ProfileScreen onSaved={onSaved} today={FIXED_TODAY} />);
+    fill();
+    fireEvent.change(screen.getByLabelText(/height/i), { target: { value: '80' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('rejects a weight just below the lower bound (19kg)', async () => {
+    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
+    fill();
+    fireEvent.change(screen.getByLabelText(/weight/i), { target: { value: '19' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/weight/i);
+  });
+
+  it('accepts a weight at the lower bound (20kg)', async () => {
+    const onSaved = vi.fn();
+    render(<ProfileScreen onSaved={onSaved} today={FIXED_TODAY} />);
+    fill();
+    fireEvent.change(screen.getByLabelText(/weight/i), { target: { value: '20' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('rejects sessions just above the upper bound (22/week)', async () => {
+    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
+    fill();
+    fireEvent.change(screen.getByLabelText(/sessions per week/i), { target: { value: '22' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/sessions/i);
+  });
+
+  it('accepts sessions at the upper bound (21/week)', async () => {
+    const onSaved = vi.fn();
+    render(<ProfileScreen onSaved={onSaved} today={FIXED_TODAY} />);
+    fill();
+    fireEvent.change(screen.getByLabelText(/sessions per week/i), { target: { value: '21' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });
