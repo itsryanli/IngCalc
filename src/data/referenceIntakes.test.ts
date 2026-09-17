@@ -59,11 +59,14 @@ describe('RNI_MY boundary precision', () => {
     expect(rniFor('female', 31).magnesium).toBe(320);
   });
 
-  it('matches the source exactly at the zinc 65/66 boundary', () => {
-    expect(rniFor('male', 65).zinc).toBe(6.3);
-    expect(rniFor('male', 66).zinc).toBe(6.2);
-    expect(rniFor('female', 65).zinc).toBe(4.4);
-    expect(rniFor('female', 66).zinc).toBe(4.3);
+  it('matches the source exactly at the zinc 64/65 boundary', () => {
+    // The zinc chapter's own "RNI for adults" narrative table and Appendix
+    // 20.1 both print this split as "60-64 years" / "> 65 years" — age 65
+    // itself already gets the lower (elderly) figure, not age 66.
+    expect(rniFor('male', 64).zinc).toBe(6.3);
+    expect(rniFor('male', 65).zinc).toBe(6.2);
+    expect(rniFor('female', 64).zinc).toBe(4.4);
+    expect(rniFor('female', 65).zinc).toBe(4.3);
   });
 
   it('matches the source exactly at the female calcium 49/50 boundary', () => {
