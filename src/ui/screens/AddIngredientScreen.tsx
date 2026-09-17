@@ -76,9 +76,13 @@ export function AddIngredientScreen({
       {NUTRIENT_KEYS.map((k) => (
         <div key={k}>
           <label htmlFor={`n-${k}`}>{LABELS[k]}</label>
+          {/* type="text" with inputMode="decimal" allows validation to catch non-numeric input that
+              type="number" would sanitise away, rendering the Number.isFinite guard reachable.
+              inputMode preserves the numeric keypad on mobile devices. */}
           <input
             id={`n-${k}`}
             type="text"
+            inputMode="decimal"
             value={entries[k]}
             onChange={(e) => setEntries((s) => ({ ...s, [k]: e.target.value }))}
           />
