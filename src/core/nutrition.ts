@@ -98,7 +98,7 @@ export function computeCooked(input: CookInput): CookedResult {
       label: 'Protein retention',
       detail: `× ${proteinRetention.factor.toFixed(2)}`,
       value: `${round(totals.protein)}g protein`,
-      sourceNote: proteinRetention.assumed ? 'assumed 100% — no sourced figure' : 'USDA retention factors',
+      sourceNote: proteinRetention.assumed ? 'assumed 100% — no sourced figure' : 'category retention factor — coarse estimate',
     },
     {
       label: 'Per 100g cooked',

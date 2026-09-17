@@ -1,10 +1,18 @@
 // Nutrient retention factors: the fraction of a nutrient's MASS that survives
 // cooking. This is leaching, and is separate from water loss (the yield factor).
-// These values are the brief's starting estimates and have not yet been
-// independently cross-checked against their intended source. Task 9's golden-value
-// regression suite will verify them. Entries are omitted rather than guessed; a
-// missing entry is reported to the user as "assumed 100% retention".
-// Source (intended): USDA Table of Nutrient Retention Factors, Release 6.
+// These values started as the brief's unverified estimates, intended to be sourced
+// from the USDA Table of Nutrient Retention Factors, Release 6 — that lookup table
+// was never actually consulted, for any row in this file, including the ones below.
+// Task 9's golden-value regression suite (32 cases) instead corrected the rows that
+// carry an inline "corrected by Task 9" comment — the MINERALS_BOILED overrides for
+// vegetable, legume and grain boiled, and the fat figure in MACROS_DRIP — by working
+// backwards from real USDA FoodData Central raw/cooked nutrient-content pairs
+// (implied retention = cooked nutrient mass ÷ raw nutrient mass, corrected for
+// yield), a different and more direct method than looking up Release 6. Every other
+// row — including all of fruit, egg, seafood, and every steamed case across every
+// category — is STILL the brief's original, uncorrected estimate and remains as
+// unverified as the day this file was written. Entries are omitted rather than
+// guessed; a missing entry is reported to the user as "assumed 100% retention".
 import type { Category, CookMethod, NutrientKey } from '../core/types';
 
 export type RetentionTable = Partial<

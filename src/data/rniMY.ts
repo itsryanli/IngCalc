@@ -71,7 +71,7 @@
 // practical difference. For women both buckets give 420 too (the anomaly
 // above), and only the ">70"/">70" bucket afterward drops to 320 — so under
 // EITHER reading, age 70 itself still gets 420, and the drop to 320 begins
-// only after 70. This file's bands (51-59, 60-65, 66-69, 70-200) put age 70
+// only after 70. This file's bands (51-59, 60-64, 65-69, 70-200) put age 70
 // in the last band, matching Appendix 25.1's implied "70 and above" reading
 // for the ">70" label (the same reading used for sodium's identically-
 // punctuated ">70" cut) — but the source's own two tables disagree on
@@ -90,6 +90,9 @@ export interface RniBand {
   maxAge: number;
   values: Partial<Record<NutrientKey, number>>;
 }
+
+/** Every band below starts at 19 — RNI Malaysia 2017 does not publish figures for under-19s. */
+export const RNI_MIN_AGE = 19;
 
 export const RNI_MY: { bands: readonly RniBand[] } = {
   bands: [

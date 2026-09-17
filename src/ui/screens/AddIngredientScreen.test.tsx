@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AddIngredientScreen } from './AddIngredientScreen';
 import { db } from '../../storage/db';
+import * as userIngredientsModule from '../../storage/userIngredients';
 
 beforeEach(async () => { await db.userIngredients.clear(); });
 
@@ -89,5 +90,23 @@ describe('AddIngredientScreen', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     const saved = (await db.userIngredients.toArray())[0]!;
     expect(saved.per100gRaw.protein).toBe(0);
+  });
+
+  it('shows a plain-language error and does not call onSaved when saving fails', async () => {
+    // Dexie can reject (private browsing, quota, a blocked upgrade). Without a try/catch
+    // around the save, that rejection is unhandled, onSaved never fires, and the user taps
+    // Save to absolutely nothing: no error, no navigation, form unchanged.
+    const onSaved = vi.fn();
+    const spy = vi
+      .spyOn(userIngredientsModule, 'saveUserIngredient')
+      .mockRejectedValue(new Error('storage unavailable'));
+    try {
+      render(<AddIngredientScreen initialName="Petai" onSaved={onSaved} />);
+      fireEvent.click(screen.getByRole('button', { name: /save/i }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(/could not save/i);
+      expect(onSaved).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

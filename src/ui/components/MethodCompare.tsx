@@ -35,6 +35,16 @@ export function MethodCompare({ rows, highlight }: { rows: readonly MethodRow[];
           </tr>
         ))}
       </tbody>
+      <tfoot>
+        <tr>
+          <td colSpan={2 + highlight.length + 1}>
+            {/* Same reasoning as NutrientTable's legend: <abbr title> has no hover on a phone. */}
+            <p className="method-compare__legend">
+              * Retention assumed 100% — no sourced figure for this nutrient and cooking method.
+            </p>
+          </td>
+        </tr>
+      </tfoot>
     </table>
   );
 }

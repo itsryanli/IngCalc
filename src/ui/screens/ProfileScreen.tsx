@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Goal, Profile, Sex } from '../../core/types';
 import { bmr, calorieTarget, proteinGPerKgFor, proteinGPerLb, proteinTargetG, tdee } from '../../core/targets';
 import { saveProfile } from '../../storage/profiles';
+import { newId } from '../newId';
 
 interface Draft {
   name: string; sex: Sex; birthYear: string; heightCm: string;
@@ -15,7 +16,7 @@ const EMPTY: Draft = {
 
 function toProfile(d: Draft): Profile {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     name: d.name.trim(),
     sex: d.sex,
     birthYear: Number(d.birthYear),
@@ -65,7 +66,15 @@ export function ProfileScreen({ onSaved, today = new Date() }: { onSaved: (p: Pr
     if (problem !== null) { setError(problem); return; }
     setError(null);
     const p = toProfile(draft);
-    await saveProfile(p);
+    try {
+      await saveProfile(p);
+    } catch {
+      // Dexie can reject (private browsing, quota, a blocked upgrade) — without this the
+      // promise rejection would be unhandled, onSaved would never fire, and the user would
+      // tap Save to nothing: no error, no navigation, form unchanged.
+      setError('Could not save your profile — your browser may be blocking storage (for example, private browsing) or storage may be full. Please try again.');
+      return;
+    }
     onSaved(p);
   };
 

@@ -14,6 +14,12 @@ const profile: Profile = {
 // Fixed so age (and therefore every calorie/protein figure) can't shift with the calendar.
 const today = new Date('2026-06-15T00:00:00Z');
 
+// RNI Malaysia 2017 publishes no bands below 19 — this profile is 18 (2026 - 2008) at `today`.
+const under19Profile: Profile = {
+  id: 'p2', name: 'Adik', sex: 'male', birthYear: 2008,
+  heightCm: 170, weightKg: 60, sessionsPerWeek: 2, goal: 'maintain',
+};
+
 beforeEach(async () => { await db.userIngredients.clear(); });
 
 // The cooking-method <select> is queried by role rather than getByLabelText: once a result
@@ -53,7 +59,18 @@ describe('CalcScreen', () => {
   it('shows the share of the daily calorie target when a profile exists', async () => {
     render(<CalcScreen profile={profile} today={today} />);
     await selectChicken();
-    await waitFor(() => expect(screen.getByTestId('calorie-share')).toHaveTextContent('%'));
+    // Independently verified against the actual code, not just the plan's worked example:
+    // age 30 (2026 - 1996) -> BMR 10*75 + 6.25*175 - 5*30 + 5 = 1698.75 -> TDEE *1.55 (4
+    // sessions/week) = 2633.0625 -> maintain factor 1.0 -> calorieTarget = 2633.0625.
+    // 1000g raw chicken-breast roasted: kcal 1200 raw x meat/roasted kcal retention 0.95
+    // = 1140 cooked kcal. 1140 / 2633.0625 * 100 = 43.29% -> rounds to 43%.
+    // Protein: 225 raw x meat/roasted protein retention 0.98 = 220.5g. proteinTargetG =
+    // maintain g/kg 1.8 * 75kg = 135g. 220.5 / 135 * 100 = 163.33% -> rounds to 163%.
+    // (Previously this test asserted only toHaveTextContent('%'), which passes on NaN% —
+    // swapping calorieTarget for tdee, or inverting a division, would fail nothing.)
+    await waitFor(() => expect(screen.getByTestId('calorie-share')).toHaveTextContent(
+      '43% of your daily calories · 163% of your protein',
+    ));
   });
 
   it('omits the daily share when there is no profile', async () => {
@@ -67,6 +84,14 @@ describe('CalcScreen', () => {
     render(<CalcScreen profile={null} today={today} />);
     await selectChicken();
     await waitFor(() => expect(screen.getByRole('table', { name: /method comparison/i })).toBeInTheDocument());
+  });
+
+  it('explains why RNI is blank for a profile below RNI Malaysia 2017\'s minimum age (18)', async () => {
+    render(<CalcScreen profile={under19Profile} today={today} />);
+    await selectChicken();
+    // Not a silent blank: rniFor(sex, 18) returns {} (no band starts below 19), so every RNI
+    // column would otherwise read "— RNI" with nothing explaining why.
+    await waitFor(() => expect(screen.getByText(/publishes figures for ages 19 and over/i)).toBeInTheDocument());
   });
 
   it('lets the user add a missing ingredient from the picker, then selects it automatically', async () => {

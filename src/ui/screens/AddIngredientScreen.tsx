@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CATEGORIES, NUTRIENT_KEYS, type Category, type Ingredient, type NutrientKey, type NutrientProfile } from '../../core/types';
 import { zeroNutrients } from '../../core/nutrients';
 import { saveUserIngredient } from '../../storage/userIngredients';
+import { newId } from '../newId';
 
 const LABELS: Record<NutrientKey, string> = {
   kcal: 'Energy (kcal)', protein: 'Protein (g)', carbs: 'Carbohydrate (g)',
@@ -42,7 +43,7 @@ export function AddIngredientScreen({
 
     setError(null);
     const ingredient: Ingredient = {
-      id: crypto.randomUUID(),
+      id: newId(),
       name: name.trim(),
       category,
       per100gRaw,
@@ -51,7 +52,15 @@ export function AddIngredientScreen({
       source: 'user',
       archived: false,
     };
-    await saveUserIngredient(ingredient);
+    try {
+      await saveUserIngredient(ingredient);
+    } catch {
+      // Dexie can reject (private browsing, quota, a blocked upgrade) — without this the
+      // promise rejection would be unhandled, onSaved would never fire, and the user would
+      // tap Save to nothing: no error, no navigation, form unchanged.
+      setError('Could not save this ingredient — your browser may be blocking storage (for example, private browsing) or storage may be full. Please try again.');
+      return;
+    }
     onSaved(ingredient);
   };
 

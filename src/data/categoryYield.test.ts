@@ -31,4 +31,14 @@ describe('CATEGORY_YIELD', () => {
     expect(CATEGORY_YIELD.meat.roasted).toBeLessThan(1);
     expect(CATEGORY_YIELD.meat.grilled).toBeLessThan(1);
   });
+
+  // Task 9's flagship sign-flip correction: the brief's tables assumed boiled vegetables lose
+  // ~10% of their mass, but 8 of 10 real USDA raw/cooked pairs checked show them GAINING mass
+  // from water uptake instead. Reverting this to the old, wrong-signed 0.90 must fail here —
+  // before this test existed, it left all 249 other tests green while kangkung (whose own
+  // boiled factor was deliberately deleted, so it falls through to exactly this default)
+  // silently rendered a smaller-than-raw cooked weight for a vegetable that actually gains mass.
+  it('expects boiled vegetables to gain weight from water uptake, not lose it', () => {
+    expect(CATEGORY_YIELD.vegetable.boiled).toBeGreaterThanOrEqual(1);
+  });
 });

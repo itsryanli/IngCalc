@@ -1,10 +1,18 @@
 // Category-average cooking yields, used ONLY as a last-resort fallback when an
-// ingredient has no published factor for a method. These values are the brief's
-// starting estimates and have not yet been independently cross-checked against
-// their intended source. Task 9's golden-value regression suite will verify them.
-// Source (intended): USDA Agriculture Handbook 102, Food Yields Summarized by
-// Different Stages of Preparation. Values are category means and are labelled
-// 'categoryDefault' in the UI so the user knows they are rough.
+// ingredient has no published factor for a method. These values started as the
+// brief's unverified estimates, intended to be sourced from USDA Agriculture
+// Handbook 102 (Food Yields Summarized by Different Stages of Preparation) — that
+// handbook was never actually consulted, for any row in this file, including the
+// one below. Task 9's golden-value regression suite (32 cases, checked against
+// real USDA FoodData Central raw/cooked pairs) corrected `vegetable.boiled` from
+// 0.90 to 1.05: the brief's tables assumed 8-15% mass loss for every category on
+// every wet-heat method, but 8 of 10 real vegetable raw/cooked pairs checked show
+// boiled vegetables GAINING mass from water uptake, not losing it — the brief had
+// the sign backwards for this one cell. Every other cell in this table — every
+// other category, and every other method for vegetable — is STILL the brief's
+// original, uncorrected estimate and remains as unverified as the day this file
+// was written. Values are category means and are labelled 'categoryDefault' in
+// the UI so the user knows they are rough.
 import type { Category, CookMethod } from '../core/types';
 
 export const CATEGORY_YIELD: Record<Category, Record<CookMethod, number>> = {

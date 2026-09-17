@@ -3,10 +3,10 @@ import { COOK_METHODS, type CookMethod, type Ingredient, type NutrientKey, type 
 import { g, type Grams } from '../../core/units';
 import { computeCooked, rawFromCooked } from '../../core/nutrition';
 import { compareMethods } from '../../core/methodCompare';
-import { calorieTarget, microTargets, proteinTargetG } from '../../core/targets';
+import { ageFrom, calorieTarget, microTargets, proteinTargetG } from '../../core/targets';
 import { CATEGORY_YIELD } from '../../data/categoryYield';
 import { RETENTION } from '../../data/retentionTable';
-import { rniFor } from '../../data/rniMY';
+import { RNI_MIN_AGE, rniFor } from '../../data/rniMY';
 import { DV_US } from '../../data/dvUS';
 import { listUserIngredients } from '../../storage/userIngredients';
 import { useCatalogue } from '../useCatalogue';
@@ -100,6 +100,10 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
     [profile, today],
   );
 
+  // RNI Malaysia 2017 has no bands below 19; below that, rniFor(...) silently returns {} and
+  // every RNI column would read "— RNI" with no explanation. Surface why instead of hiding it.
+  const belowRniAge = profile !== null && ageFrom(profile, today) < RNI_MIN_AGE;
+
   return (
     <section>
       <h2>Calculator</h2>
@@ -154,6 +158,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
                 totals={result.cooked.totals}
                 targets={targets}
                 assumedRetentionFor={result.cooked.assumedRetentionFor}
+                belowRniAge={belowRniAge}
               />
 
               {profile !== null && (

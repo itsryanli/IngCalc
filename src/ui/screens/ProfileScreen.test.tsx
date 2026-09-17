@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ProfileScreen } from './ProfileScreen';
 import { db } from '../../storage/db';
+import * as profilesModule from '../../storage/profiles';
 
 // Fixed so the expected values (age 30, TDEE 2633, protein 135g) never drift with the calendar.
 const FIXED_TODAY = new Date('2026-06-15T00:00:00Z');
@@ -113,5 +114,22 @@ describe('ProfileScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows a plain-language error and does not call onSaved when saving fails', async () => {
+    // Dexie can reject (private browsing, quota, a blocked upgrade). Without a try/catch
+    // around the save, that rejection is unhandled, onSaved never fires, and the user taps
+    // Save to absolutely nothing: no error, no navigation, form unchanged.
+    const onSaved = vi.fn();
+    const spy = vi.spyOn(profilesModule, 'saveProfile').mockRejectedValue(new Error('storage unavailable'));
+    try {
+      render(<ProfileScreen onSaved={onSaved} today={FIXED_TODAY} />);
+      fill();
+      fireEvent.click(screen.getByRole('button', { name: /save/i }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(/could not save/i);
+      expect(onSaved).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

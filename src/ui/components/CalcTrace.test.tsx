@@ -30,8 +30,11 @@ describe('CalcTrace', () => {
     const stepsWithoutNote = [
       { label: 'Raw', detail: '500g', value: '500.0g', sourceNote: undefined },
     ];
-    render(<CalcTrace steps={stepsWithoutNote} />);
+    const { container } = render(<CalcTrace steps={stepsWithoutNote} />);
     expect(screen.getByText('500.0g')).toBeInTheDocument();
-    expect(screen.queryByText(/sourceNote/i)).not.toBeInTheDocument();
+    // Checks the DOM directly rather than for the literal text "sourceNote" (which the
+    // component never renders — it renders the VALUE of s.sourceNote, so the old assertion
+    // passed unconditionally, even against an unconditionally-rendered empty source span).
+    expect(container.querySelector('.calc-trace__source')).toBeNull();
   });
 });
