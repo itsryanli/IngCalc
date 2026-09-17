@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CalcScreen } from './CalcScreen';
 import { db } from '../../storage/db';
+import * as userIngredientsModule from '../../storage/userIngredients';
 import type { Profile } from '../../core/types';
 
 const profile: Profile = {
@@ -86,5 +87,50 @@ describe('CalcScreen', () => {
     // And it's usable immediately: entering a weight produces a result.
     fireEvent.change(screen.getByLabelText(/^weight/i), { target: { value: '100' } });
     await waitFor(() => expect(screen.getByTestId('result-weight')).toBeInTheDocument());
+  });
+
+  it('lets the user back out of adding an ingredient without writing anything', async () => {
+    render(<CalcScreen profile={null} today={today} />);
+    await waitFor(() => expect(screen.getByLabelText(/ingredient/i)).toBeInTheDocument());
+
+    // A slip of the finger on a dropdown must be recoverable without polluting the catalogue.
+    fireEvent.change(screen.getByLabelText(/ingredient/i), { target: { value: '__add_new__' } });
+    await screen.findByLabelText(/^name/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    // Back on the calculator, not left showing the sentinel as though it were a real selection.
+    const select = await screen.findByLabelText(/ingredient/i) as HTMLSelectElement;
+    expect(select.value).toBe('');
+
+    // The one assertion that actually matters: cancelling wrote nothing to storage.
+    expect(await db.userIngredients.toArray()).toHaveLength(0);
+  });
+
+  it('tells the user plainly when a saved ingredient could not be loaded back into the picker', async () => {
+    // useCatalogue.refresh() deliberately swallows storage errors so the calculator keeps
+    // working offline — but that means CalcScreen can't assume refresh() actually picked up
+    // the ingredient it just asked AddIngredientScreen to save. Force that failure here.
+    const spy = vi
+      .spyOn(userIngredientsModule, 'listUserIngredients')
+      .mockRejectedValue(new Error('storage unavailable'));
+
+    try {
+      render(<CalcScreen profile={null} today={today} />);
+      await waitFor(() => expect(screen.getByLabelText(/ingredient/i)).toBeInTheDocument());
+
+      fireEvent.change(screen.getByLabelText(/ingredient/i), { target: { value: '__add_new__' } });
+      const nameInput = await screen.findByLabelText(/^name/i);
+      fireEvent.change(nameInput, { target: { value: 'Petai' } });
+      fireEvent.click(screen.getByRole('button', { name: /save ingredient/i }));
+
+      // The user sees something, not nothing: a plain statement of what happened.
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not be loaded/i));
+
+      // And the calculator itself is still there and usable, not a blank/broken screen.
+      expect(screen.getByLabelText(/ingredient/i)).toBeInTheDocument();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

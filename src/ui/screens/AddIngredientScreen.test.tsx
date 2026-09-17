@@ -66,6 +66,21 @@ describe('AddIngredientScreen', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/name/i);
   });
 
+  it('has no Cancel button when no onCancel is given', () => {
+    render(<AddIngredientScreen initialName="Petai" onSaved={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument();
+  });
+
+  it('calls onCancel and does not save when Cancel is clicked', async () => {
+    const onCancel = vi.fn();
+    const onSaved = vi.fn();
+    render(<AddIngredientScreen initialName="Petai" onSaved={onSaved} onCancel={onCancel} />);
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(await db.userIngredients.toArray()).toHaveLength(0);
+  });
+
   it('treats whitespace-only nutrient field as unfilled default', async () => {
     const onSaved = vi.fn();
     render(<AddIngredientScreen initialName="Petai" onSaved={onSaved} />);

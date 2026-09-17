@@ -19,8 +19,8 @@ const emptyEntries = (): Entries => {
 };
 
 export function AddIngredientScreen({
-  initialName, onSaved,
-}: { initialName: string; onSaved: (i: Ingredient) => void }) {
+  initialName, onSaved, onCancel,
+}: { initialName: string; onSaved: (i: Ingredient) => void; onCancel?: () => void }) {
   const [name, setName] = useState(initialName);
   const [category, setCategory] = useState<Category>('other');
   const [absorbsWater, setAbsorbsWater] = useState(false);
@@ -91,6 +91,9 @@ export function AddIngredientScreen({
 
       {error !== null && <p role="alert">{error}</p>}
       <button type="button" onClick={() => void submit()}>Save ingredient</button>
+      {onCancel !== undefined && (
+        <button type="button" onClick={onCancel}>Cancel</button>
+      )}
     </section>
   );
 }

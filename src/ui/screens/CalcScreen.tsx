@@ -8,6 +8,7 @@ import { CATEGORY_YIELD } from '../../data/categoryYield';
 import { RETENTION } from '../../data/retentionTable';
 import { rniFor } from '../../data/rniMY';
 import { DV_US } from '../../data/dvUS';
+import { listUserIngredients } from '../../storage/userIngredients';
 import { useCatalogue } from '../useCatalogue';
 import { WeightInput, type WeightUnit } from '../components/WeightInput';
 import { CalcTrace } from '../components/CalcTrace';
@@ -28,24 +29,54 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
   const [entered, setEntered] = useState<'raw' | 'cooked'>('raw');
   const [method, setMethod] = useState<CookMethod>('roasted');
   const [addingIngredient, setAddingIngredient] = useState(false);
+  const [addIngredientError, setAddIngredientError] = useState<string | null>(null);
 
   const ingredient = catalogue.find((i) => i.id === ingredientId) ?? null;
 
   const handleIngredientChange = (value: string) => {
     if (value === ADD_NEW) {
+      setAddIngredientError(null);
       setAddingIngredient(true);
       return;
     }
     setIngredientId(value);
   };
 
+  // The select stays on the sentinel value only while addingIngredient is true — while it's
+  // true the whole select is unmounted (see below), and ingredientId itself was never changed
+  // to the sentinel, so returning here (via save or cancel) always lands back on whatever was
+  // genuinely selected before, never on "Ingredient not listed? Add it" itself.
+  const handleAddCancelled = () => {
+    setAddingIngredient(false);
+  };
+
   const handleIngredientAdded = async (added: Ingredient) => {
     // The ingredient is already persisted (AddIngredientScreen saved it before calling us);
-    // refresh() re-merges the catalogue from storage so it shows up, then we select it so
-    // the user lands back on the calculator with their ingredient chosen — never dead-ended.
+    // refresh() re-merges the catalogue from storage so it shows up.
     await refresh();
-    setIngredientId(added.id);
+
+    // refresh() deliberately swallows storage errors (the calculator must keep working
+    // offline/in private browsing), so it can't tell us whether THIS refresh actually picked
+    // up what we just saved. Confirm directly from storage rather than assuming success —
+    // otherwise a failed refresh silently strands the user on a blank calculator.
+    let confirmed: Ingredient[] = [];
+    try {
+      confirmed = await listUserIngredients();
+    } catch {
+      confirmed = [];
+    }
+
     setAddingIngredient(false);
+
+    if (confirmed.some((i) => i.id === added.id)) {
+      setAddIngredientError(null);
+      setIngredientId(added.id);
+    } else {
+      setAddIngredientError(
+        `"${added.name}" was saved, but could not be loaded back into the list just now. ` +
+        'Try again, or pick it from the ingredient list once storage is available.',
+      );
+    }
   };
 
   const result = useMemo(() => {
@@ -74,7 +105,11 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
       <h2>Calculator</h2>
 
       {addingIngredient ? (
-        <AddIngredientScreen initialName="" onSaved={(added) => { void handleIngredientAdded(added); }} />
+        <AddIngredientScreen
+          initialName=""
+          onSaved={(added) => { void handleIngredientAdded(added); }}
+          onCancel={handleAddCancelled}
+        />
       ) : (
         <>
           <label htmlFor="ingredient">Ingredient</label>
@@ -87,6 +122,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
             {catalogue.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
             <option value={ADD_NEW}>Ingredient not listed? Add it</option>
           </select>
+          {addIngredientError !== null && <p role="alert">{addIngredientError}</p>}
 
           <WeightInput label="Weight" value={weight} unit={unit} onChange={setWeight} onUnitChange={setUnit} />
 
