@@ -61,7 +61,10 @@ describe('App without storage', () => {
     });
     const { App: AppNoStorage } = await import('./App');
     render(<AppNoStorage />);
-    expect(await screen.findByRole('alert')).toHaveTextContent(/private browsing|storage/i);
-    vi.doUnmock('../storage/db');
+    try {
+      expect(await screen.findByRole('alert')).toHaveTextContent(/private browsing|storage/i);
+    } finally {
+      vi.doUnmock('../storage/db');
+    }
   });
 });
