@@ -1,8 +1,10 @@
 // Nutrient retention factors: the fraction of a nutrient's MASS that survives
 // cooking. This is leaching, and is separate from water loss (the yield factor).
-// Source: USDA Table of Nutrient Retention Factors, Release 6.
-// Entries are omitted rather than guessed; a missing entry is reported to the
-// user as "assumed 100% retention".
+// These values are the brief's starting estimates and have not yet been
+// independently cross-checked against their intended source. Task 9's golden-value
+// regression suite will verify them. Entries are omitted rather than guessed; a
+// missing entry is reported to the user as "assumed 100% retention".
+// Source (intended): USDA Table of Nutrient Retention Factors, Release 6.
 import type { Category, CookMethod, NutrientKey } from '../core/types';
 
 export type RetentionTable = Partial<
