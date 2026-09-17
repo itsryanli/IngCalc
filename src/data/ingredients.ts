@@ -38,7 +38,10 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Chicken breast, skinless',
     category: 'meat',
     per100gRaw: n({ kcal: 120, protein: 22.5, fat: 2.6, potassium: 334, iron: 0.37, magnesium: 27, zinc: 0.68, calcium: 5, sodium: 45 }),
-    publishedYield: { roasted: 0.75, grilled: 0.71, panFried: 0.72, boiled: 0.70, steamed: 0.76 },
+    // roasted/grilled corrected by Task 9's golden-value suite: derived from
+    // FDC 171077 (raw) vs FDC 171477/171534 (cooked, roasted/grilled) — the
+    // brief's own starting figures were close but ~5% off.
+    publishedYield: { roasted: 0.71, grilled: 0.72, panFried: 0.72, boiled: 0.70, steamed: 0.76 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 171077',
@@ -49,7 +52,9 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Chicken thigh, boneless, skinless',
     category: 'meat',
     per100gRaw: n({ kcal: 149.3, protein: 18.6, fat: 7.9, potassium: 271.8, iron: 0.6, magnesium: 21.8, zinc: 1.35, calcium: 5.65, sodium: 62.3 }),
-    publishedYield: { roasted: 0.78, grilled: 0.74, panFried: 0.75, boiled: 0.72, steamed: 0.79 },
+    // roasted corrected by Task 9's golden-value suite: derived from FDC
+    // 2646171 (raw) vs FDC 172388 (cooked, roasted).
+    publishedYield: { roasted: 0.74, grilled: 0.74, panFried: 0.75, boiled: 0.72, steamed: 0.79 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 2646171',
@@ -71,7 +76,10 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Beef, top sirloin steak',
     category: 'meat',
     per100gRaw: n({ kcal: 146.2, protein: 21.98, carbs: 0.22, fat: 5.71, potassium: 349.4, iron: 2.22, magnesium: 22.08, zinc: 3.45, calcium: 3.7, sodium: 42.85 }),
-    publishedYield: { roasted: 0.72, grilled: 0.68, panFried: 0.70, boiled: 0.68, stirFried: 0.72 },
+    // grilled corrected by Task 9's golden-value suite: derived from FDC
+    // 2727574 (raw) vs FDC 168633 (cooked, broiled — treated as this app's
+    // grilled).
+    publishedYield: { roasted: 0.72, grilled: 0.73, panFried: 0.70, boiled: 0.68, stirFried: 0.72 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 2727574',
@@ -93,7 +101,9 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Pork loin, boneless',
     category: 'meat',
     per100gRaw: n({ kcal: 173.7, protein: 21.12, fat: 9.47, potassium: 361.2, iron: 0.45, magnesium: 21.96, zinc: 1.57, calcium: 4.11, sodium: 40.2 }),
-    publishedYield: { roasted: 0.74, grilled: 0.70, panFried: 0.72, boiled: 0.71 },
+    // roasted corrected by Task 9's golden-value suite: derived from FDC
+    // 2646168 (raw) vs FDC 167821 (cooked, roasted).
+    publishedYield: { roasted: 0.76, grilled: 0.70, panFried: 0.72, boiled: 0.71 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 2646168',
@@ -115,7 +125,9 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Lamb, leg, whole, separable lean and fat',
     category: 'meat',
     per100gRaw: n({ kcal: 209, protein: 18.47, fat: 14.42, potassium: 258, iron: 1.7, magnesium: 24, zinc: 3.43, calcium: 8, sodium: 57 }),
-    publishedYield: { roasted: 0.72, grilled: 0.68, boiled: 0.70 },
+    // roasted corrected by Task 9's golden-value suite: derived from FDC
+    // 174372 (raw) vs FDC 174373 (cooked, roasted) — an exact lineage pair.
+    publishedYield: { roasted: 0.69, grilled: 0.68, boiled: 0.70 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 174372',
@@ -128,7 +140,14 @@ export const INGREDIENTS: readonly Ingredient[] = [
     // uses the whole-duck "meat and skin" composition as the closest match.
     category: 'meat',
     per100gRaw: n({ kcal: 404, protein: 11.49, fat: 39.34, potassium: 209, iron: 2.4, magnesium: 15, zinc: 1.36, calcium: 11, sodium: 63 }),
-    publishedYield: { panFried: 0.68, roasted: 0.65, grilled: 0.66 },
+    // roasted corrected by Task 9's golden-value suite: derived from FDC
+    // 172408 (raw, whole domesticated duck meat+skin) vs FDC 172409 (cooked,
+    // roasted) — the same-lineage pair, not the breast-specific cooked entry
+    // (which is a different bird/cut and was the wrong comparison). Fat and
+    // kcal still diverge sharply after this fix — a very fatty whole bird
+    // renders far more of its fat on roasting than the model's shared meat
+    // fat-retention factor assumes; see KNOWN_DIVERGENCES in golden.test.ts.
+    publishedYield: { panFried: 0.68, roasted: 0.60, grilled: 0.66 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 172408',
@@ -181,7 +200,10 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Prawn (shrimp), farm raised',
     category: 'seafood',
     per100gRaw: n({ kcal: 75.7, protein: 15.57, carbs: 0.48, fat: 0.8, potassium: 145.9, iron: 0.52, magnesium: 22.53, zinc: 0.94, calcium: 64.63, sodium: 474.9 }),
-    publishedYield: { boiled: 0.80, steamed: 0.83, stirFried: 0.82, deepFried: 0.78 },
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 2684443 (raw) vs FDC 171971 (cooked, moist heat, used as the boiled
+    // proxy).
+    publishedYield: { boiled: 0.70, steamed: 0.83, stirFried: 0.82, deepFried: 0.78 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 2684443',
@@ -192,7 +214,12 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Squid, mixed species',
     category: 'seafood',
     per100gRaw: n({ kcal: 92, protein: 15.58, carbs: 3.08, fat: 1.38, potassium: 246, iron: 0.68, magnesium: 33, zinc: 1.53, calcium: 32, sodium: 44 }),
-    publishedYield: { boiled: 0.75, stirFried: 0.78, deepFried: 0.76, grilled: 0.74 },
+    // deepFried mass-yield corrected by Task 9's golden-value suite: derived
+    // from FDC 174223 (raw) vs FDC 171982 (cooked, fried). kcal/fat/carbs
+    // still diverge after this fix — deep-frying adds oil mass via
+    // absorption, which this app's retention model (a pure multiplier on the
+    // RAW nutrient, never additive) cannot represent; see KNOWN_DIVERGENCES.
+    publishedYield: { boiled: 0.75, stirFried: 0.78, deepFried: 0.85, grilled: 0.74 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 174223',
@@ -203,7 +230,10 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Salmon, Atlantic, farm raised',
     category: 'seafood',
     per100gRaw: n({ kcal: 203.1, protein: 20.32, fat: 13.11, potassium: 378.2, iron: 0.26, magnesium: 25.39, zinc: 0.34, calcium: 9.42, sodium: 49.49 }),
-    publishedYield: { steamed: 0.83, panFried: 0.78, grilled: 0.76, roasted: 0.79 },
+    // roasted corrected by Task 9's golden-value suite: derived from FDC
+    // 2684441 (raw) vs FDC 175168 (cooked, dry heat, used as the roasted
+    // proxy).
+    publishedYield: { steamed: 0.83, panFried: 0.78, grilled: 0.76, roasted: 0.90 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 2684441',
@@ -286,8 +316,12 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'firm-tofu',
     name: 'Firm tofu, prepared with calcium sulfate',
     category: 'legume',
+    // deepFried mass-yield corrected by Task 9's golden-value suite: derived
+    // from FDC 172475 (raw) vs FDC 174304 (cooked, fried) — an exact lineage
+    // pair. kcal/fat/carbs still diverge after this fix, for the same
+    // oil-absorption reason as squid above; see KNOWN_DIVERGENCES.
     per100gRaw: n({ kcal: 144, protein: 17.27, carbs: 2.78, fibre: 2.3, fat: 8.72, potassium: 237, iron: 2.66, magnesium: 58, zinc: 1.57, calcium: 683, sodium: 14 }),
-    publishedYield: { panFried: 0.85, deepFried: 0.75, stirFried: 0.90, boiled: 0.95 },
+    publishedYield: { panFried: 0.85, deepFried: 0.92, stirFried: 0.90, boiled: 0.95 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 172475',
@@ -309,8 +343,10 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'dried-chickpeas',
     name: 'Chickpeas, mature seeds, dried',
     category: 'legume',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 173756 (raw) vs FDC 173757 (cooked, boiled) — an exact lineage pair.
     per100gRaw: n({ kcal: 378, protein: 20.47, carbs: 62.95, fibre: 12.2, fat: 6.04, potassium: 718, iron: 4.31, magnesium: 79, zinc: 2.76, calcium: 57, sodium: 24 }),
-    publishedYield: { boiled: 2.5, steamed: 2.3 },
+    publishedYield: { boiled: 2.31, steamed: 2.3 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 173756',
@@ -320,8 +356,12 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'red-lentils',
     name: 'Lentils, pink or red, dried',
     category: 'legume',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 174284 (raw, pink/red) vs FDC 172421 (cooked, boiled — generic
+    // "Lentils, mature seeds" proxy; no pink/red-specific cooked entry
+    // exists in FoodData Central).
     per100gRaw: n({ kcal: 358, protein: 23.91, carbs: 63.1, fibre: 10.8, fat: 2.17, potassium: 668, iron: 7.39, magnesium: 59, zinc: 3.6, calcium: 48, sodium: 7 }),
-    publishedYield: { boiled: 2.5, steamed: 2.3 },
+    publishedYield: { boiled: 2.65, steamed: 2.3 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 174284',
@@ -331,8 +371,12 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'peanuts',
     name: 'Peanuts, raw',
     category: 'legume',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 2515376 (raw) vs FDC 174260 (cooked, boiled) — the brief's starting
+    // 1.15 badly underestimated how much water raw peanuts absorb when
+    // boiled in the shell/skin.
     per100gRaw: n({ kcal: 550.6, protein: 23.21, carbs: 26.5, fibre: 8.01, fat: 43.28, potassium: 635.6, iron: 1.55, magnesium: 179.7, zinc: 2.78, calcium: 49.13, sodium: 1.49 }),
-    publishedYield: { boiled: 1.15, roasted: 0.95 },
+    publishedYield: { boiled: 1.72, roasted: 0.95 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 2515376',
@@ -342,8 +386,16 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'soybean',
     name: 'Soybeans, mature seeds, dried',
     category: 'legume',
+    // boiled yield nudged (2.5 -> 2.6, kcal-anchored) by Task 9's golden-value
+    // suite from FDC 174270 (raw) vs FDC 174299 (cooked, boiled). Unlike
+    // every other legume/grain checked, soybean's protein-anchored (2.0),
+    // carbs-anchored (3.6) and fibre-anchored (1.55) implied yields disagree
+    // sharply with each other and with kcal (2.6) — a sign that soy protein
+    // and soluble carbohydrate leach into the cooking water at different
+    // rates, which no single mass-yield number can reconcile. Protein and
+    // carbs remain excluded via KNOWN_DIVERGENCES in golden.test.ts.
     per100gRaw: n({ kcal: 446, protein: 36.49, carbs: 30.16, fibre: 9.3, fat: 19.94, potassium: 1797, iron: 15.7, magnesium: 280, zinc: 4.89, calcium: 277, sodium: 2 }),
-    publishedYield: { boiled: 2.5, steamed: 2.3 },
+    publishedYield: { boiled: 2.6, steamed: 2.3 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 174270',
@@ -355,8 +407,10 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'white-rice',
     name: 'White rice, long grain',
     category: 'grain',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 169756 (raw) vs FDC 169757 (cooked, boiled).
     per100gRaw: n({ kcal: 365, protein: 7.1, carbs: 80, fibre: 1.3, fat: 0.7, potassium: 115, iron: 0.8, magnesium: 25, zinc: 1.1, calcium: 28, sodium: 5 }),
-    publishedYield: { boiled: 2.6, steamed: 2.4 },
+    publishedYield: { boiled: 2.65, steamed: 2.4 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 169756',
@@ -366,8 +420,10 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'brown-rice',
     name: 'Brown rice, long grain',
     category: 'grain',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 169703 (raw) vs FDC 169704 (cooked, boiled) — an exact lineage pair.
     per100gRaw: n({ kcal: 367, protein: 7.54, carbs: 76.25, fibre: 3.6, fat: 3.2, potassium: 250, iron: 1.29, magnesium: 116, zinc: 2.13, calcium: 9, sodium: 5 }),
-    publishedYield: { boiled: 2.5, steamed: 2.3 },
+    publishedYield: { boiled: 2.75, steamed: 2.3 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 169703',
@@ -377,8 +433,19 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'rolled-oats',
     name: 'Rolled oats, dry',
     category: 'grain',
+    // boiled: Task 9's golden-value suite derived FDC 169705 (raw oats) vs
+    // FDC 173905 (cooked oatmeal, "regular and quick", cooked with water) as
+    // implying a ~6.65x yield — a real, well-known property of cooked
+    // oatmeal (USDA's own reference preparation is very water-heavy, ~70
+    // kcal/100g cooked, matching common "1 cup cooked oatmeal ≈ 166 kcal /
+    // 234 g" package figures) — much more dilute than a typical home 1:2
+    // oats:water ratio. That figure is capped here at 3.4 to respect this
+    // repo's own ingredients.test.ts plausibility ceiling (<=3.5x); the
+    // residual gap is intentionally NOT hidden — see the rolled-oats entries
+    // in golden.test.ts's KNOWN_DIVERGENCES, and the controller may want to
+    // revisit the 3.5x ceiling itself given this real counter-example.
     per100gRaw: n({ kcal: 389, protein: 16.89, carbs: 66.27, fibre: 10.6, fat: 6.9, potassium: 429, iron: 4.72, magnesium: 177, zinc: 3.97, calcium: 54, sodium: 2 }),
-    publishedYield: { boiled: 2.6, steamed: 2.2 },
+    publishedYield: { boiled: 3.4, steamed: 2.2 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 169705',
@@ -399,8 +466,10 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'bihun',
     name: 'Bihun (rice vermicelli), dry',
     category: 'grain',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 169742 (raw) vs FDC 168914 (cooked, boiled) — an exact lineage pair.
     per100gRaw: n({ kcal: 364, protein: 5.95, carbs: 80.18, fibre: 1.6, fat: 0.56, potassium: 30, iron: 0.7, magnesium: 12, zinc: 0.74, calcium: 18, sodium: 182 }),
-    publishedYield: { boiled: 2.8, steamed: 2.5 },
+    publishedYield: { boiled: 3.32, steamed: 2.5 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 169742',
@@ -410,8 +479,10 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'yellow-noodles',
     name: 'Yellow noodles (egg noodles), dry',
     category: 'grain',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 169731 (raw) vs FDC 169732 (cooked, boiled) — an exact lineage pair.
     per100gRaw: n({ kcal: 384, protein: 14.16, carbs: 71.27, fibre: 3.3, fat: 4.44, potassium: 244, iron: 4.01, magnesium: 58, zinc: 1.92, calcium: 35, sodium: 21 }),
-    publishedYield: { boiled: 2.2, steamed: 2.0 },
+    publishedYield: { boiled: 3.12, steamed: 2.0 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 169731',
@@ -436,6 +507,15 @@ export const INGREDIENTS: readonly Ingredient[] = [
     category: 'vegetable',
     per100gRaw: n({ kcal: 19, protein: 2.6, carbs: 3.1, fibre: 2.1, fat: 0.2, potassium: 312, iron: 1.67, magnesium: 71, zinc: 0.18, calcium: 77, sodium: 113 }),
     publishedYield: { boiled: 0.88, steamed: 0.92, stirFried: 0.78 },
+    // NOTE: kangkung's own raw/cooked pair is not in FoodData Central, but
+    // Task 9's golden-value suite found the SAME systematic pattern across
+    // every other boiled leafy/root vegetable it could check directly (see
+    // bayam, sawi, brinjal, etc. below): boiled vegetables in FDC gain mass
+    // (water uptake) rather than lose it, so a below-1.0 "boiled" yield here
+    // is very likely still wrong by the same margin. Left unchanged because
+    // no direct USDA kangkung raw+cooked pair exists to derive a real number
+    // from — flagged for a follow-up sourcing pass, not silently "fixed" by
+    // analogy.
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 168390',
@@ -445,8 +525,11 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'sawi',
     name: 'Sawi (mustard greens)',
     category: 'vegetable',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 169256 (raw) vs FDC 169257 (cooked, boiled) — an exact lineage pair.
+    // Boiled mustard greens gain mass, same direction as bayam above.
     per100gRaw: n({ kcal: 27, protein: 2.86, carbs: 4.67, fibre: 3.2, fat: 0.42, potassium: 384, iron: 1.64, magnesium: 32, zinc: 0.25, calcium: 115, sodium: 20 }),
-    publishedYield: { boiled: 0.87, steamed: 0.91, stirFried: 0.79 },
+    publishedYield: { boiled: 1.04, steamed: 0.91, stirFried: 0.79 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 169256',
@@ -457,8 +540,13 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Bayam (amaranth leaves)',
     // fibre was not measured in this source entry; recorded as 0 per brief.
     category: 'vegetable',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 168385 (raw) vs FDC 169202 (cooked, boiled) — an exact lineage pair.
+    // Boiled amaranth leaves GAIN mass (water uptake during boiling) rather
+    // than lose it; the brief's starting estimate had the direction wrong,
+    // not just the magnitude.
     per100gRaw: n({ kcal: 23, protein: 2.46, carbs: 4.02, fat: 0.33, potassium: 611, iron: 2.32, magnesium: 55, zinc: 0.9, calcium: 215, sodium: 20 }),
-    publishedYield: { boiled: 0.85, steamed: 0.90, stirFried: 0.77 },
+    publishedYield: { boiled: 1.04, steamed: 0.90, stirFried: 0.77 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 168385',
@@ -468,8 +556,10 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'cabbage',
     name: 'Cabbage, raw',
     category: 'vegetable',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 169975 (raw) vs FDC 168514 (cooked, boiled).
     per100gRaw: n({ kcal: 25, protein: 1.28, carbs: 5.8, fibre: 2.5, fat: 0.1, potassium: 170, iron: 0.47, magnesium: 12, zinc: 0.18, calcium: 40, sodium: 18 }),
-    publishedYield: { boiled: 0.92, steamed: 0.94, stirFried: 0.85 },
+    publishedYield: { boiled: 1.07, steamed: 0.94, stirFried: 0.85 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 169975',
@@ -480,8 +570,10 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Long beans (yardlong bean), raw',
     // fibre was not measured in this source entry; recorded as 0 per brief.
     category: 'vegetable',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 169222 (raw) vs FDC 169223 (cooked, boiled) — an exact lineage pair.
     per100gRaw: n({ kcal: 47, protein: 2.8, carbs: 8.35, fat: 0.4, potassium: 240, iron: 0.47, magnesium: 44, zinc: 0.37, calcium: 50, sodium: 4 }),
-    publishedYield: { boiled: 0.90, steamed: 0.93, stirFried: 0.85 },
+    publishedYield: { boiled: 0.96, steamed: 0.93, stirFried: 0.85 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 169222',
@@ -491,8 +583,14 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'bendi',
     name: 'Bendi (okra), raw',
     category: 'vegetable',
+    // boiled: derived from FDC 169260 (raw) vs FDC 169261 (cooked, boiled)
+    // — an exact lineage pair — implies ~1.58x (okra's mucilage absorbs a
+    // lot of boiling water). Capped at 1.1 here to respect this repo's own
+    // ingredients.test.ts ceiling for non-water-absorbing foods (okra is not
+    // one of the rice/pasta/legume foods that flag covers); the residual
+    // gap is documented, not hidden, in golden.test.ts's KNOWN_DIVERGENCES.
     per100gRaw: n({ kcal: 33, protein: 1.93, carbs: 7.45, fibre: 3.2, fat: 0.19, potassium: 299, iron: 0.62, magnesium: 57, zinc: 0.58, calcium: 82, sodium: 7 }),
-    publishedYield: { boiled: 0.91, steamed: 0.93, stirFried: 0.83 },
+    publishedYield: { boiled: 1.1, steamed: 0.93, stirFried: 0.83 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 169260',
@@ -502,8 +600,10 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'brinjal',
     name: 'Brinjal (eggplant), raw',
     category: 'vegetable',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 169228 (raw) vs FDC 169229 (cooked, boiled) — an exact lineage pair.
     per100gRaw: n({ kcal: 25, protein: 0.98, carbs: 5.88, fibre: 3.0, fat: 0.18, potassium: 229, iron: 0.23, magnesium: 14, zinc: 0.16, calcium: 9, sodium: 2 }),
-    publishedYield: { boiled: 0.88, steamed: 0.90, stirFried: 0.75, deepFried: 0.72, roasted: 0.72 },
+    publishedYield: { boiled: 0.69, steamed: 0.90, stirFried: 0.75, deepFried: 0.72, roasted: 0.72 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 169228',
@@ -513,8 +613,14 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'carrot',
     name: 'Carrot, raw',
     category: 'vegetable',
+    // boiled: derived from FDC 170393 (raw) vs FDC 170394 (cooked, boiled)
+    // — an exact lineage pair — implies ~1.17x. Capped at 1.1 to respect
+    // this repo's own ingredients.test.ts non-water-absorbing ceiling; the
+    // small residual gap this leaves is within this suite's macro tolerance
+    // once combined with the retention factor, so no divergence is needed
+    // for carrot.
     per100gRaw: n({ kcal: 41, protein: 0.93, carbs: 9.58, fibre: 2.8, fat: 0.24, potassium: 320, iron: 0.3, magnesium: 12, zinc: 0.24, calcium: 33, sodium: 69 }),
-    publishedYield: { boiled: 0.90, steamed: 0.93, stirFried: 0.85, roasted: 0.82 },
+    publishedYield: { boiled: 1.1, steamed: 0.93, stirFried: 0.85, roasted: 0.82 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 170393',
@@ -579,8 +685,13 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'pumpkin',
     name: 'Pumpkin, raw',
     category: 'vegetable',
+    // boiled: derived from FDC 168448 (raw) vs FDC 168449 (cooked, boiled)
+    // — an exact lineage pair — implies ~1.31x. Capped at 1.1 to respect
+    // this repo's own ingredients.test.ts non-water-absorbing ceiling; the
+    // residual gap is documented, not hidden, in golden.test.ts's
+    // KNOWN_DIVERGENCES.
     per100gRaw: n({ kcal: 26, protein: 1.0, carbs: 6.5, fibre: 0.5, fat: 0.1, potassium: 340, iron: 0.8, magnesium: 12, zinc: 0.32, calcium: 21, sodium: 1 }),
-    publishedYield: { boiled: 0.88, steamed: 0.91, roasted: 0.80 },
+    publishedYield: { boiled: 1.1, steamed: 0.91, roasted: 0.80 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 168448',
@@ -590,8 +701,13 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'sweet-potato',
     name: 'Sweet potato, raw',
     category: 'vegetable',
+    // boiled: derived from FDC 168482 (raw) vs FDC 168484 (cooked, boiled,
+    // without skin) implies ~1.13x. Capped at 1.1 to respect this repo's
+    // own ingredients.test.ts non-water-absorbing ceiling; the tiny residual
+    // gap this leaves is within this suite's macro tolerance, so no
+    // divergence is needed for sweet-potato.
     per100gRaw: n({ kcal: 86, protein: 1.57, carbs: 20.12, fibre: 3.0, fat: 0.05, potassium: 337, iron: 0.61, magnesium: 25, zinc: 0.3, calcium: 30, sodium: 55 }),
-    publishedYield: { boiled: 0.90, steamed: 0.92, roasted: 0.78 },
+    publishedYield: { boiled: 1.1, steamed: 0.92, roasted: 0.78 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 168482',
@@ -601,8 +717,11 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'potato',
     name: 'Potato, flesh and skin, raw',
     category: 'vegetable',
+    // roasted corrected by Task 9's golden-value suite: derived from FDC
+    // 170026 (raw) vs FDC 170093 (cooked, baked in skin — used as the
+    // roasted proxy).
     per100gRaw: n({ kcal: 77, protein: 2.05, carbs: 17.49, fibre: 2.1, fat: 0.09, potassium: 425, iron: 0.81, magnesium: 23, zinc: 0.3, calcium: 12, sodium: 6 }),
-    publishedYield: { boiled: 0.90, steamed: 0.92, roasted: 0.75, deepFried: 0.68 },
+    publishedYield: { boiled: 0.90, steamed: 0.92, roasted: 0.82, deepFried: 0.68 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 170026',
@@ -612,8 +731,14 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'onion',
     name: 'Onion, raw',
     category: 'vegetable',
+    // boiled corrected by Task 9's golden-value suite: derived from FDC
+    // 170000 (raw) vs FDC 170001 (cooked, boiled) — an exact lineage pair.
+    // Onion and brinjal (eggplant) both lose a modest amount of mass when
+    // boiled; most of the leafy/root vegetables in this suite instead gain
+    // mass. Real boiled-vegetable yield varies by food, not in one uniform
+    // direction — see the file-level note near bayam below.
     per100gRaw: n({ kcal: 40, protein: 1.1, carbs: 9.34, fibre: 1.7, fat: 0.1, potassium: 146, iron: 0.21, magnesium: 10, zinc: 0.17, calcium: 23, sodium: 4 }),
-    publishedYield: { boiled: 0.88, stirFried: 0.75, deepFried: 0.55, roasted: 0.80 },
+    publishedYield: { boiled: 0.92, stirFried: 0.75, deepFried: 0.55, roasted: 0.80 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 170000',
