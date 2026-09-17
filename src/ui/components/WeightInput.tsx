@@ -1,5 +1,5 @@
 import { useId, useState, useEffect } from 'react';
-import { g, gToKg, kgToG, type Grams } from '../../core/units';
+import { g, gToKg, type Grams } from '../../core/units';
 
 export type WeightUnit = 'g' | 'kg';
 
@@ -26,18 +26,24 @@ export function WeightInput({ value, unit, label, onChange, onUnitChange }: Prop
 
   const handle = (raw: string) => {
     setRawText(raw);
-    const parsed = Number(raw);
 
-    if (raw.trim() === '' || !Number.isFinite(parsed)) {
-      setError('Enter a number');
+    if (raw.trim() === '') {
+      setError('Enter a valid weight');
       return;
     }
-    if (parsed < 0) {
-      setError('Weight cannot be negative');
+
+    const parsed = Number(raw);
+    // Compute the actual gram value that will be passed to g()
+    const grams = unit === 'kg' ? parsed * 1000 : parsed;
+
+    // Validate the value we're about to construct, not just the parsed input
+    if (!Number.isFinite(grams) || grams < 0) {
+      setError('Enter a valid weight');
       return;
     }
+
     setError(null);
-    onChange(unit === 'kg' ? kgToG(parsed) : g(parsed));
+    onChange(g(grams));
   };
 
   return (

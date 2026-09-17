@@ -26,7 +26,7 @@ describe('WeightInput', () => {
     render(<WeightInput value={g(100)} unit="g" onChange={onChange} onUnitChange={vi.fn()} label="Weight" />);
     fireEvent.change(screen.getByLabelText('Weight'), { target: { value: '-5' } });
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent(/cannot be negative/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/enter a valid weight/i);
   });
 
   it('switches units without changing the underlying weight', () => {
@@ -51,7 +51,7 @@ describe('WeightInput', () => {
     render(<WeightInput value={g(100)} unit="g" onChange={onChange} onUnitChange={vi.fn()} label="Weight" />);
     fireEvent.change(screen.getByLabelText('Weight'), { target: { value: '1e400' } });
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent(/enter a number/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/enter a valid weight/i);
   });
 
   it('rejects empty input', () => {
@@ -59,7 +59,7 @@ describe('WeightInput', () => {
     render(<WeightInput value={g(100)} unit="g" onChange={onChange} onUnitChange={vi.fn()} label="Weight" />);
     fireEvent.change(screen.getByLabelText('Weight'), { target: { value: '' } });
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent(/enter a number/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/enter a valid weight/i);
   });
 
   it('rejects non-numeric input', () => {
@@ -67,7 +67,7 @@ describe('WeightInput', () => {
     render(<WeightInput value={g(100)} unit="g" onChange={onChange} onUnitChange={vi.fn()} label="Weight" />);
     fireEvent.change(screen.getByLabelText('Weight'), { target: { value: 'abc' } });
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent(/enter a number/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/enter a valid weight/i);
   });
 
   it('allows partial input and then completes to valid', () => {
@@ -90,5 +90,42 @@ describe('WeightInput', () => {
     fireEvent.change(input, { target: { value: '52' } });
     expect(input.value).toBe('52');
     expect(onChange).toHaveBeenLastCalledWith(52);
+  });
+
+  it('preserves partial input: lone minus sign', () => {
+    const onChange = vi.fn();
+    render(<WeightInput value={g(500)} unit="g" onChange={onChange} onUnitChange={vi.fn()} label="Weight" />);
+    const input = screen.getByLabelText('Weight') as HTMLInputElement;
+
+    // Type a minus sign (invalid by itself in number input, becomes empty)
+    fireEvent.change(input, { target: { value: '-' } });
+    // HTML number input normalizes invalid input, so this may be empty
+    // but the important thing is onChange is not called
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/enter a valid weight/i);
+  });
+
+  it('preserves partial input: lone decimal point', () => {
+    const onChange = vi.fn();
+    render(<WeightInput value={g(500)} unit="g" onChange={onChange} onUnitChange={vi.fn()} label="Weight" />);
+    const input = screen.getByLabelText('Weight') as HTMLInputElement;
+
+    // Type a decimal point alone (invalid, number input normalizes it)
+    fireEvent.change(input, { target: { value: '.' } });
+    // HTML number input normalizes this too
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/enter a valid weight/i);
+  });
+
+  it('CRITICAL: rejects multiplication overflow in kg mode without throwing', () => {
+    // This test documents a second critical route to RangeError:
+    // In kg mode, parsed * 1000 can overflow to Infinity even if parsed is finite.
+    // For example: parsed = 1e306 (finite), but parsed * 1000 = Infinity (non-finite)
+    // Verified: Number.isFinite(1e306) === true, but Number.isFinite(1e306 * 1000) === false
+    const onChange = vi.fn();
+    render(<WeightInput value={g(0)} unit="kg" onChange={onChange} onUnitChange={vi.fn()} label="Weight" />);
+    fireEvent.change(screen.getByLabelText('Weight'), { target: { value: '1e306' } });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/enter a valid weight/i);
   });
 });
