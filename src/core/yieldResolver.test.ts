@@ -45,6 +45,18 @@ describe('resolveYield', () => {
       .toEqual({ factor: 0.72, source: 'measured', sampleCount: 2 });
   });
 
+  it('averages per-sample ratios, not the ratio of summed weights', () => {
+    // Mean of ratios: (400/500 + 1050/1500) / 2 = (0.80 + 0.70) / 2 = 0.75
+    // Ratio of sums: (400+1050) / (500+1500) = 1450/2000 = 0.725
+    // This test distinguishes the two formulas and pins mean-of-ratios.
+    const samples = [
+      sample({ rawUsedG: g(500), cookedWeightG: g(400) }),
+      sample({ rawUsedG: g(1500), cookedWeightG: g(1050) }),
+    ];
+    expect(resolveYield(chicken, 'roasted', samples, CATEGORY_YIELD))
+      .toEqual({ factor: 0.75, source: 'measured', sampleCount: 2 });
+  });
+
   it('ignores samples for other ingredients or other methods', () => {
     const samples = [
       sample({ ingredientId: 'beef-sirloin' }),
