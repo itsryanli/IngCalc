@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useState, useEffect } from 'react';
 import { g, gToKg, kgToG, type Grams } from '../../core/units';
 
 export type WeightUnit = 'g' | 'kg';
@@ -13,12 +13,22 @@ interface Props {
 
 export function WeightInput({ value, unit, label, onChange, onUnitChange }: Props) {
   const id = useId();
+  const [rawText, setRawText] = useState<string>(() =>
+    unit === 'kg' ? gToKg(value).toString() : value.toString()
+  );
   const [error, setError] = useState<string | null>(null);
-  const displayed = unit === 'kg' ? gToKg(value) : value;
+
+  // Sync rawText when prop value or unit changes from outside
+  useEffect(() => {
+    setRawText(unit === 'kg' ? gToKg(value).toString() : value.toString());
+    setError(null);
+  }, [value, unit]);
 
   const handle = (raw: string) => {
+    setRawText(raw);
     const parsed = Number(raw);
-    if (raw.trim() === '' || Number.isNaN(parsed)) {
+
+    if (raw.trim() === '' || !Number.isFinite(parsed)) {
       setError('Enter a number');
       return;
     }
@@ -39,7 +49,7 @@ export function WeightInput({ value, unit, label, onChange, onUnitChange }: Prop
         inputMode="decimal"
         min={0}
         step={unit === 'kg' ? 0.01 : 1}
-        value={displayed}
+        value={rawText}
         onChange={(e) => handle(e.target.value)}
       />
       {(['g', 'kg'] as const).map((u) => (
