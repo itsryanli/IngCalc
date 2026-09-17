@@ -433,19 +433,16 @@ export const INGREDIENTS: readonly Ingredient[] = [
     id: 'rolled-oats',
     name: 'Rolled oats, dry',
     category: 'grain',
-    // boiled: Task 9's golden-value suite derived FDC 169705 (raw oats) vs
-    // FDC 173905 (cooked oatmeal, "regular and quick", cooked with water) as
-    // implying a ~6.65x yield — a real, well-known property of cooked
-    // oatmeal (USDA's own reference preparation is very water-heavy, ~70
-    // kcal/100g cooked, matching common "1 cup cooked oatmeal ≈ 166 kcal /
-    // 234 g" package figures) — much more dilute than a typical home 1:2
-    // oats:water ratio. That figure is capped here at 3.4 to respect this
-    // repo's own ingredients.test.ts plausibility ceiling (<=3.5x); the
-    // residual gap is intentionally NOT hidden — see the rolled-oats entries
-    // in golden.test.ts's KNOWN_DIVERGENCES, and the controller may want to
-    // revisit the 3.5x ceiling itself given this real counter-example.
+    // boiled: derived from FDC 169705 (raw oats) vs FDC 173905 (cooked
+    // oatmeal, "regular and quick", cooked with water): implies a ~6.65x
+    // yield — a real, well-known property of cooked oatmeal (USDA's own
+    // reference preparation is very water-heavy, ~70 kcal/100g cooked,
+    // matching common "1 cup cooked oatmeal ≈ 166 kcal / 234 g" package
+    // figures). This was previously capped at 3.4 to fit ingredients.test.ts's
+    // then-3.5 ceiling; the controller raised that ceiling to 8.0 on this
+    // exact evidence, so the real, uncapped value is restored here.
     per100gRaw: n({ kcal: 389, protein: 16.89, carbs: 66.27, fibre: 10.6, fat: 6.9, potassium: 429, iron: 4.72, magnesium: 177, zinc: 3.97, calcium: 54, sodium: 2 }),
-    publishedYield: { boiled: 3.4, steamed: 2.2 },
+    publishedYield: { boiled: 6.65, steamed: 2.2 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 169705',
@@ -506,16 +503,18 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Kangkung (water spinach)',
     category: 'vegetable',
     per100gRaw: n({ kcal: 19, protein: 2.6, carbs: 3.1, fibre: 2.1, fat: 0.2, potassium: 312, iron: 1.67, magnesium: 71, zinc: 0.18, calcium: 77, sodium: 113 }),
-    publishedYield: { boiled: 0.88, steamed: 0.92, stirFried: 0.78 },
-    // NOTE: kangkung's own raw/cooked pair is not in FoodData Central, but
-    // Task 9's golden-value suite found the SAME systematic pattern across
-    // every other boiled leafy/root vegetable it could check directly (see
-    // bayam, sawi, brinjal, etc. below): boiled vegetables in FDC gain mass
-    // (water uptake) rather than lose it, so a below-1.0 "boiled" yield here
-    // is very likely still wrong by the same margin. Left unchanged because
-    // no direct USDA kangkung raw+cooked pair exists to derive a real number
-    // from — flagged for a follow-up sourcing pass, not silently "fixed" by
-    // analogy.
+    // boiled: no FoodData Central raw/cooked pair exists for kangkung to
+    // derive a real number from, but Task 9's golden-value suite found the
+    // SAME systematic pattern across every other boiled leafy/root
+    // vegetable it could check directly (bayam, sawi, brinjal, etc. below):
+    // boiled vegetables gain mass (water uptake) rather than lose it, so
+    // this inherited 0.88 (mass loss) almost certainly has the wrong sign.
+    // Rather than guess a replacement by analogy, the boiled factor is
+    // removed entirely; resolveYield now falls through to
+    // CATEGORY_YIELD.vegetable.boiled (corrected to 1.05 by this same
+    // suite), and the UI labels the result 'categoryDefault' — an honest
+    // rough estimate, not a confidently-wrong specific number.
+    publishedYield: { steamed: 0.92, stirFried: 0.78 },
     absorbsWater: false,
     source: 'usda',
     sourceRef: 'FDC 168390',
@@ -584,14 +583,16 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Bendi (okra), raw',
     category: 'vegetable',
     // boiled: derived from FDC 169260 (raw) vs FDC 169261 (cooked, boiled)
-    // — an exact lineage pair — implies ~1.58x (okra's mucilage absorbs a
-    // lot of boiling water). Capped at 1.1 here to respect this repo's own
-    // ingredients.test.ts ceiling for non-water-absorbing foods (okra is not
-    // one of the rice/pasta/legume foods that flag covers); the residual
-    // gap is documented, not hidden, in golden.test.ts's KNOWN_DIVERGENCES.
+    // — an exact lineage pair — implies ~1.58x: okra's mucilage absorbs a
+    // lot of boiling water, the same real phenomenon `absorbsWater` exists
+    // to flag, even though the mechanism (fiber/mucilage, not starch) is
+    // different from rice/pasta/legumes. Previously capped at 1.1 (this
+    // repo's non-water-absorbing ceiling) with `absorbsWater: false`; the
+    // controller ruled to restore the real value and flag this food as
+    // water-absorbing instead of leaving a known-wrong number in place.
     per100gRaw: n({ kcal: 33, protein: 1.93, carbs: 7.45, fibre: 3.2, fat: 0.19, potassium: 299, iron: 0.62, magnesium: 57, zinc: 0.58, calcium: 82, sodium: 7 }),
-    publishedYield: { boiled: 1.1, steamed: 0.93, stirFried: 0.83 },
-    absorbsWater: false,
+    publishedYield: { boiled: 1.58, steamed: 0.93, stirFried: 0.83 },
+    absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 169260',
     archived: false,
@@ -614,14 +615,16 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Carrot, raw',
     category: 'vegetable',
     // boiled: derived from FDC 170393 (raw) vs FDC 170394 (cooked, boiled)
-    // — an exact lineage pair — implies ~1.17x. Capped at 1.1 to respect
-    // this repo's own ingredients.test.ts non-water-absorbing ceiling; the
-    // small residual gap this leaves is within this suite's macro tolerance
-    // once combined with the retention factor, so no divergence is needed
-    // for carrot.
+    // — an exact lineage pair — implies ~1.17x: boiled carrot genuinely
+    // gains a little mass (water uptake), the same real phenomenon
+    // `absorbsWater` exists to flag. Previously capped at 1.1 with
+    // `absorbsWater: false`; the controller ruled to restore the real value
+    // and flag this food as water-absorbing instead of leaving a
+    // known-wrong number in place. (roasted is unaffected — dry heat, not
+    // boiling, and stays well under 1.1 anyway.)
     per100gRaw: n({ kcal: 41, protein: 0.93, carbs: 9.58, fibre: 2.8, fat: 0.24, potassium: 320, iron: 0.3, magnesium: 12, zinc: 0.24, calcium: 33, sodium: 69 }),
-    publishedYield: { boiled: 1.1, steamed: 0.93, stirFried: 0.85, roasted: 0.82 },
-    absorbsWater: false,
+    publishedYield: { boiled: 1.17, steamed: 0.93, stirFried: 0.85, roasted: 0.82 },
+    absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 170393',
     archived: false,
@@ -686,13 +689,14 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Pumpkin, raw',
     category: 'vegetable',
     // boiled: derived from FDC 168448 (raw) vs FDC 168449 (cooked, boiled)
-    // — an exact lineage pair — implies ~1.31x. Capped at 1.1 to respect
-    // this repo's own ingredients.test.ts non-water-absorbing ceiling; the
-    // residual gap is documented, not hidden, in golden.test.ts's
-    // KNOWN_DIVERGENCES.
+    // — an exact lineage pair — implies ~1.31x: boiled pumpkin gains mass
+    // (water uptake), the same real phenomenon `absorbsWater` exists to
+    // flag. Previously capped at 1.1 with `absorbsWater: false`; the
+    // controller ruled to restore the real value and flag this food as
+    // water-absorbing instead of leaving a known-wrong number in place.
     per100gRaw: n({ kcal: 26, protein: 1.0, carbs: 6.5, fibre: 0.5, fat: 0.1, potassium: 340, iron: 0.8, magnesium: 12, zinc: 0.32, calcium: 21, sodium: 1 }),
-    publishedYield: { boiled: 1.1, steamed: 0.91, roasted: 0.80 },
-    absorbsWater: false,
+    publishedYield: { boiled: 1.31, steamed: 0.91, roasted: 0.80 },
+    absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 168448',
     archived: false,
@@ -702,13 +706,14 @@ export const INGREDIENTS: readonly Ingredient[] = [
     name: 'Sweet potato, raw',
     category: 'vegetable',
     // boiled: derived from FDC 168482 (raw) vs FDC 168484 (cooked, boiled,
-    // without skin) implies ~1.13x. Capped at 1.1 to respect this repo's
-    // own ingredients.test.ts non-water-absorbing ceiling; the tiny residual
-    // gap this leaves is within this suite's macro tolerance, so no
-    // divergence is needed for sweet-potato.
+    // without skin) implies ~1.13x: boiled sweet potato gains a little mass
+    // (water uptake), the same real phenomenon `absorbsWater` exists to
+    // flag. Previously capped at 1.1 with `absorbsWater: false`; the
+    // controller ruled to restore the real value and flag this food as
+    // water-absorbing instead of leaving a known-wrong number in place.
     per100gRaw: n({ kcal: 86, protein: 1.57, carbs: 20.12, fibre: 3.0, fat: 0.05, potassium: 337, iron: 0.61, magnesium: 25, zinc: 0.3, calcium: 30, sodium: 55 }),
-    publishedYield: { boiled: 1.1, steamed: 0.92, roasted: 0.78 },
-    absorbsWater: false,
+    publishedYield: { boiled: 1.13, steamed: 0.92, roasted: 0.78 },
+    absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 168482',
     archived: false,

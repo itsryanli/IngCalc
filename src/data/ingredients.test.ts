@@ -63,11 +63,18 @@ describe('INGREDIENTS', () => {
   });
 
   it('keeps published yields within a plausible range', () => {
+    // The water-absorbing ceiling was raised from 3.5 to 8.0 by Task 9's
+    // golden-value suite: real USDA FoodData Central raw/cooked pairs show
+    // cooked oatmeal (rolled-oats, boiled) implies a ~6.65x yield — porridge
+    // is USDA-reference-level watery (~70 kcal/100g cooked), which the
+    // original 3.5 ceiling (calibrated on rice at ~2.6-3x) excluded. 8.0
+    // still catches the error this check actually exists to catch (a
+    // decimal-place slip, e.g. 26 instead of 2.6) while admitting porridge.
+    // Do not re-tighten this without equivalent FDC evidence.
     for (const ing of INGREDIENTS) {
       for (const [method, factor] of Object.entries(ing.publishedYield)) {
         expect(factor, `${ing.id}.${method}`).toBeGreaterThan(0.3);
-        expect(factor, `${ing.id}.${method}`).toBeLessThanOrEqual(3.5);
-        if (!ing.absorbsWater) expect(factor, `${ing.id}.${method}`).toBeLessThanOrEqual(1.1);
+        expect(factor, `${ing.id}.${method}`).toBeLessThanOrEqual(ing.absorbsWater ? 8.0 : 1.1);
       }
     }
   });

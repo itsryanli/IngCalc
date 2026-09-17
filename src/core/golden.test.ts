@@ -110,16 +110,25 @@ const KNOWN_DIVERGENCES: KnownDivergence[] = [
   // ---- vegetable: trace-mineral (calcium) leaching variance ----
   { ingredientId: 'brinjal', method: 'boiled', nutrient: 'calcium', reason: 'Eggplant\'s raw calcium is tiny (9mg/100g); its cooked reference (FDC 169229) implies a calcium concentration factor far outside what the vegetable-boiled category average (tuned across 10 real vegetables) can hit for every one of them at once.' },
   { ingredientId: 'bendi', method: 'boiled', nutrient: 'calcium', reason: 'Okra\'s calcium retention (FDC 169260 raw vs 169261 cooked) sits well outside the shared vegetable-boiled calcium factor\'s fit for leafier vegetables in this suite.' },
-  { ingredientId: 'bendi', method: 'boiled', nutrient: 'kcal', reason: 'The USDA-derived yield for this exact FDC pair (169260 raw vs 169261 cooked) is ~1.58x (okra\'s mucilage absorbs a lot of boiling water), but ingredients.ts caps it at 1.1x to respect this repo\'s own ingredients.test.ts ceiling for non-water-absorbing foods — okra is not one of the rice/pasta/legume foods that flag is defined to cover. That cap, not a data error, is the direct cause of this drift.' },
-  { ingredientId: 'bendi', method: 'boiled', nutrient: 'carbs', reason: 'Same yield-vs-plausibility-ceiling tension as bendi kcal above.' },
   { ingredientId: 'cabbage', method: 'boiled', nutrient: 'calcium', reason: 'Cabbage\'s calcium retention (FDC 169975 raw vs 168514 cooked, the only available "with salt" reference) diverges from the shared vegetable-boiled calcium factor by more than the mineral tolerance allows.' },
-  { ingredientId: 'pumpkin', method: 'boiled', nutrient: 'kcal', reason: 'The USDA-derived yield for this exact FDC pair (168448 raw vs 168449 cooked) is ~1.31x, but ingredients.ts caps it at 1.1x to respect this repo\'s own ingredients.test.ts ceiling for non-water-absorbing foods. That cap, not a data error, is the direct cause of this drift.' },
-  { ingredientId: 'pumpkin', method: 'boiled', nutrient: 'carbs', reason: 'Same yield-vs-plausibility-ceiling tension as pumpkin kcal above.' },
-  { ingredientId: 'pumpkin', method: 'boiled', nutrient: 'calcium', reason: 'Same yield-vs-plausibility-ceiling tension as pumpkin kcal above; the yield cap alone accounts for most of this 20.9% drift (just over the 20% mineral tolerance).' },
-  // ---- grain: rolled-oats lineage mismatch + extreme dilution ----
-  { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'kcal', reason: 'The USDA-derived yield for this exact FDC pair (169705 raw vs 173905 cooked) is ~6.65x, but ingredients.ts caps it at 3.4x to respect this repo\'s own ingredients.test.ts plausibility ceiling (yields <=3.5x) — see the comment there. That cap, not a data error, is the direct cause of this drift; the controller may want to revisit the 3.5x ceiling given this real counter-example.' },
-  { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'carbs', reason: 'Same yield-vs-plausibility-ceiling tension as rolled-oats kcal above.' },
-  { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'potassium', reason: 'Same yield-vs-plausibility-ceiling tension as rolled-oats kcal above; potassium is more leach-sensitive than kcal/carbs so the mismatch shows up more sharply here.' },
+  // NOTE: bendi/pumpkin kcal/carbs divergences that used to be recorded
+  // here were caused by ingredients.ts capping their yields to fit
+  // ingredients.test.ts's then-tighter plausibility ceiling, not by any
+  // real model limitation. The controller raised that ceiling (see
+  // ingredients.test.ts) and the real, uncapped yields were restored in
+  // ingredients.ts; both cases now pass on their own and no longer need a
+  // divergence entry.
+  // ---- grain: rolled-oats raw/cooked lineage mismatch ----
+  // Restoring rolled-oats' real, uncapped yield (6.65x, once the plausibility
+  // ceiling was raised — see ingredients.ts and ingredients.test.ts) did NOT
+  // make these three pass: the raw reference (FDC 169705, plain "Oats") and
+  // cooked reference (FDC 173905, "regular and quick" oats cooked with
+  // water) are different SR Legacy records for the same food, not a strict
+  // raw/cooked pair, so no yield value derived from this pair can perfectly
+  // reproduce the cooked reference's own kcal/carbs/potassium at once.
+  { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'kcal', reason: 'The raw reference (FDC 169705, plain "Oats") and cooked reference (FDC 173905, "regular and quick" oats cooked with water) are different SR Legacy records for the same food, not a strict raw/cooked pair. This persists even with the real, uncapped 6.65x yield restored — it is a lineage mismatch, not a plausibility-ceiling artifact.' },
+  { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'carbs', reason: 'Same raw/cooked lineage mismatch as rolled-oats kcal above.' },
+  { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'potassium', reason: 'Same raw/cooked lineage mismatch as rolled-oats kcal above; potassium is more leach-sensitive than kcal/carbs so the mismatch shows up more sharply here.' },
   { ingredientId: 'bihun', method: 'boiled', nutrient: 'potassium', reason: 'Rice noodles start from an already very low raw potassium figure (30mg/100g); the grain-category boiled potassium factor, tuned across rice/oats/noodles together, cannot hit this low a number exactly while also fitting white rice and brown rice.' },
   { ingredientId: 'yellow-noodles', method: 'boiled', nutrient: 'potassium', reason: 'Egg noodles leach potassium at a different rate than plain rice starch when boiled (FDC 169731 raw vs 169732 cooked, an exact lineage pair); the shared grain-boiled potassium factor cannot fit both rice and egg noodles at once.' },
   // ---- legume: differential macro leaching (protein/carbs/fibre disagree) ----
