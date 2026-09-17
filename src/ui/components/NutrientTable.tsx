@@ -12,11 +12,19 @@ const UNITS: Record<NutrientKey, string> = {
   potassium: 'mg', iron: 'mg', magnesium: 'mg', zinc: 'mg', calcium: 'mg', sodium: 'mg',
 };
 
-const fmt = (value: number, unit: string): string =>
-  `${value.toLocaleString('en-MY', { maximumFractionDigits: unit === 'mg' ? 0 : 1 })}${unit}`;
+const fmt = (value: number, unit: string): string => {
+  // Magnitude-based precision: preserve small values that would otherwise round to zero
+  let fractionDigits: number;
+  if (unit === 'mg') {
+    fractionDigits = value < 1 ? 2 : value < 10 ? 1 : 0;
+  } else {
+    fractionDigits = 1;
+  }
+  return `${value.toLocaleString('en-MY', { maximumFractionDigits: fractionDigits })}${unit}`;
+};
 
 const pct = (value: number, target: number | undefined, standard: string): string =>
-  target === undefined ? `— ${standard}` : `${Math.round((value / target) * 100)}% ${standard}`;
+  target === undefined || target <= 0 ? `— ${standard}` : `${Math.round((value / target) * 100)}% ${standard}`;
 
 interface Props {
   totals: NutrientProfile;

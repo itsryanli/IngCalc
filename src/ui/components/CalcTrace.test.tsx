@@ -25,4 +25,13 @@ describe('CalcTrace', () => {
     const { container } = render(<CalcTrace steps={[]} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('omits sourceNote span when not provided', () => {
+    const stepsWithoutNote = [
+      { label: 'Raw', detail: '500g', value: '500.0g', sourceNote: undefined },
+    ];
+    render(<CalcTrace steps={stepsWithoutNote} />);
+    expect(screen.getByText('500.0g')).toBeInTheDocument();
+    expect(screen.queryByText(/sourceNote/i)).not.toBeInTheDocument();
+  });
 });
