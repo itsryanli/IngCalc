@@ -1,0 +1,90 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import 'fake-indexeddb/auto';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { CalcScreen } from './CalcScreen';
+import { db } from '../../storage/db';
+import type { Profile } from '../../core/types';
+
+const profile: Profile = {
+  id: 'p1', name: 'Ryan', sex: 'male', birthYear: 1996,
+  heightCm: 175, weightKg: 75, sessionsPerWeek: 4, goal: 'maintain',
+};
+
+// Fixed so age (and therefore every calorie/protein figure) can't shift with the calendar.
+const today = new Date('2026-06-15T00:00:00Z');
+
+beforeEach(async () => { await db.userIngredients.clear(); });
+
+// The cooking-method <select> is queried by role rather than getByLabelText: once a result
+// is showing, the MethodCompare table's aria-label ("Method comparison") also matches /method/i
+// under getByLabelText's aria-label fallback, which getByRole('combobox', ...) doesn't share.
+const selectChicken = async () => {
+  await waitFor(() => expect(screen.getByLabelText(/ingredient/i)).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText(/ingredient/i), { target: { value: 'chicken-breast' } });
+  fireEvent.change(screen.getByLabelText(/^weight/i), { target: { value: '1000' } });
+  fireEvent.change(screen.getByRole('combobox', { name: /method/i }), { target: { value: 'roasted' } });
+};
+
+describe('CalcScreen', () => {
+  it('shows the cooked weight for a raw input', async () => {
+    render(<CalcScreen profile={null} today={today} />);
+    await selectChicken();
+    // chicken-breast's published roasted yield is 0.71 (corrected by Task 9's golden-value
+    // suite against real FDC pairs) — not the 0.75 the brief's own worked example assumed.
+    // 1000g raw x 0.71 = 710g cooked; see task-19-report.md for the discrepancy note.
+    await waitFor(() => expect(screen.getByTestId('result-weight')).toHaveTextContent('710'));
+  });
+
+  it('shows the working, including the yield provenance', async () => {
+    render(<CalcScreen profile={null} today={today} />);
+    await selectChicken();
+    await waitFor(() => expect(screen.getByText(/published factor/i)).toBeInTheDocument());
+  });
+
+  it('shows the raw weight when the entered weight is cooked', async () => {
+    render(<CalcScreen profile={null} today={today} />);
+    await selectChicken();
+    fireEvent.click(screen.getByRole('radio', { name: /cooked/i }));
+    // 1000g cooked / 0.71 = 1408.45g raw -> "1,408" at zero fraction digits.
+    await waitFor(() => expect(screen.getByTestId('result-weight')).toHaveTextContent('1,408'));
+  });
+
+  it('shows the share of the daily calorie target when a profile exists', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    await waitFor(() => expect(screen.getByTestId('calorie-share')).toHaveTextContent('%'));
+  });
+
+  it('omits the daily share when there is no profile', async () => {
+    render(<CalcScreen profile={null} today={today} />);
+    await selectChicken();
+    await waitFor(() => expect(screen.getByTestId('result-weight')).toBeInTheDocument());
+    expect(screen.queryByTestId('calorie-share')).not.toBeInTheDocument();
+  });
+
+  it('ranks cooking methods by what they retain', async () => {
+    render(<CalcScreen profile={null} today={today} />);
+    await selectChicken();
+    await waitFor(() => expect(screen.getByRole('table', { name: /method comparison/i })).toBeInTheDocument());
+  });
+
+  it('lets the user add a missing ingredient from the picker, then selects it automatically', async () => {
+    render(<CalcScreen profile={null} today={today} />);
+    await waitFor(() => expect(screen.getByLabelText(/ingredient/i)).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText(/ingredient/i), { target: { value: '__add_new__' } });
+
+    const nameInput = await screen.findByLabelText(/^name/i);
+    fireEvent.change(nameInput, { target: { value: 'Petai' } });
+    fireEvent.change(screen.getByLabelText(/^protein/i), { target: { value: '6' } });
+    fireEvent.click(screen.getByRole('button', { name: /save ingredient/i }));
+
+    // Back on the calculator, the picker now shows the new ingredient, selected.
+    const select = await screen.findByLabelText(/ingredient/i) as HTMLSelectElement;
+    await waitFor(() => expect(select.selectedOptions[0]?.textContent).toBe('Petai'));
+
+    // And it's usable immediately: entering a weight produces a result.
+    fireEvent.change(screen.getByLabelText(/^weight/i), { target: { value: '100' } });
+    await waitFor(() => expect(screen.getByTestId('result-weight')).toBeInTheDocument());
+  });
+});

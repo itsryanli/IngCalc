@@ -13,6 +13,15 @@ const kangkung: Ingredient = {
   absorbsWater: false, source: 'usda', sourceRef: 'FDC 168390', archived: false,
 };
 
+// 'other' has no entries at all in RETENTION, so every nutrient/method combination
+// is assumed — a clean fixture for the provenance test below.
+const mysteryPaste: Ingredient = {
+  id: 'mystery-paste', name: 'Mystery paste', category: 'other',
+  per100gRaw: { ...zeroNutrients(), kcal: 50, protein: 2, potassium: 100, magnesium: 20 },
+  publishedYield: { boiled: 0.9 },
+  absorbsWater: false, source: 'usda', sourceRef: 'test fixture', archived: false,
+};
+
 const rows = () => compareMethods(kangkung, [], CATEGORY_YIELD, RETENTION, ['potassium', 'magnesium']);
 
 describe('compareMethods', () => {
@@ -52,6 +61,18 @@ describe('compareMethods', () => {
     // Verify the expected alphabetical sequence
     expect(order.slice(order.indexOf('deepFried'), order.indexOf('stirFried') + 1))
       .toEqual(['deepFried', 'grilled', 'panFried', 'roasted', 'stirFried']);
+  });
+
+  it('marks highlighted nutrients whose retention is assumed, not sourced', () => {
+    const steamed = rows().find((r) => r.method === 'steamed')!;
+    // vegetable/steamed has sourced figures for both potassium and magnesium.
+    expect(steamed.assumedRetentionFor).toEqual([]);
+
+    const paste = compareMethods(mysteryPaste, [], CATEGORY_YIELD, RETENTION, ['potassium', 'magnesium']).find(
+      (r) => r.method === 'boiled',
+    )!;
+    // 'other' has no retention entries at all: both highlighted nutrients are assumed.
+    expect(paste.assumedRetentionFor).toEqual(['potassium', 'magnesium']);
   });
 
   it('prefers the user measured yield once samples exist', () => {
