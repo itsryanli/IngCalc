@@ -1,0 +1,63 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import 'fake-indexeddb/auto';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { ProfileScreen } from './ProfileScreen';
+import { db } from '../../storage/db';
+
+// Fixed so the expected values (age 30, TDEE 2633, protein 135g) never drift with the calendar.
+const FIXED_TODAY = new Date('2026-06-15T00:00:00Z');
+
+beforeEach(async () => { await db.profiles.clear(); });
+
+const fill = () => {
+  fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'Ryan' } });
+  fireEvent.change(screen.getByLabelText(/birth year/i), { target: { value: '1996' } });
+  fireEvent.change(screen.getByLabelText(/height/i), { target: { value: '175' } });
+  fireEvent.change(screen.getByLabelText(/weight/i), { target: { value: '75' } });
+  fireEvent.change(screen.getByLabelText(/sessions per week/i), { target: { value: '4' } });
+};
+
+describe('ProfileScreen', () => {
+  it('shows the computed targets as the form is filled in', async () => {
+    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
+    fill();
+    await waitFor(() => {
+      expect(screen.getByTestId('tdee')).toHaveTextContent('2633');
+      expect(screen.getByTestId('calorie-target')).toHaveTextContent('2633');
+    });
+  });
+
+  it('shows the protein target in both g/kg and g/lb', async () => {
+    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
+    fill();
+    await waitFor(() => {
+      expect(screen.getByTestId('protein-target')).toHaveTextContent('135');
+      expect(screen.getByTestId('protein-target')).toHaveTextContent('g/lb');
+    });
+  });
+
+  it('refuses to save without a name', async () => {
+    const onSaved = vi.fn();
+    render(<ProfileScreen onSaved={onSaved} today={FIXED_TODAY} />);
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/name/i);
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('rejects an implausible birth year', async () => {
+    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
+    fill();
+    fireEvent.change(screen.getByLabelText(/birth year/i), { target: { value: '1700' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/birth year/i);
+  });
+
+  it('persists the profile and reports it', async () => {
+    const onSaved = vi.fn();
+    render(<ProfileScreen onSaved={onSaved} today={FIXED_TODAY} />);
+    fill();
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(await db.profiles.count()).toBe(1);
+  });
+});
