@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import 'fake-indexeddb/auto';
 import { mergeCatalogue, useCatalogue } from './useCatalogue';
 import { zeroNutrients } from '../core/nutrients';
 import { db } from '../storage/db';
 import { saveUserIngredient } from '../storage/userIngredients';
+import * as userIngredientsModule from '../storage/userIngredients';
 import type { Ingredient } from '../core/types';
 
 const make = (id: string, name: string, over: Partial<Ingredient> = {}): Ingredient => ({
@@ -74,5 +75,73 @@ describe('useCatalogue hook', () => {
     const found = result.current.catalogue.find((i) => i.id === 'test-ing');
     expect(found).toBeDefined();
     expect(found?.name).toBe('Test Ingredient');
+  });
+
+  it('refresh result is not clobbered by slow initial load resolving late', async () => {
+    // This test demonstrates the race condition: if the mount's initial load
+    // is slow and resolves after a refresh call, it could overwrite the refresh
+    // result with stale data. The generation guard should prevent this.
+
+    let resolveSlowLoad: ((value: Ingredient[]) => void) = null as any;
+    let resolveQuickLoad: ((value: Ingredient[]) => void) = null as any;
+
+    const slowLoadPromise = new Promise<Ingredient[]>((resolve) => {
+      resolveSlowLoad = resolve;
+    });
+
+    const quickLoadPromise = new Promise<Ingredient[]>((resolve) => {
+      resolveQuickLoad = resolve;
+    });
+
+    let callCount = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockListUserIngredients: any = vi.spyOn(userIngredientsModule as any, 'listUserIngredients').mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        // First call (mount) - slow
+        return slowLoadPromise;
+      } else {
+        // Second call (refresh) - quick
+        return quickLoadPromise;
+      }
+    });
+
+    try {
+      // Mount the hook - initial load starts but is slow
+      const { result } = renderHook(() => useCatalogue());
+      expect(result.current.loading).toBe(true);
+
+      // Before the initial load resolves, call refresh
+      await act(async () => {
+        const refreshPromise = result.current.refresh();
+
+        // Resolve the refresh call quickly with a specific ingredient
+        const refreshData = [make('from-refresh', 'From Refresh', { source: 'user' })];
+        resolveQuickLoad(refreshData);
+
+        // Wait for refresh to complete
+        await refreshPromise;
+      });
+
+      // Now resolve the slow initial load (this comes late)
+      const slowData = [make('from-slow-load', 'From Slow Load', { source: 'user' })];
+      resolveSlowLoad(slowData);
+
+      // Wait a bit to let the slow load settle
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      }, { timeout: 1000 });
+
+      // The catalogue should have the refresh result, not the slow load
+      // If the bug exists, the slow load will overwrite refresh and we'll see "From Slow Load"
+      const hasRefreshResult = result.current.catalogue.some((i) => i.id === 'from-refresh');
+      const hasSlowLoadResult = result.current.catalogue.some((i) => i.id === 'from-slow-load');
+
+      // The refresh result MUST be present; the slow load must NOT overwrite it
+      expect(hasRefreshResult).toBe(true);
+      expect(hasSlowLoadResult).toBe(false);
+    } finally {
+      mockListUserIngredients.mockRestore();
+    }
   });
 });

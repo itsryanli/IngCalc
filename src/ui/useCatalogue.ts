@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import type { Ingredient } from '../core/types';
 import { INGREDIENTS } from '../data/ingredients';
 import { listUserIngredients } from '../storage/userIngredients';
@@ -18,36 +18,40 @@ export function mergeCatalogue(
 export function useCatalogue(): { catalogue: Ingredient[]; loading: boolean; refresh: () => Promise<void> } {
   const [catalogue, setCatalogue] = useState<Ingredient[]>(() => mergeCatalogue(INGREDIENTS, []));
   const [loading, setLoading] = useState(true);
+  const generationRef = useRef(0);
 
-  const loadCatalogue = async () => {
-    try {
-      const user = await listUserIngredients();
-      setCatalogue(mergeCatalogue(INGREDIENTS, user));
-    } catch {
-      /* storage unavailable: the bundled catalogue still works */
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchAndMerge = useCallback(
+    async (gen: number) => {
+      try {
+        const user = await listUserIngredients();
+        // Only apply this result if the generation is still current
+        if (gen === generationRef.current) {
+          setCatalogue(mergeCatalogue(INGREDIENTS, user));
+        }
+      } catch {
+        /* storage unavailable: the bundled catalogue still works */
+      } finally {
+        // Only clear loading if this generation is still current
+        if (gen === generationRef.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    let cancelled = false;
-    loadCatalogue().then(() => {
-      if (!cancelled) {
-        // Loading state was already set in finally block
-      }
-    });
-    return () => { cancelled = true; };
-  }, []);
+    const gen = generationRef.current;
+    fetchAndMerge(gen);
+    return () => {
+      generationRef.current += 1;
+    };
+  }, [fetchAndMerge]);
 
-  const refresh = async () => {
-    try {
-      const user = await listUserIngredients();
-      setCatalogue(mergeCatalogue(INGREDIENTS, user));
-    } catch {
-      /* storage unavailable: the bundled catalogue still works */
-    }
-  };
+  const refresh = useCallback(async () => {
+    const gen = ++generationRef.current;
+    await fetchAndMerge(gen);
+  }, [fetchAndMerge]);
 
   return { catalogue, loading, refresh };
 }
