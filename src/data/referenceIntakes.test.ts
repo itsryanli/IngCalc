@@ -43,3 +43,45 @@ describe('DV_US', () => {
     }
   });
 });
+
+// Regression coverage for a real bug: an earlier version of this table used
+// coarser bands than the source and "rounded" a nutrient to the nearest
+// published band when its real cut point fell inside that band — silently
+// wrong for part of the band's age range. These tests probe both sides of
+// every band edge this file actually ships, so a future re-banding that
+// reintroduces that shortcut fails loudly instead of passing by accident
+// (the brief's own sampled ages above happen to miss every edge below).
+describe('RNI_MY boundary precision', () => {
+  it('matches the source exactly at the magnesium 30/31 boundary', () => {
+    expect(rniFor('male', 30).magnesium).toBe(400);
+    expect(rniFor('male', 31).magnesium).toBe(420);
+    expect(rniFor('female', 30).magnesium).toBe(310);
+    expect(rniFor('female', 31).magnesium).toBe(320);
+  });
+
+  it('matches the source exactly at the zinc 65/66 boundary', () => {
+    expect(rniFor('male', 65).zinc).toBe(6.3);
+    expect(rniFor('male', 66).zinc).toBe(6.2);
+    expect(rniFor('female', 65).zinc).toBe(4.4);
+    expect(rniFor('female', 66).zinc).toBe(4.3);
+  });
+
+  it('matches the source exactly at the female calcium 49/50 boundary', () => {
+    // Caught during the same fix, not originally flagged by review: calcium
+    // steps up a year earlier than iron/magnesium's 51 boundary for women.
+    expect(rniFor('female', 49).calcium).toBe(1000);
+    expect(rniFor('female', 50).calcium).toBe(1200);
+  });
+
+  it('matches the source exactly at the sodium 69/70 boundary', () => {
+    expect(rniFor('male', 69).sodium).toBe(1500);
+    expect(rniFor('male', 70).sodium).toBe(1200);
+    expect(rniFor('female', 69).sodium).toBe(1500);
+    expect(rniFor('female', 70).sodium).toBe(1200);
+  });
+
+  it('matches the source exactly at the female iron 50/51 boundary', () => {
+    expect(rniFor('female', 50).iron).toBe(20);
+    expect(rniFor('female', 51).iron).toBe(8);
+  });
+});
