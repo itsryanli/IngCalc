@@ -39,8 +39,19 @@ describe('compareMethods', () => {
     expect(grilled.yieldSource).toBe('categoryDefault');
   });
 
-  it('sorts deterministically, breaking ties by method name', () => {
-    expect(rows().map((r) => r.method)).toEqual(rows().map((r) => r.method));
+  it('orders tied methods alphabetically, not by declaration order', () => {
+    const order = rows().map((r) => r.method);
+    // Idempotence check: calling twice yields same order
+    expect(order).toEqual(rows().map((r) => r.method));
+
+    // The tied group at score 91 is: deepFried, grilled, panFried, roasted, stirFried
+    const tiedMethods = ['deepFried', 'grilled', 'panFried', 'roasted', 'stirFried'] as const;
+    const tiedIndices = tiedMethods.map((m) => order.indexOf(m));
+    // Verify they appear in alphabetical order (not COOK_METHODS insertion order)
+    expect(tiedIndices).toEqual([...tiedIndices].sort((a, b) => a - b));
+    // Verify the expected alphabetical sequence
+    expect(order.slice(order.indexOf('deepFried'), order.indexOf('stirFried') + 1))
+      .toEqual(['deepFried', 'grilled', 'panFried', 'roasted', 'stirFried']);
   });
 
   it('prefers the user measured yield once samples exist', () => {
