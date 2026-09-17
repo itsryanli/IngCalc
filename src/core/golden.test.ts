@@ -68,6 +68,18 @@ interface GoldenCase {
   /** USDA's own COOKED entry, per 100g cooked. */
   usdaCookedRef: string;
   expectedPer100gCooked: Partial<Record<NutrientKey, number>>;
+  /**
+   * Set only when EVERY nutrient in `expectedPer100gCooked` is legitimately
+   * excluded via KNOWN_DIVERGENCES (e.g. every asserted nutrient is broken
+   * by the same structural model limit, such as oil absorption during
+   * frying, and no other real USDA-sourced nutrient for this food passes
+   * within tolerance either). A case marked `referenceOnly` asserts nothing
+   * — it exists purely to document a known model limit against a real
+   * source, not to catch a regression. The structural guard test below
+   * requires this flag on any case that would otherwise be fully excluded,
+   * so an inert case can never silently look live.
+   */
+  referenceOnly?: true;
 }
 
 /**
@@ -127,14 +139,14 @@ const KNOWN_DIVERGENCES: KnownDivergence[] = [
   // raw/cooked pair, so no yield value derived from this pair can perfectly
   // reproduce the cooked reference's own kcal/carbs/potassium at once.
   { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'kcal', reason: 'The raw reference (FDC 169705, plain "Oats") and cooked reference (FDC 173905, "regular and quick" oats cooked with water) are different SR Legacy records for the same food, not a strict raw/cooked pair. This persists even with the real, uncapped 6.65x yield restored — it is a lineage mismatch, not a plausibility-ceiling artifact.' },
-  { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'carbs', reason: 'Same raw/cooked lineage mismatch as rolled-oats kcal above.' },
+  { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'carbs', reason: 'Same raw/cooked FDC lineage mismatch as rolled-oats kcal above (FDC 169705 raw vs FDC 173905 cooked, different SR Legacy records for the same food).' },
   { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'potassium', reason: 'Same raw/cooked lineage mismatch as rolled-oats kcal above; potassium is more leach-sensitive than kcal/carbs so the mismatch shows up more sharply here.' },
   { ingredientId: 'bihun', method: 'boiled', nutrient: 'potassium', reason: 'Rice noodles start from an already very low raw potassium figure (30mg/100g); the grain-category boiled potassium factor, tuned across rice/oats/noodles together, cannot hit this low a number exactly while also fitting white rice and brown rice.' },
   { ingredientId: 'yellow-noodles', method: 'boiled', nutrient: 'potassium', reason: 'Egg noodles leach potassium at a different rate than plain rice starch when boiled (FDC 169731 raw vs 169732 cooked, an exact lineage pair); the shared grain-boiled potassium factor cannot fit both rice and egg noodles at once.' },
   // ---- legume: differential macro leaching (protein/carbs/fibre disagree) ----
   { ingredientId: 'dried-chickpeas', method: 'boiled', nutrient: 'iron', reason: 'Chickpeas\' iron retention (FDC 173756 raw vs 173757 cooked, an exact lineage pair) implies a much higher concentration factor than red lentils in the same legume-boiled bucket; no single legume iron factor fits both.' },
   { ingredientId: 'red-lentils', method: 'boiled', nutrient: 'kcal', reason: 'Red lentils\' protein-anchored yield (2.65x, used for consistency across every case in this suite) disagrees with a kcal- or carbs-anchored yield (~3.1x) for this specific FDC pair (174284 raw vs 172421 cooked, itself a generic-lentil proxy) — the same differential-leaching pattern as soybean below, just milder.' },
-  { ingredientId: 'red-lentils', method: 'boiled', nutrient: 'carbs', reason: 'Same protein-vs-carbs yield-anchor disagreement as red-lentils kcal above.' },
+  { ingredientId: 'red-lentils', method: 'boiled', nutrient: 'carbs', reason: 'Same protein-vs-carbs yield-anchor disagreement as red-lentils kcal above: no single mass-yield number can satisfy both macros for this legume at once.' },
   { ingredientId: 'red-lentils', method: 'boiled', nutrient: 'iron', reason: 'Same legume iron-retention variance as dried-chickpeas above; red lentils and chickpeas need very different iron factors from the same shared bucket.' },
   { ingredientId: 'soybean', method: 'boiled', nutrient: 'carbs', reason: 'Documented in ingredients.ts: soybean\'s protein- (2.0x), carbs- (3.6x) and fibre- (1.55x) anchored implied yields disagree sharply with each other for this exact-lineage FDC pair (174270/174299), meaning soy protein and soluble carbohydrate leach into the cooking water at genuinely different rates. No single mass-yield number can satisfy both a protein-anchored yield (used consistently across this suite) and this food\'s carbs figure at once.' },
   { ingredientId: 'peanuts', method: 'boiled', nutrient: 'carbs', reason: 'Boiled peanuts (FDC 2515376 raw vs 174260 cooked) show the same protein-vs-carbs anchor disagreement as soybean above, though milder.' },
@@ -196,7 +208,10 @@ const CASES: GoldenCase[] = [
     ingredientId: 'duck-breast',
     method: 'roasted',
     usdaCookedRef: 'FDC 172409 (SR Legacy) — Duck, domesticated, meat and skin, cooked, roasted',
-    expectedPer100gCooked: { kcal: 337.0, protein: 18.99, iron: 2.7 },
+    // zinc is NOT excluded via KNOWN_DIVERGENCES (kcal/protein/iron are) —
+    // it passes on the current data and is what keeps this case live: a
+    // reverted/wrong yield or retention factor would move it out of band.
+    expectedPer100gCooked: { kcal: 337.0, protein: 18.99, iron: 2.7, zinc: 1.86 },
   },
 
   // ------------------------------------------------------------ SEAFOOD ---
@@ -332,7 +347,11 @@ const CASES: GoldenCase[] = [
     ingredientId: 'rolled-oats',
     method: 'boiled',
     usdaCookedRef: 'FDC 173905 (SR Legacy) — Cereals, oats, regular and quick, unenriched, cooked with water (includes boiling and microwaving), without salt',
-    expectedPer100gCooked: { kcal: 71.0, carbs: 12.0, potassium: 70.0 },
+    // magnesium is NOT excluded via KNOWN_DIVERGENCES (kcal/carbs/potassium
+    // are) — it passes on the current data and is what keeps this case
+    // live: reverting the 6.65x yield to the old 2.6 would move it out of
+    // band (verified — see task-9-report.md).
+    expectedPer100gCooked: { kcal: 71.0, carbs: 12.0, potassium: 70.0, magnesium: 27.0 },
   },
   {
     ingredientId: 'bihun',
@@ -361,7 +380,9 @@ const CASES: GoldenCase[] = [
     ingredientId: 'red-lentils',
     method: 'boiled',
     usdaCookedRef: 'FDC 172421 (SR Legacy) — Lentils, mature seeds, cooked, boiled, without salt',
-    expectedPer100gCooked: { kcal: 116.0, carbs: 20.13, iron: 3.33 },
+    // zinc is NOT excluded via KNOWN_DIVERGENCES (kcal/carbs/iron are) — it
+    // passes on the current data and is what keeps this case live.
+    expectedPer100gCooked: { kcal: 116.0, carbs: 20.13, iron: 3.33, zinc: 1.27 },
   },
   {
     // Only a "with salt" cooked entry exists; sodium is never asserted in
@@ -383,7 +404,10 @@ const CASES: GoldenCase[] = [
     ingredientId: 'firm-tofu',
     method: 'deepFried',
     usdaCookedRef: 'FDC 174304 (SR Legacy) — Tofu, fried, prepared with calcium sulfate',
-    expectedPer100gCooked: { kcal: 270.0, carbs: 8.86, iron: 4.87, calcium: 961.0 },
+    // zinc is NOT excluded via KNOWN_DIVERGENCES (kcal/carbs/iron/calcium
+    // are) — it passes on the current data and is what keeps this case
+    // live, even though oil absorption breaks kcal/carbs/fat here.
+    expectedPer100gCooked: { kcal: 270.0, carbs: 8.86, iron: 4.87, calcium: 961.0, zinc: 1.99 },
   },
 ];
 
@@ -425,9 +449,50 @@ describe('golden values: derived cooked nutrients vs USDA cooked entries', () =>
   }
 
   describe('known divergences (excluded from the tolerance check above, with a written reason)', () => {
+    // `reason.length > 20` alone is satisfiable by filler ("xxxxxxxxxxxxxxxxxxxx"
+    // clears it). Require something a reviewer can actually verify: at
+    // least 12 words, AND either a specific FDC id (so the claim is
+    // rechecked-able against a real source) or a named mechanism (so it
+    // is a structural explanation, not a shrug).
+    const NAMED_MECHANISM = /retention|leach|render|absorption|absorb|concentrat|lineage|yield-anchor|mismatch|variance|factor|caveat|coagulant/i;
+    const FDC_ID = /FDC\s*\d+/i;
     for (const d of KNOWN_DIVERGENCES) {
-      it(`${d.ingredientId} ${d.method} ${d.nutrient}: has a non-empty written reason`, () => {
-        expect(d.reason.length).toBeGreaterThan(20);
+      it(`${d.ingredientId} ${d.method} ${d.nutrient}: has a substantive written reason`, () => {
+        const wordCount = d.reason.trim().split(/\s+/).length;
+        expect(wordCount, `${d.ingredientId}.${d.nutrient} reason is only ${wordCount} words`).toBeGreaterThanOrEqual(12);
+        expect(
+          FDC_ID.test(d.reason) || NAMED_MECHANISM.test(d.reason),
+          `${d.ingredientId}.${d.nutrient} reason cites neither an FDC id nor a named mechanism: "${d.reason}"`,
+        ).toBe(true);
+      });
+    }
+  });
+
+  describe('no case is silently inert (every asserted nutrient excluded via KNOWN_DIVERGENCES)', () => {
+    // A case whose every expectedPer100gCooked key is excluded provides
+    // zero regression protection: nothing it asserts can ever fail, no
+    // matter how wrong the underlying yield/retention data becomes. That
+    // is only acceptable when explicitly and visibly marked `referenceOnly`
+    // (meaning: no real USDA-sourced nutrient for this food passes within
+    // tolerance, so the case exists purely to document a known model
+    // limit). This guard makes that condition impossible to introduce by
+    // accident.
+    for (const c of CASES) {
+      it(`${c.ingredientId} ${c.method}: is not silently fully excluded`, () => {
+        const keys = Object.keys(c.expectedPer100gCooked) as NutrientKey[];
+        const allExcluded = keys.every((key) =>
+          KNOWN_DIVERGENCES.some(
+            (d) => d.ingredientId === c.ingredientId && d.method === c.method && d.nutrient === key,
+          ),
+        );
+        if (allExcluded) {
+          expect(
+            c.referenceOnly,
+            `${c.ingredientId} ${c.method} has every asserted nutrient excluded via KNOWN_DIVERGENCES but is not marked referenceOnly — it currently asserts nothing and cannot fail on any regression`,
+          ).toBe(true);
+        } else {
+          expect(c.referenceOnly, `${c.ingredientId} ${c.method} is marked referenceOnly but has a live (non-excluded) nutrient — remove the flag`).toBeUndefined();
+        }
       });
     }
   });

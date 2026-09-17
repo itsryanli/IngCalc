@@ -603,6 +603,13 @@ export const INGREDIENTS: readonly Ingredient[] = [
     category: 'vegetable',
     // boiled corrected by Task 9's golden-value suite: derived from FDC
     // 169228 (raw) vs FDC 169229 (cooked, boiled) — an exact lineage pair.
+    // Brinjal loses ~30% of its mass when boiled (yield 0.69) — the
+    // LARGEST-magnitude change of any of the 10 vegetables this suite
+    // checked directly, several times onion's ~8% loss. Do not describe
+    // this alongside onion as "both lose a modest amount" (an earlier draft
+    // of this comment did, and understated it); most other vegetables in
+    // this suite gain mass when boiled, and brinjal's loss is the biggest
+    // single deviation from that pattern in either direction.
     per100gRaw: n({ kcal: 25, protein: 0.98, carbs: 5.88, fibre: 3.0, fat: 0.18, potassium: 229, iron: 0.23, magnesium: 14, zinc: 0.16, calcium: 9, sodium: 2 }),
     publishedYield: { boiled: 0.69, steamed: 0.90, stirFried: 0.75, deepFried: 0.72, roasted: 0.72 },
     absorbsWater: false,
@@ -738,10 +745,12 @@ export const INGREDIENTS: readonly Ingredient[] = [
     category: 'vegetable',
     // boiled corrected by Task 9's golden-value suite: derived from FDC
     // 170000 (raw) vs FDC 170001 (cooked, boiled) — an exact lineage pair.
-    // Onion and brinjal (eggplant) both lose a modest amount of mass when
-    // boiled; most of the leafy/root vegetables in this suite instead gain
-    // mass. Real boiled-vegetable yield varies by food, not in one uniform
-    // direction — see the file-level note near bayam below.
+    // Onion loses a modest ~8% of its mass when boiled; most of the
+    // leafy/root vegetables in this suite instead gain mass, and brinjal
+    // (eggplant) loses far more than onion does — see the brinjal entry
+    // below, this is not the same magnitude of effect. Real boiled-
+    // vegetable yield varies by food, not in one uniform direction — see
+    // the file-level note near bayam below.
     per100gRaw: n({ kcal: 40, protein: 1.1, carbs: 9.34, fibre: 1.7, fat: 0.1, potassium: 146, iron: 0.21, magnesium: 10, zinc: 0.17, calcium: 23, sodium: 4 }),
     publishedYield: { boiled: 0.92, stirFried: 0.75, deepFried: 0.55, roasted: 0.80 },
     absorbsWater: false,

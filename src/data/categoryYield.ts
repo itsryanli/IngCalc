@@ -15,10 +15,13 @@ export const CATEGORY_YIELD: Record<Category, Record<CookMethod, number>> = {
   // vegetable raw+cooked FDC pairs (bayam, sawi, brinjal, long-beans, bendi,
   // pumpkin, carrot, cabbage, sweet-potato, onion) showed boiled-vegetable
   // yield varies by food — most gain mass (water uptake) rather than losing
-  // the ~10% this fallback originally assumed, but onion and brinjal lose a
-  // little. 1.05 (mass roughly conserved, slightly up) is a better
-  // catch-all fallback than the original 0.90; this default is only used
-  // when an ingredient has no ingredient-specific published yield.
+  // the ~10% this fallback originally assumed. Onion loses a modest ~8%;
+  // brinjal (eggplant) loses far more — ~30%, the single largest-magnitude
+  // change among all 10 vegetables checked, not a "little" like onion's.
+  // 1.05 (mass roughly conserved, slightly up) is a better catch-all
+  // fallback than the original 0.90; this default is only used when an
+  // ingredient has no ingredient-specific published yield (both onion and
+  // brinjal do have one, so this fallback never actually applies to them).
   vegetable: { boiled: 1.05, steamed: 0.92, panFried: 0.80, stirFried: 0.78, deepFried: 0.72, roasted: 0.75, grilled: 0.74 },
   fruit:     { boiled: 0.90, steamed: 0.92, panFried: 0.82, stirFried: 0.82, deepFried: 0.75, roasted: 0.78, grilled: 0.77 },
   grain:     { boiled: 2.60, steamed: 2.40, panFried: 1.00, stirFried: 1.00, deepFried: 0.95, roasted: 0.95, grilled: 0.95 },
