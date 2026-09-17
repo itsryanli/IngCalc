@@ -78,8 +78,7 @@ export function AddIngredientScreen({
           <label htmlFor={`n-${k}`}>{LABELS[k]}</label>
           <input
             id={`n-${k}`}
-            type="number"
-            step="any"
+            type="text"
             value={entries[k]}
             onChange={(e) => setEntries((s) => ({ ...s, [k]: e.target.value }))}
           />

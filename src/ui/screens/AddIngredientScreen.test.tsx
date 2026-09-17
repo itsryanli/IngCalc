@@ -48,4 +48,31 @@ describe('AddIngredientScreen', () => {
     const saved = (await db.userIngredients.toArray())[0]!;
     expect(saved.per100gRaw.magnesium).toBe(0);
   });
+
+  it('rejects non-numeric nutrient input and does not save', async () => {
+    const onSaved = vi.fn();
+    render(<AddIngredientScreen initialName="Petai" onSaved={onSaved} />);
+    fireEvent.change(screen.getByLabelText(/^protein/i), { target: { value: 'abc' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/must be a number/i);
+    expect(onSaved).not.toHaveBeenCalled();
+    const saved = await db.userIngredients.toArray();
+    expect(saved).toHaveLength(0);
+  });
+
+  it('rejects whitespace-only name like empty name', async () => {
+    render(<AddIngredientScreen initialName="   " onSaved={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/name/i);
+  });
+
+  it('treats whitespace-only nutrient field as unfilled default', async () => {
+    const onSaved = vi.fn();
+    render(<AddIngredientScreen initialName="Petai" onSaved={onSaved} />);
+    fireEvent.change(screen.getByLabelText(/^protein/i), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const saved = (await db.userIngredients.toArray())[0]!;
+    expect(saved.per100gRaw.protein).toBe(0);
+  });
 });
