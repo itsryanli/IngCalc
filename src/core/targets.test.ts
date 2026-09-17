@@ -69,8 +69,21 @@ describe('targets', () => {
   });
 
   it('omits a standard that has no figure rather than inventing one', () => {
+    // Both sources empty for every key; cannot discriminate against backfilling, but still validates the both-empty case.
     const t = microTargets(male, TODAY, () => ({}), {});
     expect(t.potassium?.rni).toBeUndefined();
     expect(t.potassium?.dv).toBeUndefined();
+  });
+
+  it('does not backfill RNI from DV when RNI is absent', () => {
+    const t = microTargets(male, TODAY, () => ({}), { iron: 18 });
+    expect(t.iron?.dv).toBe(18);
+    expect(t.iron?.rni).toBeUndefined();
+  });
+
+  it('does not backfill DV from RNI when DV is absent', () => {
+    const t = microTargets(male, TODAY, () => ({ iron: 9 }), {});
+    expect(t.iron?.rni).toBe(9);
+    expect(t.iron?.dv).toBeUndefined();
   });
 });

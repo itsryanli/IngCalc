@@ -1,4 +1,4 @@
-import { NUTRIENT_KEYS, type Goal, type NutrientKey, type Profile, type Sex } from './types';
+import { MICRONUTRIENT_KEYS, type Goal, type NutrientKey, type Profile, type Sex } from './types';
 
 const KG_PER_LB = 2.20462;
 
@@ -53,7 +53,8 @@ export function microTargets(
 ): Partial<Record<NutrientKey, MicroTarget>> {
   const rni = rniLookup(profile.sex, ageFrom(profile, today));
   const out: Partial<Record<NutrientKey, MicroTarget>> = {};
-  for (const k of NUTRIENT_KEYS) {
+  // Only micronutrients; calories and protein are personal targets derived from the profile, not population tables.
+  for (const k of MICRONUTRIENT_KEYS) {
     const entry: MicroTarget = {};
     if (rni[k] !== undefined) entry.rni = rni[k];
     if (dvTable[k] !== undefined) entry.dv = dvTable[k];

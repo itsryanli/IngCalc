@@ -6,6 +6,10 @@ export const NUTRIENT_KEYS = [
 ] as const;
 
 export type NutrientKey = (typeof NUTRIENT_KEYS)[number];
+
+export const MICRONUTRIENT_KEYS = [
+  'potassium', 'iron', 'magnesium', 'zinc', 'calcium', 'sodium',
+] as const;
 export type NutrientProfile = Record<NutrientKey, number>;
 
 export const CATEGORIES = [
