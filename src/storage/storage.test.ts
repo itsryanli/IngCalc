@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { db, isStorageAvailable } from './db';
 import { listProfiles, saveProfile, deleteProfile } from './profiles';
@@ -27,6 +27,17 @@ beforeEach(async () => {
 describe('storage', () => {
   it('reports availability', async () => {
     expect(await isStorageAvailable()).toBe(true);
+  });
+
+  it('reports false when IndexedDB is unavailable, so the app can warn about data loss', async () => {
+    const openSpy = vi.spyOn(db, 'open').mockRejectedValueOnce(
+      new Error('IndexedDB is unavailable (e.g. Safari private browsing)'),
+    );
+    try {
+      expect(await isStorageAvailable()).toBe(false);
+    } finally {
+      openSpy.mockRestore();
+    }
   });
 
   it('round-trips a profile', async () => {
