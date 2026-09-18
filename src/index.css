@@ -1,7 +1,769 @@
+/* ==========================================================================
+   IngCalc — design system
+
+   Colour carries meaning here rather than decoration. This app's character is
+   that it tells you where every number came from, so:
+     --accent    actions and confirmed values
+     --estimate  anything assumed, defaulted or unverified (amber)
+     --danger    genuine errors only
+   Glance at a screen and the amber tells you which numbers are soft.
+   ========================================================================== */
+
 :root {
   color-scheme: light dark;
+
+  /* Warm neutral base — a food app, not a dashboard. */
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --surface-sunken: #f3f0ec;
+  --text: #1c1917;
+  --text-dim: #6b6560;
+  --border: #e7e2dc;
+  --border-strong: #d6cfc6;
+
+  --accent: #2f7d4f;
+  --accent-hover: #27683f;
+  --accent-text: #ffffff;
+  --accent-soft: #eaf4ee;
+
+  --estimate: #8a5a10;
+  --estimate-soft: #fdf6e8;
+
+  --danger: #b3261e;
+  --danger-soft: #fdeceb;
+
+  /* Fluid sizing: grows with the viewport instead of jumping at breakpoints.
+     48px floor everywhere tappable — above the 44px guideline, because this
+     gets used with wet or floury hands. */
+  --tap-min: 3rem;
+  --btn-h: clamp(3rem, 8vw, 3.5rem);
+  --tab-h: clamp(3.5rem, 12vw, 4.25rem);
+
+  --fs-btn: clamp(1rem, 3.5vw, 1.125rem);
+  --fs-base: clamp(1rem, 3.2vw, 1.0625rem);
+  --fs-sm: clamp(0.8125rem, 2.8vw, 0.875rem);
+  --fs-xs: clamp(0.75rem, 2.5vw, 0.8125rem);
+  --fs-h1: clamp(1.25rem, 5vw, 1.5rem);
+  --fs-h2: clamp(1.375rem, 5.5vw, 1.75rem);
+  --fs-result: clamp(2rem, 9vw, 2.75rem);
+
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+
+  --radius: 0.625rem;
+  --radius-lg: 0.875rem;
+  --shadow: 0 1px 2px rgb(28 25 23 / 0.06), 0 1px 3px rgb(28 25 23 / 0.08);
+
+  --content-max: 34rem;
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1817;
+    --surface: #232120;
+    --surface-sunken: #2c2927;
+    --text: #f5f2ef;
+    --text-dim: #a8a29e;
+    --border: #35322f;
+    --border-strong: #46423e;
+
+    --accent: #52a878;
+    --accent-hover: #63b987;
+    --accent-text: #10241a;
+    --accent-soft: #1e2f25;
+
+    --estimate: #d9a441;
+    --estimate-soft: #2a2317;
+
+    --danger: #f0837c;
+    --danger-soft: #2e1a19;
+  }
+}
+
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ==========================================================================
+   Shell
+   ========================================================================== */
+
+.app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  /* Clear the fixed tab bar, plus the home indicator on iOS. */
+  padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px));
+}
+
+.app__header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.app__header h1 {
+  margin: 0;
+  font-size: var(--fs-h1);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.app__profile {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  padding: var(--sp-1) var(--sp-3);
+  background: var(--surface-sunken);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.app__main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding: var(--sp-4);
+}
+
+/* ==========================================================================
+   Tab bar — each target is roughly a fifth of the screen width
+   ========================================================================== */
+
+.tabbar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 20;
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.tab {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tab-h);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Anchored from the top rather than centred, so every tab's main label sits
+     on the same line whether or not it has a "Phase N" sub-label beneath it. */
+  justify-content: flex-start;
+  gap: var(--sp-1);
+  padding: 0.9rem var(--sp-1) var(--sp-2);
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 550;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.tab[aria-selected='true'] {
+  color: var(--accent);
+}
+
+.tab[aria-selected='true']::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--accent);
+}
+
+.tab:disabled {
+  color: var(--text-dim);
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.tab:not(:disabled):active {
+  background: var(--surface-sunken);
+}
+
+.tab__phase {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+/* ==========================================================================
+   Buttons — solid fill for the primary action, visible border for the rest
+   ========================================================================== */
+
+.btn {
+  min-height: var(--btn-h);
+  padding: var(--sp-3) var(--sp-5);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--fs-btn);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, transform 0.06s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+
+.btn:active { transform: scale(0.98); }
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 1px solid var(--accent);
+  box-shadow: var(--shadow);
+  width: 100%;
+}
+
+.btn--primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+.btn--secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1.5px solid var(--border-strong);
+  width: 100%;
+}
+
+.btn--secondary:hover { border-color: var(--text-dim); }
+
+.btn-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+}
+
+@media (min-width: 30rem) {
+  .btn-row { flex-direction: row-reverse; }
+  .btn-row .btn { width: auto; flex: 1; }
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.app label {
+  font-size: var(--fs-sm);
+  font-weight: 550;
+  color: var(--text-dim);
+}
+
+/* Matches bare <input> too — ProfileScreen's Name field has no type attribute,
+   and an attribute-only selector would leave it with raw browser styling. */
+.app input:not([type='radio']):not([type='checkbox']),
+.app select {
+  min-height: var(--tap-min);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface);
+  color: var(--text);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--fs-base);
+}
+
+.app select {
+  /* Room for the native chevron. */
+  padding-right: var(--sp-6);
+}
+
+.app input:focus-visible,
+.app select:focus-visible,
+.app button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.app fieldset {
+  margin: 0 0 var(--sp-4);
+  padding: var(--sp-3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.app legend {
+  padding-inline: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* Radio and checkbox rows as full-size tappable strips. */
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.choice {
+  flex: 1;
+  min-width: 7rem;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  font-size: var(--fs-base);
+  font-weight: 550;
+  color: var(--text);
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.choice:has(input:checked) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.choice input { width: 1.15rem; height: 1.15rem; accent-color: var(--accent); }
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  min-height: var(--tap-min);
+  padding: var(--sp-3);
+  margin-bottom: var(--sp-4);
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  font-size: var(--fs-base);
+  font-weight: 450;
+  color: var(--text);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.checkbox-row input { width: 1.3rem; height: 1.3rem; margin-top: 0.1rem; accent-color: var(--accent); flex: none; }
+
+/* Weight input with its unit toggle as a segmented control. */
+.weight__row { display: flex; gap: var(--sp-2); align-items: stretch; }
+.weight__row input { flex: 1; min-width: 0; }
+
+.seg {
+  display: flex;
+  flex: none;
+  background: var(--surface-sunken);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 3px;
+  gap: 3px;
+}
+
+.seg__btn {
+  min-width: 3.25rem;
+  /* Full tap floor on the button itself — the 3px wrapper padding sits outside it,
+     and align-items:stretch grows the weight input to match. */
+  min-height: var(--tap-min);
+  border: none;
+  border-radius: calc(var(--radius) - 3px);
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: var(--fs-btn);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.seg__btn[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: var(--shadow);
+}
+
+/* Explained values — a figure with its working on demand
+   ------------------------------------------------------------------ */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.explained__intro { margin-bottom: var(--sp-3); }
+
+.explained + .explained { border-top: 1px solid var(--border); }
+
+.explained__row {
+  width: 100%;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.explained__label { flex: 1; font-size: var(--fs-sm); color: var(--text-dim); font-weight: 550; }
+
+.explained__value {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Deliberately a visible affordance, not a hover-only tooltip: there is no
+   hover on a phone, which is the device this app is built for. */
+.explained__hint {
+  flex: none;
+  width: 1.5rem; height: 1.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.explained.is-open .explained__hint,
+.explained__row:hover .explained__hint { background: var(--accent-soft); color: var(--accent); }
+
+.explained__panel {
+  padding: 0 0 var(--sp-3);
+  border-left: 3px solid var(--accent-soft);
+  padding-left: var(--sp-3);
+  margin-bottom: var(--sp-2);
+}
+
+.explained__panel .calc-trace li { padding: var(--sp-2) 0; }
+
+/* Prose steps read as sentences, not as arithmetic. */
+.calc-trace__prose .calc-trace__detail {
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+
+/* Pointer devices get it on hover too, but the click state always wins. */
+@media (hover: hover) and (pointer: fine) {
+  .explained:not(.is-open):hover .explained__panel { display: block; }
+  .explained:not(.is-open):hover .explained__panel[hidden] { display: block; }
+}
+
+/* Typeahead ingredient picker
+   ------------------------------------------------------------------ */
+
+.picker { position: relative; }
+
+.picker__list {
+  position: absolute;
+  z-index: 30;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: var(--sp-1) 0 0;
+  padding: var(--sp-1);
+  list-style: none;
+  max-height: 55vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(28 25 23 / 0.14);
+}
+
+.picker__option {
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: calc(var(--radius) - 2px);
+  font-size: var(--fs-base);
+  cursor: pointer;
+}
+
+.picker__option.is-active,
+.picker__option:hover { background: var(--accent-soft); color: var(--accent); }
+
+.picker__option[aria-selected='true'] { font-weight: 650; }
+
+/* The add row is an action, not an ingredient — amber marks it as the
+   "nothing here matches" escape hatch rather than a catalogue entry. */
+.picker__option--add {
+  color: var(--estimate);
+  font-weight: 600;
+  border-top: 1px solid var(--border);
+  margin-top: var(--sp-1);
+  border-radius: 0 0 calc(var(--radius) - 2px) calc(var(--radius) - 2px);
+}
+
+.picker__option--add.is-active,
+.picker__option--add:hover { background: var(--estimate-soft); color: var(--estimate); }
+
+/* Grouped nutrient inputs — two columns once there is room. */
+.nutrient-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sp-3);
+}
+
+@media (min-width: 26rem) {
+  .nutrient-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.nutrient-grid .field { margin-bottom: 0; }
+
+/* ==========================================================================
+   Screens
+   ========================================================================== */
+
+.screen { margin: 0; }
+
+.screen > h2 {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-h2);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.screen__hint {
+  margin: 0 0 var(--sp-5);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-4);
+  box-shadow: var(--shadow);
+}
+
+.card__title {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+/* Banners */
+.banner {
+  padding: var(--sp-3) var(--sp-4);
+  margin: 0 0 var(--sp-4);
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+
+.banner--warn { background: var(--estimate-soft); color: var(--estimate); border: 1px solid currentColor; }
+.banner--info { background: var(--accent-soft); color: var(--accent); border: 1px solid currentColor; }
+
+.app [role='alert'] {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+  margin: var(--sp-3) 0;
+  font-size: var(--fs-sm);
+}
+
+/* ==========================================================================
+   Result — the headline number
+   ========================================================================== */
+
+.result {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-result);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.result__unit { font-size: 0.45em; font-weight: 550; color: var(--text-dim); margin-left: 0.2em; }
+
+.share {
+  margin: var(--sp-3) 0 0;
+  padding: var(--sp-3);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Calculation trace — the "how it got there" panel
+   ========================================================================== */
+
+.calc-trace {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.calc-trace li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--sp-1) var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.calc-trace li:last-child { border-bottom: none; }
+
+.calc-trace__label { font-weight: 600; font-size: var(--fs-sm); }
+.calc-trace__value {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm);
+}
+.calc-trace__detail {
+  grid-column: 1 / -1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+.calc-trace__source {
+  grid-column: 1 / -1;
+  font-size: var(--fs-xs);
+  color: var(--estimate);
+  font-weight: 550;
+}
+
+/* ==========================================================================
+   Tables
+   ========================================================================== */
+
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-inline: calc(var(--sp-4) * -1);
+  padding-inline: var(--sp-4);
+}
+
+.app table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.app thead th {
+  text-align: right;
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  padding: 0 var(--sp-2) var(--sp-2);
+  border-bottom: 1.5px solid var(--border-strong);
+  white-space: nowrap;
+}
+
+.app thead th:first-child { text-align: left; padding-left: 0; }
+
+.app tbody th[scope='row'] {
+  text-align: left;
+  font-weight: 550;
+  padding: var(--sp-3) var(--sp-2) var(--sp-3) 0;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.app tbody td {
+  text-align: right;
+  padding: var(--sp-3) var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.app tbody td:last-child { padding-right: 0; }
+
+/* An assumed or missing figure reads amber wherever it appears. */
+.app abbr[title] {
+  color: var(--estimate);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: help;
+}
+
+.app tfoot td { padding: var(--sp-3) 0 0; border: none; }
+
+.nutrient-table__legend,
+.method-compare__legend {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  color: var(--estimate);
+  text-align: left;
+  white-space: normal;
+}
+
+.nutrient-table__legend:last-child,
+.method-compare__legend:last-child { margin-bottom: 0; }
+
+/* Method comparison scrolls sideways rather than dropping the provenance
+   column — hiding where a number came from would break the app's premise. */
+.method-compare th[scope='row'] {
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
 }

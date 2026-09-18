@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ageFrom, bmr, activityMultiplier, tdee, calorieTarget, proteinTargetG, proteinGPerLb, microTargets } from './targets';
+import { ageFrom, explainTargets, bmr, activityMultiplier, tdee, calorieTarget, proteinTargetG, proteinGPerLb, microTargets } from './targets';
 import type { Profile } from './types';
 import { rniFor } from '../data/rniMY';
 import { DV_US } from '../data/dvUS';
@@ -85,5 +85,61 @@ describe('targets', () => {
     const t = microTargets(male, TODAY, () => ({ iron: 9 }), {});
     expect(t.iron?.rni).toBe(9);
     expect(t.iron?.dv).toBeUndefined();
+  });
+});
+
+describe('explainTargets', () => {
+  const at = (p: Profile) => explainTargets(p, TODAY);
+
+  it('explains BMR with the user\'s own numbers substituted', () => {
+    const { bmr } = at(male);
+    const joined = bmr.map((s) => `${s.label} ${s.detail} ${s.value} ${s.sourceNote ?? ''}`).join(' | ');
+    // The point is that the figures are the user's, not a generic formula.
+    expect(joined).toContain('75');
+    expect(joined).toContain('175');
+    expect(joined).toContain('30');
+    expect(joined).toContain('1,699');
+    expect(joined).toMatch(/Mifflin/i);
+  });
+
+  it('names the female variant when the profile is female', () => {
+    const joined = at({ ...male, sex: 'female' }).bmr.map((s) => s.sourceNote ?? '').join(' ');
+    expect(joined).toMatch(/female/i);
+  });
+
+  it('shows which activity band produced the multiplier', () => {
+    const joined = at(male).tdee.map((s) => `${s.detail} ${s.sourceNote ?? ''}`).join(' | ');
+    expect(joined).toContain('1.55');
+    // 4 sessions/week lands in the 3-4 band; say so rather than showing a bare number.
+    expect(joined).toMatch(/3–4|3-4/);
+  });
+
+  it('discloses that the activity multiplier is a coarse band, not a measurement', () => {
+    const joined = at(male).tdee.map((s) => s.sourceNote ?? '').join(' ');
+    expect(joined).toMatch(/estimate|band/i);
+  });
+
+  it('shows the goal adjustment and names the goal', () => {
+    const cut = at({ ...male, goal: 'cut' }).calories.map((s) => `${s.detail} ${s.sourceNote ?? ''}`).join(' | ');
+    expect(cut).toContain('0.85');
+    expect(cut).toMatch(/cut/i);
+  });
+
+  it('attributes the protein rate to the goal default, or to an override', () => {
+    const fromGoal = at(male).protein.map((s) => s.sourceNote ?? '').join(' ');
+    expect(fromGoal).toMatch(/maintain/i);
+
+    const overridden = at({ ...male, proteinGPerKg: 1.6 }).protein;
+    const joined = overridden.map((s) => `${s.detail} ${s.sourceNote ?? ''}`).join(' | ');
+    expect(joined).toContain('1.6');
+    expect(joined).toMatch(/your own|override/i);
+  });
+
+  it('ends each explanation on the same figure the screen displays', () => {
+    const e = at(male);
+    expect(e.bmr.at(-1)?.value).toContain('1,699');
+    expect(e.tdee.at(-1)?.value).toContain('2,633');
+    expect(e.calories.at(-1)?.value).toContain('2,633');
+    expect(e.protein.at(-1)?.value).toContain('135');
   });
 });

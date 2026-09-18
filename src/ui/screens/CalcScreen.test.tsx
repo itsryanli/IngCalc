@@ -6,6 +6,25 @@ import { db } from '../../storage/db';
 import * as userIngredientsModule from '../../storage/userIngredients';
 import type { Profile } from '../../core/types';
 
+// The ingredient control is a typeahead combobox, not a <select>, so it is driven by
+// typing and pressing a listbox option rather than by setting a value. Options activate
+// on mousedown (the input's blur would otherwise close the list before a click landed),
+// which is why press() dispatches mousedown rather than click.
+const press = (el: HTMLElement) => fireEvent.mouseDown(el);
+
+const pickIngredient = async (labelText: RegExp) => {
+  const input = await screen.findByRole('combobox', { name: /ingredient/i });
+  fireEvent.focus(input);
+  press(await screen.findByRole('option', { name: labelText }));
+};
+
+const openAddIngredient = async () => {
+  const input = await screen.findByRole('combobox', { name: /ingredient/i });
+  fireEvent.focus(input);
+  press(await screen.findByRole('option', { name: /Add a new ingredient/i }));
+};
+
+
 const profile: Profile = {
   id: 'p1', name: 'Ryan', sex: 'male', birthYear: 1996,
   heightCm: 175, weightKg: 75, sessionsPerWeek: 4, goal: 'maintain',
@@ -26,8 +45,7 @@ beforeEach(async () => { await db.userIngredients.clear(); });
 // is showing, the MethodCompare table's aria-label ("Method comparison") also matches /method/i
 // under getByLabelText's aria-label fallback, which getByRole('combobox', ...) doesn't share.
 const selectChicken = async () => {
-  await waitFor(() => expect(screen.getByLabelText(/ingredient/i)).toBeInTheDocument());
-  fireEvent.change(screen.getByLabelText(/ingredient/i), { target: { value: 'chicken-breast' } });
+  await pickIngredient(/^Chicken breast/);
   fireEvent.change(screen.getByLabelText(/^weight/i), { target: { value: '1000' } });
   fireEvent.change(screen.getByRole('combobox', { name: /method/i }), { target: { value: 'roasted' } });
 };
@@ -96,9 +114,7 @@ describe('CalcScreen', () => {
 
   it('lets the user add a missing ingredient from the picker, then selects it automatically', async () => {
     render(<CalcScreen profile={null} today={today} />);
-    await waitFor(() => expect(screen.getByLabelText(/ingredient/i)).toBeInTheDocument());
-
-    fireEvent.change(screen.getByLabelText(/ingredient/i), { target: { value: '__add_new__' } });
+    await openAddIngredient();
 
     const nameInput = await screen.findByLabelText(/^name/i);
     fireEvent.change(nameInput, { target: { value: 'Petai' } });
@@ -106,8 +122,8 @@ describe('CalcScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /save ingredient/i }));
 
     // Back on the calculator, the picker now shows the new ingredient, selected.
-    const select = await screen.findByLabelText(/ingredient/i) as HTMLSelectElement;
-    await waitFor(() => expect(select.selectedOptions[0]?.textContent).toBe('Petai'));
+    const picker = await screen.findByRole('combobox', { name: /ingredient/i }) as HTMLInputElement;
+    await waitFor(() => expect(picker.value).toBe('Petai'));
 
     // And it's usable immediately: entering a weight produces a result.
     fireEvent.change(screen.getByLabelText(/^weight/i), { target: { value: '100' } });
@@ -116,17 +132,16 @@ describe('CalcScreen', () => {
 
   it('lets the user back out of adding an ingredient without writing anything', async () => {
     render(<CalcScreen profile={null} today={today} />);
-    await waitFor(() => expect(screen.getByLabelText(/ingredient/i)).toBeInTheDocument());
 
     // A slip of the finger on a dropdown must be recoverable without polluting the catalogue.
-    fireEvent.change(screen.getByLabelText(/ingredient/i), { target: { value: '__add_new__' } });
+    await openAddIngredient();
     await screen.findByLabelText(/^name/i);
 
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
 
     // Back on the calculator, not left showing the sentinel as though it were a real selection.
-    const select = await screen.findByLabelText(/ingredient/i) as HTMLSelectElement;
-    expect(select.value).toBe('');
+    const picker = await screen.findByRole('combobox', { name: /ingredient/i }) as HTMLInputElement;
+    expect(picker.value).toBe('');
 
     // The one assertion that actually matters: cancelling wrote nothing to storage.
     expect(await db.userIngredients.toArray()).toHaveLength(0);
@@ -142,9 +157,7 @@ describe('CalcScreen', () => {
 
     try {
       render(<CalcScreen profile={null} today={today} />);
-      await waitFor(() => expect(screen.getByLabelText(/ingredient/i)).toBeInTheDocument());
-
-      fireEvent.change(screen.getByLabelText(/ingredient/i), { target: { value: '__add_new__' } });
+      await openAddIngredient();
       const nameInput = await screen.findByLabelText(/^name/i);
       fireEvent.change(nameInput, { target: { value: 'Petai' } });
       fireEvent.click(screen.getByRole('button', { name: /save ingredient/i }));
@@ -153,7 +166,7 @@ describe('CalcScreen', () => {
       await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not be loaded/i));
 
       // And the calculator itself is still there and usable, not a blank/broken screen.
-      expect(screen.getByLabelText(/ingredient/i)).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: /ingredient/i })).toBeInTheDocument();
     } finally {
       spy.mockRestore();
     }

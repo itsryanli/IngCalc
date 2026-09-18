@@ -59,3 +59,17 @@ export interface YieldSample {
   cookedWeightG: Grams;
   excludeFromCalibration: boolean;
 }
+
+/**
+ * One line of a calculation shown to the user.
+ *
+ * Both the cooking engine and the profile targets explain themselves with these,
+ * so it lives in the shared vocabulary rather than in either one.
+ */
+export interface CalcStep {
+  label: string;
+  detail: string;
+  value: string;
+  /** Where the number came from, shown to the user verbatim. */
+  sourceNote?: string;
+}
