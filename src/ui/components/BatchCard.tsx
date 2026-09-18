@@ -4,7 +4,7 @@ import {
   costPerKgCooked, costPerKgRaw, proteinPerMYRRaw, proteinPerMYRRetained,
 } from '../../core/cost';
 import type { Batch, CookSession, Ingredient } from '../../core/types';
-import { formatG, formatMYR } from '../../core/units';
+import { formatG, formatMYR, g } from '../../core/units';
 import { RETENTION } from '../../data/retentionTable';
 import { deleteBatchCascade } from '../../storage/kitchen';
 import { formatIsoDate } from '../dates';
@@ -36,7 +36,7 @@ export function BatchCard({
   const mine = sessionsOf(batch.id, sessions);
   const state = batchState(batch, sessions);
   const remaining = rawRemainingG(batch, sessions);
-  const cookedLeft = mine.reduce((sum, s) => sum + s.cookedRemainingG, 0);
+  const cookedLeft = g(mine.reduce((sum, s) => sum + s.cookedRemainingG, 0));
 
   const perKgRaw = costPerKgRaw(batch);
   const perKgCooked = costPerKgCooked(batch, sessions);
