@@ -23,8 +23,9 @@ describe('ProfileScreen', () => {
     render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
     fill();
     await waitFor(() => {
-      expect(screen.getByTestId('tdee')).toHaveTextContent('2633');
-      expect(screen.getByTestId('calorie-target')).toHaveTextContent('2633');
+      // Displayed with a thousands separator, as NutrientTable already does.
+      expect(screen.getByTestId('tdee')).toHaveTextContent('2,633');
+      expect(screen.getByTestId('calorie-target')).toHaveTextContent('2,633');
     });
   });
 
@@ -131,5 +132,28 @@ describe('ProfileScreen', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  it('explains a target on demand, with the user\'s own numbers in the working', async () => {
+    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
+    fill();
+
+    const toggle = await screen.findByRole('button', { name: /how BMR is worked out/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    // Not a generic formula — the profile's own height, weight and age.
+    expect(screen.getByText(/10 × 75kg \+ 6.25 × 175cm − 5 × 30 \+ 5/)).toBeInTheDocument();
+    // Named in both the step label and its source note, hence getAllByText.
+    expect(screen.getAllByText(/Mifflin-St Jeor/i).length).toBeGreaterThan(0);
+  });
+
+  it('keeps the working hidden until asked for', () => {
+    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
+    fill();
+    // The panel exists in the DOM but is hidden, so nothing reads it out or shows it.
+    expect(screen.getAllByText(/Mifflin-St Jeor/i)[0]).not.toBeVisible();
   });
 });

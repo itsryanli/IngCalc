@@ -1,17 +1,12 @@
 // src/core/nutrition.ts
-import type { CookMethod, Ingredient, NutrientKey, NutrientProfile, YieldSample } from './types';
+import type { CalcStep, CookMethod, Ingredient, NutrientKey, NutrientProfile, YieldSample } from './types';
+
+// Re-exported so existing importers keep working; the type itself now lives in types.ts.
+export type { CalcStep };
 import { mapNutrients, nutrientsForWeight, scaleNutrients, zeroNutrients } from './nutrients';
 import { resolveYield, type CategoryYield, type ResolvedYield } from './yieldResolver';
 import { retentionFor, type RetentionLookup } from './retention';
 import { g, type Grams } from './units';
-
-export interface CalcStep {
-  label: string;
-  detail: string;
-  value: string;
-  /** Where the number came from, shown to the user verbatim. */
-  sourceNote?: string;
-}
 
 export interface CookInput {
   ingredient: Ingredient;

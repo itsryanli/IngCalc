@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react';
 import type { Goal, Profile, Sex } from '../../core/types';
-import { bmr, calorieTarget, proteinGPerKgFor, proteinGPerLb, proteinTargetG, tdee } from '../../core/targets';
+import { bmr, calorieTarget, proteinGPerKgFor, proteinGPerLb, proteinTargetG, tdee, explainTargets } from '../../core/targets';
 import { saveProfile } from '../../storage/profiles';
+import { ExplainedValue } from '../components/ExplainedValue';
+
+/** Matches the thousands-separator convention NutrientTable already uses. */
+const kcal = (v: number): string => `${v.toLocaleString('en-MY')} kcal`;
 import { newId } from '../newId';
 
 interface Draft {
@@ -58,6 +62,7 @@ export function ProfileScreen({ onSaved, today = new Date() }: { onSaved: (p: Pr
       proteinG: Math.round(proteinTargetG(p)),
       gPerKg: proteinGPerKgFor(p),
       gPerLb: proteinGPerLb(p),
+      explain: explainTargets(p, today),
     };
   }, [draft, today]);
 
@@ -135,15 +140,27 @@ export function ProfileScreen({ onSaved, today = new Date() }: { onSaved: (p: Pr
       </div>
 
       {preview !== null && (
-        <dl className="card">
-          <dt>BMR</dt><dd data-testid="bmr">{preview.bmr} kcal</dd>
-          <dt>TDEE</dt><dd data-testid="tdee">{preview.tdee} kcal</dd>
-          <dt>Daily calorie target</dt><dd data-testid="calorie-target">{preview.calories} kcal</dd>
-          <dt>Daily protein target</dt>
-          <dd data-testid="protein-target">
-            {preview.proteinG} g ({preview.gPerKg.toFixed(1)} g/kg &middot; {preview.gPerLb.toFixed(2)} g/lb)
-          </dd>
-        </dl>
+        <div className="card">
+          <h3 className="card__title">Your daily targets</h3>
+          <p className="screen__hint explained__intro">Tap any figure to see how it was worked out.</p>
+          <ExplainedValue
+            label="BMR" testId="bmr"
+            value={kcal(preview.bmr)} steps={preview.explain.bmr}
+          />
+          <ExplainedValue
+            label="TDEE" testId="tdee"
+            value={kcal(preview.tdee)} steps={preview.explain.tdee}
+          />
+          <ExplainedValue
+            label="Daily calorie target" testId="calorie-target"
+            value={kcal(preview.calories)} steps={preview.explain.calories}
+          />
+          <ExplainedValue
+            label="Daily protein target" testId="protein-target"
+            value={`${preview.proteinG} g (${preview.gPerKg.toFixed(1)} g/kg · ${preview.gPerLb.toFixed(2)} g/lb)`}
+            steps={preview.explain.protein}
+          />
+        </div>
       )}
 
       {error !== null && <p role="alert">{error}</p>}
