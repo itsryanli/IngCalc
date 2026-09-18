@@ -358,7 +358,7 @@ export function portionsRemaining(session: CookSession): number {
 npx vitest run src/core/batch.test.ts
 ```
 
-Expected: PASS, 12 tests.
+Expected: PASS, 14 tests.
 
 - [ ] **Step 7: Confirm nothing else broke**
 
@@ -366,7 +366,7 @@ Expected: PASS, 12 tests.
 npx vitest run && npx tsc -b
 ```
 
-Expected: 285 + 12 tests pass; `tsc` silent.
+Expected: 285 + 14 tests pass; `tsc` silent.
 
 - [ ] **Step 8: Commit**
 
@@ -705,7 +705,7 @@ export function toYieldSamples(
 npx vitest run src/core/calibration.test.ts
 ```
 
-Expected: PASS, 15 tests.
+Expected: PASS, 16 tests.
 
 - [ ] **Step 5: Commit**
 
