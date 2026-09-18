@@ -412,6 +412,57 @@ body {
   box-shadow: var(--shadow);
 }
 
+/* Typeahead ingredient picker
+   ------------------------------------------------------------------ */
+
+.picker { position: relative; }
+
+.picker__list {
+  position: absolute;
+  z-index: 30;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: var(--sp-1) 0 0;
+  padding: var(--sp-1);
+  list-style: none;
+  max-height: 55vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(28 25 23 / 0.14);
+}
+
+.picker__option {
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: calc(var(--radius) - 2px);
+  font-size: var(--fs-base);
+  cursor: pointer;
+}
+
+.picker__option.is-active,
+.picker__option:hover { background: var(--accent-soft); color: var(--accent); }
+
+.picker__option[aria-selected='true'] { font-weight: 650; }
+
+/* The add row is an action, not an ingredient — amber marks it as the
+   "nothing here matches" escape hatch rather than a catalogue entry. */
+.picker__option--add {
+  color: var(--estimate);
+  font-weight: 600;
+  border-top: 1px solid var(--border);
+  margin-top: var(--sp-1);
+  border-radius: 0 0 calc(var(--radius) - 2px) calc(var(--radius) - 2px);
+}
+
+.picker__option--add.is-active,
+.picker__option--add:hover { background: var(--estimate-soft); color: var(--estimate); }
+
 /* Grouped nutrient inputs — two columns once there is room. */
 .nutrient-grid {
   display: grid;

@@ -14,13 +14,11 @@ import { WeightInput, type WeightUnit } from '../components/WeightInput';
 import { CalcTrace } from '../components/CalcTrace';
 import { NutrientTable } from '../components/NutrientTable';
 import { MethodCompare } from '../components/MethodCompare';
+import { IngredientPicker } from '../components/IngredientPicker';
 import { AddIngredientScreen } from './AddIngredientScreen';
 import { METHOD_LABELS } from '../labels';
 
 const HIGHLIGHT: NutrientKey[] = ['potassium', 'iron', 'magnesium'];
-
-/** Sentinel option value for "this ingredient isn't in the list — let me add it". */
-const ADD_NEW = '__add_new__';
 
 export function CalcScreen({ profile, today = new Date() }: { profile: Profile | null; today?: Date }) {
   const { catalogue, refresh } = useCatalogue();
@@ -30,23 +28,21 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
   const [entered, setEntered] = useState<'raw' | 'cooked'>('raw');
   const [method, setMethod] = useState<CookMethod>('roasted');
   const [addingIngredient, setAddingIngredient] = useState(false);
+  /** Seeds the add-ingredient form with whatever the user had typed into the picker. */
+  const [addInitialName, setAddInitialName] = useState('');
   const [addIngredientError, setAddIngredientError] = useState<string | null>(null);
 
   const ingredient = catalogue.find((i) => i.id === ingredientId) ?? null;
 
-  const handleIngredientChange = (value: string) => {
-    if (value === ADD_NEW) {
-      setAddIngredientError(null);
-      setAddingIngredient(true);
-      return;
-    }
-    setIngredientId(value);
+  const handleAddNew = (typedName: string) => {
+    setAddIngredientError(null);
+    setAddInitialName(typedName);
+    setAddingIngredient(true);
   };
 
-  // The select stays on the sentinel value only while addingIngredient is true — while it's
-  // true the whole select is unmounted (see below), and ingredientId itself was never changed
-  // to the sentinel, so returning here (via save or cancel) always lands back on whatever was
-  // genuinely selected before, never on "Ingredient not listed? Add it" itself.
+  // The picker is unmounted while adding, and ingredientId was never changed on the way in,
+  // so returning here (via save or cancel) always lands back on whatever was genuinely
+  // selected before.
   const handleAddCancelled = () => {
     setAddingIngredient(false);
   };
@@ -111,24 +107,18 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
 
       {addingIngredient ? (
         <AddIngredientScreen
-          initialName=""
+          initialName={addInitialName}
           onSaved={(added) => { void handleIngredientAdded(added); }}
           onCancel={handleAddCancelled}
         />
       ) : (
         <>
-          <div className="field">
-          <label htmlFor="ingredient">Ingredient</label>
-          <select
-            id="ingredient"
+          <IngredientPicker
+            catalogue={catalogue}
             value={ingredientId}
-            onChange={(e) => handleIngredientChange(e.target.value)}
-          >
-            <option value="">Choose…</option>
-            {catalogue.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-            <option value={ADD_NEW}>Ingredient not listed? Add it</option>
-          </select>
-          </div>
+            onChange={setIngredientId}
+            onAddNew={handleAddNew}
+          />
           {addIngredientError !== null && <p role="alert">{addIngredientError}</p>}
 
           <WeightInput label="Weight" value={weight} unit={unit} onChange={setWeight} onUnitChange={setUnit} />
