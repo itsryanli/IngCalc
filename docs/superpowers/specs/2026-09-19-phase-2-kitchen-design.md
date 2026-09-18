@@ -125,7 +125,8 @@ rejects correct cooks:
 
 Boiled greens take up water. The rule would have refused a cook that matches
 the app's own published figure, and the same draft's ceiling of 3.0 for
-absorbing ingredients would have refused boiled chickpeas, published at 6.65.
+absorbing ingredients would have refused boiled rolled oats, published at 6.65,
+along with bihun at 3.32.
 
 The deeper problem is that one boolean per ingredient cannot express this:
 cabbage *loses* mass steamed and *gains* it boiled. The reference factor is
@@ -318,9 +319,10 @@ Core first, following Phase 1's convention.
 - **Lifecycle invariants** — no remainder ever negative, at every transition:
   cook, partial cook, eat, weighed eat, edit, delete. Derived batch state
   correct at each.
-- **Guards** — both validators at their boundaries, including a boiled cabbage
-  cook that gains mass (must be accepted) and a boiled chickpea cook at 6.65×
-  (must be accepted), against a 10× transposed digit (must be blocked).
+- **Guards** — both validators at their boundaries, against the real bundled
+  table rather than fixtures: boiled cabbage gaining mass at 1.07 and boiled
+  rolled oats at 6.65 must both be accepted, while a 10× transposed digit must
+  be blocked.
 - **Portions over grams** — the parent spec's awkward case: a 100g serving from
   a 148g portion, asserting portions remaining follows grams rather than the
   reverse.
