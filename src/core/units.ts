@@ -21,3 +21,11 @@ export const gToKg = (v: Grams): number => v / 1000;
 
 export const addG = (a: Grams, b: Grams): Grams => g(a + b);
 export const subG = (a: Grams, b: Grams): Grams => g(a - b);
+
+/**
+ * Weights shown to the user. Whole grams above 10g, where a decimal would be
+ * false precision on a kitchen scale; one decimal below it, where dropping it
+ * would round a real 2.4g to "2g".
+ */
+export const formatG = (v: Grams): string =>
+  `${v.toLocaleString('en-MY', { maximumFractionDigits: v < 10 ? 1 : 0 })}g`;

@@ -1,4 +1,4 @@
-import type { Grams } from './units';
+import type { Grams, MYR } from './units';
 
 export const NUTRIENT_KEYS = [
   'kcal', 'protein', 'carbs', 'fibre', 'fat',
@@ -50,6 +50,55 @@ export interface Profile {
   sessionsPerWeek: number;
   goal: Goal;
   proteinGPerKg?: number;
+}
+
+/** 'YYYY-MM-DD'. Local calendar date, not an instant: which day you shopped. */
+export type IsoDate = string;
+
+export interface Purchase {
+  pricePaidMYR: MYR;
+  location: string;
+  date: IsoDate;
+}
+
+/**
+ * One purchase, household-level: you shop once for the house but eat as an
+ * individual.
+ *
+ * There is deliberately no `rawRemainingG` field. Cook sessions are an event
+ * log of raw consumption, so the remainder is always recoverable from them —
+ * storing it as well would be a second source of truth that editing could put
+ * out of step with the first. See `rawRemainingG()` in `./batch`.
+ */
+export interface Batch {
+  id: string;
+  ingredientId: string;
+  rawWeightG: Grams;
+  purchase: Purchase;
+  createdAt: number;
+}
+
+/**
+ * One cooking event, and simultaneously one yield observation: it records the
+ * ingredient (through its batch), the method, the raw weight in and the cooked
+ * weight out. That is why Phase 2 needs no separate calibration table.
+ */
+export interface CookSession {
+  id: string;
+  batchId: string;
+  method: CookMethod;
+  rawUsedG: Grams;
+  /** Measured by the user on a scale, never derived from a yield factor. */
+  cookedWeightG: Grams;
+  /**
+   * Authoritative remaining quantity. Stored rather than derived because
+   * eating writes no record until Phase 3 introduces meals.
+   */
+  cookedRemainingG: Grams;
+  cookedAt: IsoDate;
+  portionCount: number;
+  /** The day you forgot to drain it: kept, but excluded from the yield mean. */
+  excludeFromCalibration: boolean;
 }
 
 export interface YieldSample {
