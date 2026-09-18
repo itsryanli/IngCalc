@@ -77,4 +77,18 @@ describe('storage', () => {
     expect(all.length).toBe(1);
     expect(all[0]!.archived).toBe(true);
   });
+
+  it('resolves false rather than hanging when the database never responds', async () => {
+    // The Phase 1 defect: a blocked upgrade leaves Dexie's open promise pending
+    // forever, so the launch banner never renders and the user is never told
+    // their entries are being discarded.
+    const openSpy = vi.spyOn(db, 'open').mockReturnValue(
+      new Promise(() => { /* never settles */ }) as ReturnType<typeof db.open>,
+    );
+    try {
+      expect(await isStorageAvailable(20)).toBe(false);
+    } finally {
+      openSpy.mockRestore();
+    }
+  });
 });
