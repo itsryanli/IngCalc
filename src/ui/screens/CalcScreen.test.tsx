@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CalcScreen } from './CalcScreen';
 import { db } from '../../storage/db';
 import * as userIngredientsModule from '../../storage/userIngredients';
 import type { Profile } from '../../core/types';
+import { g, myr } from '../../core/units';
 
 // The ingredient control is a typeahead combobox, not a <select>, so it is driven by
 // typing and pressing a listbox option rather than by setting a value. Options activate
@@ -170,5 +171,79 @@ describe('CalcScreen', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe('CalcScreen calibration', () => {
+  beforeEach(async () => {
+    await db.batches.clear();
+    await db.cookSessions.clear();
+  });
+
+  afterEach(async () => {
+    await db.batches.clear();
+    await db.cookSessions.clear();
+  });
+
+  it('uses the published factor while the user has no cooks logged', async () => {
+    render(<CalcScreen profile={null} />);
+    await selectChicken();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('result-weight')).toHaveTextContent('710g');
+    });
+    expect(screen.getByText(/published factor/i)).toBeInTheDocument();
+  });
+
+  it('switches to the user own measured average once a cook is logged', async () => {
+    // One cook at 0.60 rather than the published 0.71.
+    await db.batches.put({
+      id: 'b1', ingredientId: 'chicken-breast', rawWeightG: g(1000),
+      purchase: { pricePaidMYR: myr(20), location: 'Pasar', date: '2026-09-19' },
+      createdAt: 0,
+    });
+    await db.cookSessions.put({
+      id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(1000),
+      cookedWeightG: g(600), cookedRemainingG: g(600), cookedAt: '2026-09-19',
+      portionCount: 4, excludeFromCalibration: false,
+    });
+
+    render(<CalcScreen profile={null} />);
+    await selectChicken();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('result-weight')).toHaveTextContent('600g');
+    });
+    expect(screen.getByText(/your average across 1 cook/i)).toBeInTheDocument();
+  });
+
+  it('honours an excluded cook, falling back to the published factor', async () => {
+    await db.batches.put({
+      id: 'b1', ingredientId: 'chicken-breast', rawWeightG: g(1000),
+      purchase: { pricePaidMYR: myr(20), location: 'Pasar', date: '2026-09-19' },
+      createdAt: 0,
+    });
+    await db.cookSessions.put({
+      id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(1000),
+      cookedWeightG: g(600), cookedRemainingG: g(600), cookedAt: '2026-09-19',
+      portionCount: 4, excludeFromCalibration: true,
+    });
+
+    render(<CalcScreen profile={null} />);
+    await selectChicken();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('result-weight')).toHaveTextContent('710g');
+    });
+  });
+
+  it('offers to log the calculated weight as a batch', async () => {
+    render(<CalcScreen profile={null} />);
+    await selectChicken();
+
+    fireEvent.click(await screen.findByRole('button', { name: /log this as a batch/i }));
+
+    // Prefilled from the calculator, so the user does not retype it.
+    expect(screen.getByLabelText(/^raw weight/i)).toHaveValue(1000);
   });
 });

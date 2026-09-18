@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { COOK_METHODS, type CookMethod, type Ingredient, type NutrientKey, type Profile } from '../../core/types';
-import { g, type Grams } from '../../core/units';
+import { formatG, g, type Grams } from '../../core/units';
 import { computeCooked, rawFromCooked } from '../../core/nutrition';
 import { compareMethods } from '../../core/methodCompare';
 import { ageFrom, calorieTarget, microTargets, proteinTargetG } from '../../core/targets';
@@ -10,11 +10,13 @@ import { RNI_MIN_AGE, rniFor } from '../../data/rniMY';
 import { DV_US } from '../../data/dvUS';
 import { listUserIngredients } from '../../storage/userIngredients';
 import { useCatalogue } from '../useCatalogue';
+import { useKitchen } from '../useKitchen';
 import { WeightInput, type WeightUnit } from '../components/WeightInput';
 import { CalcTrace } from '../components/CalcTrace';
 import { NutrientTable } from '../components/NutrientTable';
 import { MethodCompare } from '../components/MethodCompare';
 import { IngredientPicker } from '../components/IngredientPicker';
+import { AddBatchForm } from '../components/AddBatchForm';
 import { AddIngredientScreen } from './AddIngredientScreen';
 import { METHOD_LABELS } from '../labels';
 
@@ -22,6 +24,11 @@ const HIGHLIGHT: NutrientKey[] = ['potassium', 'iron', 'magnesium'];
 
 export function CalcScreen({ profile, today = new Date() }: { profile: Profile | null; today?: Date }) {
   const { catalogue, refresh } = useCatalogue();
+  // The point of Phase 2: resolveYield's `measured` branch has been
+  // unreachable since Phase 1 because nothing produced samples.
+  const { sessions, samples, refresh: refreshKitchen } = useKitchen();
+  const [loggingBatch, setLoggingBatch] = useState(false);
+  const [loggedMessage, setLoggedMessage] = useState<string | null>(null);
   const [ingredientId, setIngredientId] = useState('');
   const [weight, setWeight] = useState<Grams>(g(0));
   const [unit, setUnit] = useState<WeightUnit>('g');
@@ -80,16 +87,16 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
     if (ingredient === null || weight <= 0) return null;
     const rawG = entered === 'raw'
       ? weight
-      : rawFromCooked(ingredient, weight, method, [], CATEGORY_YIELD).rawWeightG;
+      : rawFromCooked(ingredient, weight, method, samples, CATEGORY_YIELD).rawWeightG;
     const cooked = computeCooked({
-      ingredient, rawG, method, samples: [], categoryYield: CATEGORY_YIELD, retention: RETENTION,
+      ingredient, rawG, method, samples, categoryYield: CATEGORY_YIELD, retention: RETENTION,
     });
     return { cooked, shownWeight: entered === 'raw' ? cooked.cookedWeightG : rawG };
-  }, [ingredient, weight, entered, method]);
+  }, [ingredient, weight, entered, method, samples]);
 
   const rows = useMemo(
-    () => (ingredient === null ? [] : compareMethods(ingredient, [], CATEGORY_YIELD, RETENTION, HIGHLIGHT)),
-    [ingredient],
+    () => (ingredient === null ? [] : compareMethods(ingredient, samples, CATEGORY_YIELD, RETENTION, HIGHLIGHT)),
+    [ingredient, samples],
   );
 
   const targets = useMemo(
@@ -105,7 +112,25 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
     <section className="screen">
       <h2>Calculator</h2>
 
-      {addingIngredient ? (
+      {loggingBatch && ingredient !== null ? (
+        <AddBatchForm
+          catalogue={catalogue}
+          sessions={sessions}
+          initialIngredientId={ingredient.id}
+          initialRawWeightG={result?.cooked.rawWeightG}
+          onSaved={(batch) => {
+            void (async () => {
+              await refreshKitchen();
+              setLoggingBatch(false);
+              setLoggedMessage(
+                `Logged ${formatG(batch.rawWeightG)} of ${ingredient.name.toLowerCase()} to your kitchen.`,
+              );
+            })();
+          }}
+          onCancel={() => setLoggingBatch(false)}
+          onAddNew={handleAddNew}
+        />
+      ) : addingIngredient ? (
         <AddIngredientScreen
           initialName={addInitialName}
           onSaved={(added) => { void handleIngredientAdded(added); }}
@@ -152,6 +177,20 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
 
                 <CalcTrace steps={result.cooked.steps} />
               </div>
+
+              <div className="btn-row">
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => { setLoggedMessage(null); setLoggingBatch(true); }}
+                >
+                  Log this as a batch
+                </button>
+              </div>
+
+              {loggedMessage !== null && (
+                <p className="banner banner--info" role="status">{loggedMessage}</p>
+              )}
 
               <div className="card">
                 <h3 className="card__title">Nutrients</h3>
