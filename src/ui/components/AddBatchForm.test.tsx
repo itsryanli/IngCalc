@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AddBatchForm } from './AddBatchForm';
 import { db } from '../../storage/db';
+import * as kitchenModule from '../../storage/kitchen';
 import { g, myr } from '../../core/units';
 import { zeroNutrients } from '../../core/nutrients';
 import type { Batch, CookSession, Ingredient } from '../../core/types';
@@ -91,6 +92,21 @@ describe('AddBatchForm creating', () => {
     fireEvent.change(screen.getByLabelText(/price/i), { target: { value: '0' } });
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
+  });
+
+  it('reports a failed write instead of silently doing nothing', async () => {
+    const onSaved = vi.fn();
+    const spy = vi.spyOn(kitchenModule, 'saveBatch').mockRejectedValue(new Error('quota'));
+    try {
+      render(<AddBatchForm {...props} onSaved={onSaved} initialIngredientId="chicken-breast" />);
+      fireEvent.change(screen.getByLabelText(/^raw weight/i), { target: { value: '500' } });
+      fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/storage/i);
+      expect(onSaved).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('accepts a blank location, because you do not always remember', async () => {

@@ -73,7 +73,19 @@ export function AddBatchForm({
       createdAt: batch?.createdAt ?? Date.now(),
     };
 
-    await saveBatch(saved);
+    try {
+      await saveBatch(saved);
+    } catch {
+      // Dexie can reject (private browsing, quota, a blocked upgrade) — without this the
+      // promise rejection would be unhandled, onSaved would never fire, and the user would
+      // tap Save to nothing: no error, no navigation, form unchanged.
+      setError(
+        'Could not save this purchase — your browser may be blocking storage ' +
+        '(for example, private browsing) or storage may be full. Please try again.',
+      );
+      return;
+    }
+
     onSaved(saved);
   };
 
