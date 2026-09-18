@@ -95,7 +95,9 @@ describe('SessionRow', () => {
   it('asks before deleting a cook, naming what is left of it', () => {
     render(<SessionRow {...props} session={session()} />);
     fireEvent.click(screen.getByRole('button', { name: /^delete/i }));
-    expect(screen.getByRole('alert')).toHaveTextContent('284g');
+    // A confirmation question paired with its own buttons, not an assertive
+    // announcement — found by its text, leaving role="alert" free for write errors.
+    expect(screen.getByText(/delete this cook/i)).toHaveTextContent('284g');
   });
 
   it('deletes the cook on confirmation', async () => {
@@ -142,6 +144,8 @@ describe('SessionRow', () => {
       render(<SessionRow {...props} session={session()} onChanged={onChanged} />);
       fireEvent.click(screen.getByLabelText(/ignore this cook/i));
 
+      // The confirm prompt is no longer role="alert", so findByRole unambiguously
+      // means a write error.
       expect(await screen.findByRole('alert')).toHaveTextContent(/could not update/i);
       expect(onChanged).not.toHaveBeenCalled();
       expect((await db.cookSessions.toArray())[0]!.excludeFromCalibration).toBe(false);
@@ -160,11 +164,51 @@ describe('SessionRow', () => {
       fireEvent.click(screen.getByRole('button', { name: /^delete/i }));
       fireEvent.click(screen.getByRole('button', { name: /yes, delete/i }));
 
-      // findByRole would resolve on the confirm prompt's own alert (still present
-      // at click time), so wait for the specific failure text instead.
-      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not delete/i));
+      expect(await screen.findByRole('alert')).toHaveTextContent(/could not delete/i);
       expect(onChanged).not.toHaveBeenCalled();
       expect(await db.cookSessions.toArray()).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  // Finding 1 from review: the exclude checkbox is reachable while the delete
+  // confirmation is open, and a failed write there must still be visible — the
+  // old `!confirming` render guard hid it.
+  it('surfaces a save error from the ignore toggle even while the delete confirmation is open', async () => {
+    const onChanged = vi.fn();
+    await db.cookSessions.put(session());
+    const spy = vi.spyOn(kitchenModule, 'saveCookSession').mockRejectedValue(new Error('storage unavailable'));
+
+    try {
+      render(<SessionRow {...props} session={session()} onChanged={onChanged} />);
+      fireEvent.click(screen.getByRole('button', { name: /^delete/i }));
+      fireEvent.click(screen.getByLabelText(/ignore this cook/i));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/could not update/i);
+      expect(onChanged).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  // Finding 2 from review: neither confirm-dialog transition cleared a stale
+  // error, so re-opening the dialog after a failed delete and backing out of it
+  // resurrected a message about a failure that wasn't just attempted.
+  it('clears a stale delete error on a change of mind, on reopening the dialog', async () => {
+    await db.cookSessions.put(session());
+    const spy = vi.spyOn(kitchenModule, 'deleteCookSession').mockRejectedValue(new Error('storage unavailable'));
+
+    try {
+      render(<SessionRow {...props} session={session()} />);
+      fireEvent.click(screen.getByRole('button', { name: /^delete/i }));
+      fireEvent.click(screen.getByRole('button', { name: /yes, delete/i }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(/could not delete/i);
+
+      fireEvent.click(screen.getByRole('button', { name: /^delete/i }));
+      fireEvent.click(screen.getByRole('button', { name: /keep it/i }));
+
+      expect(screen.queryByRole('alert')).toBeNull();
     } finally {
       spy.mockRestore();
     }

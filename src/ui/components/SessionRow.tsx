@@ -42,9 +42,6 @@ export function SessionRow({ batch, ingredient, session, onChanged, onEdit }: Pr
     try {
       await deleteCookSession(session.id);
     } catch {
-      // Drop the confirmation along with the attempt: the delete prompt and this
-      // message both use role="alert", and the delete never happened, so there is
-      // nothing left to keep confirming.
       setConfirming(false);
       setError('Could not delete this cook — storage may be blocked or full. Please try again.');
       return;
@@ -88,7 +85,9 @@ export function SessionRow({ batch, ingredient, session, onChanged, onEdit }: Pr
 
       {confirming ? (
         <>
-          <p role="alert">
+          {/* A question with its own buttons, not an assertive announcement — plain
+              text, so role="alert" stays free to mean "a write just failed". */}
+          <p>
             Delete this cook? {formatG(session.cookedRemainingG)} of it is still
             unaccounted for, and its raw weight goes back to the batch.
           </p>
@@ -96,7 +95,11 @@ export function SessionRow({ batch, ingredient, session, onChanged, onEdit }: Pr
             <button type="button" className="btn btn--primary" onClick={() => { void remove(); }}>
               Yes, delete it
             </button>
-            <button type="button" className="btn btn--secondary" onClick={() => setConfirming(false)}>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => { setError(null); setConfirming(false); }}
+            >
               Keep it
             </button>
           </div>
@@ -106,15 +109,17 @@ export function SessionRow({ batch, ingredient, session, onChanged, onEdit }: Pr
           <button type="button" className="btn btn--secondary" onClick={() => onEdit(session)}>
             Edit
           </button>
-          <button type="button" className="btn btn--secondary" onClick={() => setConfirming(true)}>
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={() => { setError(null); setConfirming(true); }}
+          >
             Delete
           </button>
         </div>
       )}
 
-      {/* Only rendered outside the confirm prompt: that prompt is also role="alert", and
-          confirming is always false by the time a write failure sets this message. */}
-      {error !== null && !confirming && <p role="alert">{error}</p>}
+      {error !== null && <p role="alert">{error}</p>}
     </div>
   );
 }
