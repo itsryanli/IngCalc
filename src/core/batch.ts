@@ -119,3 +119,64 @@ export function validateEat(session: CookSession, grams: Grams): Validation {
 export function applyEat(session: CookSession, grams: Grams): CookSession {
   return { ...session, cookedRemainingG: g(Math.max(0, session.cookedRemainingG - grams)) };
 }
+
+export const cookedRawTotalG = (batch: Batch, sessions: readonly CookSession[]): Grams =>
+  g(sessionsOf(batch.id, sessions).reduce((sum, s) => sum + s.rawUsedG, 0));
+
+/**
+ * A purchase weight may be corrected downwards only as far as what has already
+ * been cooked out of it.
+ */
+export function validateRawWeightEdit(
+  batch: Batch,
+  sessions: readonly CookSession[],
+  newRawWeightG: Grams,
+): Validation {
+  if (newRawWeightG <= 0) return no('A batch has to weigh something.');
+
+  const cooked = cookedRawTotalG(batch, sessions);
+  if (newRawWeightG < cooked - EPSILON) {
+    return no(
+      `${formatG(cooked)} of this batch has already been cooked, so it cannot ` +
+      `have weighed less than that.`,
+    );
+  }
+
+  return ok;
+}
+
+/** A session's raw weight may grow into whatever the *other* sessions left. */
+export function validateRawUsedEdit(
+  batch: Batch,
+  sessions: readonly CookSession[],
+  sessionId: string,
+  newRawUsedG: Grams,
+): Validation {
+  if (newRawUsedG <= 0) return no('A cook has to use some of the batch.');
+
+  const others = sessionsOf(batch.id, sessions)
+    .filter((s) => s.id !== sessionId)
+    .reduce((sum, s) => sum + s.rawUsedG, 0);
+  const available = g(Math.max(0, batch.rawWeightG - others));
+
+  if (newRawUsedG > available + EPSILON) {
+    return no(`Only ${formatG(available)} of this batch is available for this cook.`);
+  }
+
+  return ok;
+}
+
+/**
+ * Rescales what is left after a cooked weight is corrected, preserving the
+ * FRACTION eaten rather than the grams eaten — the grams were always a reading
+ * of the same food, so weighing 800g as 80g and fixing it later should leave a
+ * half-eaten batch still half remaining.
+ */
+export function rescaleCookedRemaining(session: CookSession, newCookedWeightG: Grams): Grams {
+  // Nothing was eaten out of a session that never recorded a weight, so the
+  // corrected weight is entirely remaining.
+  if (session.cookedWeightG <= 0) return newCookedWeightG;
+
+  const fractionLeft = session.cookedRemainingG / session.cookedWeightG;
+  return g(Math.min(newCookedWeightG, Math.max(0, newCookedWeightG * fractionLeft)));
+}

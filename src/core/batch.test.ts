@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Batch, CookSession } from './types';
 import { g, myr } from './units';
 import {
-  applyEat, batchState, portionsRemaining, portionWeightG, portionsToGrams, rawRemainingG, sessionsOf, validateCook, validateEat, type CookDraft,
+  applyEat, batchState, cookedRawTotalG, portionsRemaining, portionWeightG, portionsToGrams, rawRemainingG, rescaleCookedRemaining, sessionsOf, validateCook, validateEat, validateRawUsedEdit, validateRawWeightEdit, type CookDraft,
 } from './batch';
 import type { Ingredient } from './types';
 import { INGREDIENTS } from '../data/ingredients';
@@ -231,5 +231,89 @@ describe('applyEat', () => {
 
   it('never leaves a negative remainder even when floats disagree', () => {
     expect(applyEat(session({ cookedRemainingG: g(148) }), g(148.0000001)).cookedRemainingG).toBe(0);
+  });
+});
+
+describe('cookedRawTotalG', () => {
+  it('sums the raw weight every session of this batch consumed', () => {
+    const sessions = [
+      session({ id: 's1', rawUsedG: g(400) }),
+      session({ id: 's2', rawUsedG: g(250) }),
+      session({ id: 's3', batchId: 'b2', rawUsedG: g(900) }),
+    ];
+    expect(cookedRawTotalG(batch(), sessions)).toBe(650);
+  });
+});
+
+describe('validateRawWeightEdit', () => {
+  it('accepts a correction that still covers what has been cooked', () => {
+    const sessions = [session({ rawUsedG: g(400) })];
+    expect(validateRawWeightEdit(batch(), sessions, g(800))).toEqual({ ok: true });
+  });
+
+  it('accepts a correction down to exactly what has been cooked', () => {
+    const sessions = [session({ rawUsedG: g(400) })];
+    expect(validateRawWeightEdit(batch(), sessions, g(400))).toEqual({ ok: true });
+  });
+
+  it('blocks a correction below what has been cooked, naming that total', () => {
+    // Clamping instead would leave a batch claiming more food came out of it
+    // than went into it, which no later screen could interpret.
+    const sessions = [session({ rawUsedG: g(400) })];
+    const result = validateRawWeightEdit(batch(), sessions, g(300));
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.message).toContain('400g');
+  });
+
+  it('blocks a correction to zero', () => {
+    expect(validateRawWeightEdit(batch(), [], g(0)).ok).toBe(false);
+  });
+});
+
+describe('validateRawUsedEdit', () => {
+  it('accepts a change that fits the remainder excluding this session', () => {
+    const sessions = [session({ id: 's1', rawUsedG: g(400) }), session({ id: 's2', rawUsedG: g(300) })];
+    // 1000 total, 300 used by the other session, so s1 may grow to 700.
+    expect(validateRawUsedEdit(batch(), sessions, 's1', g(700))).toEqual({ ok: true });
+  });
+
+  it('blocks a change that would overdraw the batch', () => {
+    const sessions = [session({ id: 's1', rawUsedG: g(400) }), session({ id: 's2', rawUsedG: g(300) })];
+    const result = validateRawUsedEdit(batch(), sessions, 's1', g(701));
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.message).toContain('700g');
+  });
+
+  it('blocks a change to zero', () => {
+    expect(validateRawUsedEdit(batch(), [session()], 's1', g(0)).ok).toBe(false);
+  });
+});
+
+describe('rescaleCookedRemaining', () => {
+  it('preserves the fraction eaten rather than the grams eaten', () => {
+    // 80g logged for what was really 800g, half eaten. Correcting the weight
+    // should leave it half remaining, not 40g remaining out of 800g.
+    const s = session({ cookedWeightG: g(80), cookedRemainingG: g(40) });
+    expect(rescaleCookedRemaining(s, g(800))).toBe(400);
+  });
+
+  it('keeps an untouched session whole', () => {
+    const s = session({ cookedWeightG: g(300), cookedRemainingG: g(300) });
+    expect(rescaleCookedRemaining(s, g(750))).toBe(750);
+  });
+
+  it('keeps a finished session finished', () => {
+    const s = session({ cookedWeightG: g(300), cookedRemainingG: g(0) });
+    expect(rescaleCookedRemaining(s, g(750))).toBe(0);
+  });
+
+  it('never exceeds the corrected cooked weight', () => {
+    const s = session({ cookedWeightG: g(300), cookedRemainingG: g(300) });
+    expect(rescaleCookedRemaining(s, g(100))).toBe(100);
+  });
+
+  it('treats a session that recorded no cooked weight as wholly remaining', () => {
+    const s = session({ cookedWeightG: g(0), cookedRemainingG: g(0) });
+    expect(rescaleCookedRemaining(s, g(500))).toBe(500);
   });
 });
