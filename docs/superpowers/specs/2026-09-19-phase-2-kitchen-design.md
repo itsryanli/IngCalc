@@ -82,23 +82,63 @@ about a duplicated batch or a wrong price.
 
 ### 2.4 Outlier rule: deviation from the reference figure
 
-A cook session is flagged when either holds:
+Everything is measured against the **reference factor** for that ingredient and
+method: its published factor, or the category default when it has none.
 
-1. Its observed yield (`cookedWeightG / rawUsedG`) differs from the reference
-   figure — the ingredient's published factor for that method, or the category
-   default when it has none — by more than **±35%**.
-2. It is physically implausible: yield above 1.0 for an ingredient with
-   `absorbsWater: false`, or above 3.0 for one with `absorbsWater: true`.
+```
+observed  = cookedWeightG / rawUsedG
+reference = ingredient.publishedYield[method] ?? CATEGORY_YIELD[category][method]
+```
+
+Two bands, with different consequences:
+
+| Band | Test | Consequence |
+|---|---|---|
+| **Impossible** | `observed` outside `[reference / 3, reference × 3]` | Blocked at entry; a stored row in this band is flagged `implausible` |
+| **Improbable** | within those bounds but more than **±35%** from `reference` | Flagged `deviation`; kept and counted unless excluded |
 
 Flagging is advisory. The session is kept and shown, with one tap to set
-`excludeFromCalibration`, exactly as §6 requires.
+`excludeFromCalibration`, exactly as §6 requires. The ±35% band is deliberately
+loose: a real kitchen differs from USDA's, and the rule exists to catch a
+transposed digit, not to police technique. The ×3 hard bounds catch any
+order-of-magnitude slip — 500g entered as 5000g — while admitting every yield
+the bundled data itself publishes.
 
 The rejected alternative was deviation from the user's own mean, which is
 silent until roughly four cooks of the same ingredient and method exist — and
 so misses precisely the early typos it would be most valuable against. The
-reference rule works from the first cook. ±35% is deliberately loose: a real
-kitchen differs from USDA's, and the rule is there to catch a transposed digit,
-not to police technique.
+reference rule works from the first cook.
+
+### Why the bounds come from the reference, not from `absorbsWater`
+
+An earlier draft of this rule blocked cooked weight above raw weight unless the
+ingredient had `absorbsWater: true`, which is how the parent spec §6 phrases
+its direction-aware sanity check. Checked against the bundled data, that rule
+rejects correct cooks:
+
+| Ingredient | `absorbsWater` | Published boiled yield |
+|---|---|---|
+| Sawi (mustard greens) | `false` | 1.04 |
+| Bayam (amaranth leaves) | `false` | 1.04 |
+| Cabbage | `false` | 1.07 |
+| `CATEGORY_YIELD.vegetable.boiled` | — | 1.05 |
+
+Boiled greens take up water. The rule would have refused a cook that matches
+the app's own published figure, and the same draft's ceiling of 3.0 for
+absorbing ingredients would have refused boiled chickpeas, published at 6.65.
+
+The deeper problem is that one boolean per ingredient cannot express this:
+cabbage *loses* mass steamed and *gains* it boiled. The reference factor is
+already per ingredient **and** per method, so bounds derived from it are
+direction-aware in a way `absorbsWater` cannot be. This is a stricter reading
+of §6's intent, not a departure from it.
+
+`absorbsWater` keeps its documented role — it is what makes a published yield
+above 1 expected rather than surprising, and it drives the wording shown to the
+user — but it is not the gate. Note also that the bundled data applies it
+inconsistently: okra, carrot, pumpkin and sweet potato are marked `true` while
+sawi and cabbage are `false`, despite all of them gaining mass when boiled. A
+gate resting on that field would inherit the inconsistency.
 
 ---
 
@@ -198,9 +238,8 @@ validateCook(batch, sessions, draft, ingredient): CookValidation
 validateEat(session, grams): EatValidation
 ```
 
-`validateCook` blocks a raw amount above the remainder and applies the
-direction-aware sanity check: cooked above raw is an error only when
-`absorbsWater` is false. `validateEat` blocks eating more than
+`validateCook` blocks a raw amount above the remainder and rejects an observed
+yield outside §2.4's impossible band. `validateEat` blocks eating more than
 `cookedRemainingG` and reports the remainder in both grams and portions, since
 the user is thinking in whichever the card last showed them.
 
@@ -267,6 +306,7 @@ Additions to the parent spec's §6 table:
 | Corrected `cookedWeightG` rescales the remainder | Clamped into `[0, cookedWeightG]`, with the new remainder shown |
 | Delete a batch with sessions | Confirmed first, naming the sessions and cooked weight that go with it |
 | Session flagged as an outlier | Shown with its reason and a one-tap exclude (§2.4) |
+| Cook draft outside the impossible band | Blocked, naming the typical yield for that ingredient and method (§2.4) |
 | Blocked version-2 upgrade | Resolves false and reports, rather than hanging (§4) |
 
 ---
@@ -278,13 +318,14 @@ Core first, following Phase 1's convention.
 - **Lifecycle invariants** — no remainder ever negative, at every transition:
   cook, partial cook, eat, weighed eat, edit, delete. Derived batch state
   correct at each.
-- **Guards** — both validators at their boundaries, including the
-  `absorbsWater` direction case in both directions.
+- **Guards** — both validators at their boundaries, including a boiled cabbage
+  cook that gains mass (must be accepted) and a boiled chickpea cook at 6.65×
+  (must be accepted), against a 10× transposed digit (must be blocked).
 - **Portions over grams** — the parent spec's awkward case: a 100g serving from
   a 148g portion, asserting portions remaining follows grams rather than the
   reverse.
-- **Outlier rule** — at ±35% exactly, either side, and both implausibility
-  branches.
+- **Outlier rule** — at ±35% exactly, either side (not flagged), just past it
+  (flagged `deviation`), and outside the ×3 bounds (flagged `implausible`).
 - **Cost** — all four figures, plus apportioning across a partially cooked
   batch, plus a zero-price batch (a gift, or an unrecorded price).
 - **Corrections** — a corrected `cookedWeightG` preserves the eaten fraction; a
