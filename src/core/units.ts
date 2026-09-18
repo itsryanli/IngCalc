@@ -29,3 +29,7 @@ export const subG = (a: Grams, b: Grams): Grams => g(a - b);
  */
 export const formatG = (v: Grams): string =>
   `${v.toLocaleString('en-MY', { maximumFractionDigits: v < 10 ? 1 : 0 })}g`;
+
+/** Always two decimals: prices are read against a receipt. */
+export const formatMYR = (v: MYR): string =>
+  `RM${v.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
