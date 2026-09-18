@@ -36,11 +36,13 @@ describe('KitchenScreen', () => {
   });
 
   it('groups batches by their derived state', async () => {
-    await db.batches.bulkPut([batch('b1'), batch('b2'), batch('b3')]);
-    // b2 fully cooked with food left; b3 fully cooked and fully eaten.
+    await db.batches.bulkPut([batch('b1'), batch('b2'), batch('b3'), batch('b4')]);
+    // b2 fully cooked with food left; b3 fully cooked and fully eaten;
+    // b4 only partly used, so raw weight remains alongside the cook.
     await db.cookSessions.bulkPut([
       session('s2', 'b2'),
       session('s3', 'b3', { cookedRemainingG: g(0) }),
+      session('s4', 'b4', { rawUsedG: g(400), cookedWeightG: g(284), cookedRemainingG: g(284) }),
     ]);
 
     render(<KitchenScreen />);
@@ -49,6 +51,9 @@ describe('KitchenScreen', () => {
       expect(screen.getByRole('heading', { name: /^raw$/i })).toBeInTheDocument();
     });
     expect(screen.getByRole('heading', { name: /^cooked$/i })).toBeInTheDocument();
+    // Grouping is this screen's core job: a bug routing a part-cooked batch into
+    // "raw" or "cooked" instead of its own group would otherwise pass unnoticed.
+    expect(screen.getByRole('heading', { name: /^part cooked$/i })).toBeInTheDocument();
     // Finished batches are hidden behind a toggle: a kitchen accumulates them
     // forever, and this is a phone screen.
     expect(screen.queryByRole('heading', { name: /^finished$/i })).toBeNull();
@@ -137,6 +142,28 @@ describe('KitchenScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /save ingredient/i }));
 
     // Back on the purchase form, its picker now shows the new ingredient, selected.
+    const returnedPicker = await screen.findByRole('combobox', { name: /ingredient/i }) as HTMLInputElement;
+    await waitFor(() => expect(returnedPicker.value).toBe('Petai'));
+  });
+
+  // Same fix, but from the edit path: the batch already has an ingredient
+  // (chicken-breast), and adding a brand-new one from its picker must override
+  // that original selection rather than be silently dropped behind it.
+  it('preselects a newly added ingredient after returning from editing a batch', async () => {
+    await db.batches.put(batch('b1'));
+    render(<KitchenScreen />);
+    await waitFor(() => { expect(screen.getByTestId('batch-state')).toBeInTheDocument(); });
+
+    fireEvent.click(screen.getByRole('button', { name: /edit purchase/i }));
+
+    const picker = await screen.findByRole('combobox', { name: /ingredient/i });
+    fireEvent.focus(picker);
+    fireEvent.change(picker, { target: { value: 'Petai' } });
+    press(await screen.findByRole('option', { name: /Add "Petai"/i }));
+
+    expect(await screen.findByLabelText(/^name/i)).toHaveValue('Petai');
+    fireEvent.click(screen.getByRole('button', { name: /save ingredient/i }));
+
     const returnedPicker = await screen.findByRole('combobox', { name: /ingredient/i }) as HTMLInputElement;
     await waitFor(() => expect(returnedPicker.value).toBe('Petai'));
   });

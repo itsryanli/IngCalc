@@ -29,8 +29,11 @@ export function AddBatchForm({
 }: Props) {
   const editing = batch !== undefined;
 
+  // initialIngredientId wins over an edited batch's own ingredient: the only reason to
+  // add a brand-new ingredient while editing a batch is to change that batch to it, so
+  // the batch's original ingredient losing here is the point, not a bug to "tidy" away.
   const [ingredientId, setIngredientId] = useState(
-    batch?.ingredientId ?? initialIngredientId ?? '',
+    initialIngredientId ?? batch?.ingredientId ?? '',
   );
   const [rawWeightG, setRawWeightG] = useState<Grams>(
     batch?.rawWeightG ?? initialRawWeightG ?? g(0),

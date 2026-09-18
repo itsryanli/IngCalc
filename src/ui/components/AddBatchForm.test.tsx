@@ -13,6 +13,13 @@ const catalogue: Ingredient[] = [{
   per100gRaw: { ...zeroNutrients(), protein: 23 },
   publishedYield: { roasted: 0.71 }, absorbsWater: false,
   source: 'usda', archived: false,
+}, {
+  // A second, distinct ingredient: proving initialIngredientId wins over an edited
+  // batch's own ingredient needs two real options, not just re-selecting the same one.
+  id: 'petai', name: 'Petai', category: 'other',
+  per100gRaw: { ...zeroNutrients(), protein: 14 },
+  publishedYield: {}, absorbsWater: false,
+  source: 'user', archived: false,
 }];
 
 const existing: Batch = {
@@ -146,5 +153,12 @@ describe('AddBatchForm editing', () => {
     fireEvent.change(screen.getByLabelText(/^raw weight/i), { target: { value: '300' } });
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
     expect(await screen.findByRole('alert')).toHaveTextContent('400g');
+  });
+
+  it('lets a newly added ingredient override the batch being edited', () => {
+    // The only reason to add a brand-new ingredient while editing a batch is to
+    // change that batch to it, so initialIngredientId must win over batch.ingredientId.
+    render(<AddBatchForm {...props} batch={existing} sessions={[]} initialIngredientId="petai" />);
+    expect(screen.getByRole('combobox', { name: /ingredient/i })).toHaveValue('Petai');
   });
 });
