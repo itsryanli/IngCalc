@@ -246,4 +246,18 @@ describe('CalcScreen calibration', () => {
     // Prefilled from the calculator, so the user does not retype it.
     expect(screen.getByLabelText(/^raw weight/i)).toHaveValue(1000);
   });
+
+  it('still reaches the add-ingredient form when "add new" is opened from inside the batch form', async () => {
+    render(<CalcScreen profile={null} />);
+    await selectChicken();
+
+    fireEvent.click(await screen.findByRole('button', { name: /log this as a batch/i }));
+    // AddBatchForm renders its own IngredientPicker wired to the same onAddNew handler
+    // as the calculator's — that's the composition this test exercises, not just reads.
+    await openAddIngredient();
+
+    // Without clearing loggingBatch, the batch-form branch keeps winning the ternary
+    // and this never appears: the picker just closes with no visible effect.
+    expect(await screen.findByLabelText(/^name/i)).toBeInTheDocument();
+  });
 });

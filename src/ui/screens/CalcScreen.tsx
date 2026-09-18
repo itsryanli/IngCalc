@@ -42,6 +42,10 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
   const ingredient = catalogue.find((i) => i.id === ingredientId) ?? null;
 
   const handleAddNew = (typedName: string) => {
+    // The batch form renders its own picker wired to this same handler. Without
+    // clearing loggingBatch, its branch keeps winning the ternary below and the
+    // add-ingredient screen never renders — the affordance silently does nothing.
+    setLoggingBatch(false);
     setAddIngredientError(null);
     setAddInitialName(typedName);
     setAddingIngredient(true);
