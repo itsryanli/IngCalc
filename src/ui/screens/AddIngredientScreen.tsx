@@ -65,25 +65,32 @@ export function AddIngredientScreen({
   };
 
   return (
-    <section>
+    <section className="screen">
       <h2>Add an ingredient</h2>
-      <p>Values per 100g raw. Anything you leave blank is recorded as zero.</p>
+      <p className="screen__hint">Values per 100g raw. Anything you leave blank is recorded as zero.</p>
 
-      <label htmlFor="ing-name">Name</label>
-      <input id="ing-name" value={name} onChange={(e) => setName(e.target.value)} />
+      <div className="field">
+        <label htmlFor="ing-name">Name</label>
+        <input id="ing-name" value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
 
-      <label htmlFor="ing-category">Category</label>
-      <select id="ing-category" value={category} onChange={(e) => setCategory(e.target.value as Category)}>
-        {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-      </select>
+      <div className="field">
+        <label htmlFor="ing-category">Category</label>
+        <select id="ing-category" value={category} onChange={(e) => setCategory(e.target.value as Category)}>
+          {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
 
-      <label>
+      <label className="checkbox-row">
         <input type="checkbox" checked={absorbsWater} onChange={(e) => setAbsorbsWater(e.target.checked)} />
         Absorbs water when cooked (rice, pasta, dried beans)
       </label>
 
+      <fieldset>
+        <legend>Nutrients per 100g raw</legend>
+        <div className="nutrient-grid">
       {NUTRIENT_KEYS.map((k) => (
-        <div key={k}>
+        <div key={k} className="field">
           <label htmlFor={`n-${k}`}>{LABELS[k]}</label>
           {/* type="text" with inputMode="decimal" allows validation to catch non-numeric input that
               type="number" would sanitise away, rendering the Number.isFinite guard reachable.
@@ -97,12 +104,16 @@ export function AddIngredientScreen({
           />
         </div>
       ))}
+        </div>
+      </fieldset>
 
       {error !== null && <p role="alert">{error}</p>}
-      <button type="button" onClick={() => void submit()}>Save ingredient</button>
-      {onCancel !== undefined && (
-        <button type="button" onClick={onCancel}>Cancel</button>
-      )}
+      <div className="btn-row">
+        <button type="button" className="btn btn--primary" onClick={() => void submit()}>Save ingredient</button>
+        {onCancel !== undefined && (
+          <button type="button" className="btn btn--secondary" onClick={onCancel}>Cancel</button>
+        )}
+      </div>
     </section>
   );
 }

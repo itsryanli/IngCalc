@@ -15,6 +15,7 @@ import { CalcTrace } from '../components/CalcTrace';
 import { NutrientTable } from '../components/NutrientTable';
 import { MethodCompare } from '../components/MethodCompare';
 import { AddIngredientScreen } from './AddIngredientScreen';
+import { METHOD_LABELS } from '../labels';
 
 const HIGHLIGHT: NutrientKey[] = ['potassium', 'iron', 'magnesium'];
 
@@ -105,7 +106,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
   const belowRniAge = profile !== null && ageFrom(profile, today) < RNI_MIN_AGE;
 
   return (
-    <section>
+    <section className="screen">
       <h2>Calculator</h2>
 
       {addingIngredient ? (
@@ -116,6 +117,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
         />
       ) : (
         <>
+          <div className="field">
           <label htmlFor="ingredient">Ingredient</label>
           <select
             id="ingredient"
@@ -126,49 +128,66 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
             {catalogue.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
             <option value={ADD_NEW}>Ingredient not listed? Add it</option>
           </select>
+          </div>
           {addIngredientError !== null && <p role="alert">{addIngredientError}</p>}
 
           <WeightInput label="Weight" value={weight} unit={unit} onChange={setWeight} onUnitChange={setUnit} />
 
           <fieldset>
             <legend>This weight is</legend>
+            <div className="choice-row">
             {(['raw', 'cooked'] as const).map((s) => (
-              <label key={s}>
+              <label key={s} className="choice">
                 <input type="radio" name="entered" value={s} checked={entered === s} onChange={() => setEntered(s)} />
                 {s}
               </label>
             ))}
+            </div>
           </fieldset>
 
+          <div className="field">
           <label htmlFor="method">Cooking method</label>
           <select id="method" value={method} onChange={(e) => setMethod(e.target.value as CookMethod)}>
-            {COOK_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+            {COOK_METHODS.map((m) => <option key={m} value={m}>{METHOD_LABELS[m]}</option>)}
           </select>
+          </div>
 
           {result !== null && (
             <>
-              <p data-testid="result-weight">
-                {result.shownWeight.toLocaleString('en-MY', { maximumFractionDigits: 0 })}g{' '}
-                {entered === 'raw' ? 'cooked' : 'raw'}
-              </p>
+              <div className="card">
+                <p className="result" data-testid="result-weight">
+                  {result.shownWeight.toLocaleString('en-MY', { maximumFractionDigits: 0 })}g{' '}
+                  <span className="result__unit">{entered === 'raw' ? 'cooked' : 'raw'}</span>
+                </p>
 
-              <CalcTrace steps={result.cooked.steps} />
+                <CalcTrace steps={result.cooked.steps} />
+              </div>
 
+              <div className="card">
+                <h3 className="card__title">Nutrients</h3>
+                <div className="table-scroll">
               <NutrientTable
                 totals={result.cooked.totals}
                 targets={targets}
                 assumedRetentionFor={result.cooked.assumedRetentionFor}
                 belowRniAge={belowRniAge}
               />
+                </div>
+              </div>
 
               {profile !== null && (
-                <p data-testid="calorie-share">
+                <p className="share" data-testid="calorie-share">
                   {Math.round((result.cooked.totals.kcal / calorieTarget(profile, today)) * 100)}% of your daily
                   calories · {Math.round((result.cooked.totals.protein / proteinTargetG(profile)) * 100)}% of your protein
                 </p>
               )}
 
-              <MethodCompare rows={rows} highlight={HIGHLIGHT} />
+              <div className="card">
+                <h3 className="card__title">Which method keeps the most</h3>
+                <div className="table-scroll">
+                  <MethodCompare rows={rows} highlight={HIGHLIGHT} />
+                </div>
+              </div>
             </>
           )}
         </>

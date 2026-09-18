@@ -52,13 +52,13 @@ export function App() {
 
   return (
     <div className="app">
-      <header>
+      <header className="app__header">
         <h1>IngCalc</h1>
-        {profile !== null && <span>{profile.name}</span>}
+        {profile !== null && <span className="app__profile">{profile.name}</span>}
       </header>
 
       {!storageOk && (
-        <p role="alert">
+        <p role="alert" className="banner--warn">
           This browser will not let the app save anything — private browsing blocks storage.
           You can still use the calculator, but profiles and ingredients you add will be lost
           when you close the tab.
@@ -66,25 +66,31 @@ export function App() {
       )}
 
       {storageOk && profile === null && tab === 'calc' && (
-        <p>Set up a profile to see what a portion is worth against your daily targets.</p>
+        <p className="banner banner--info">
+          Set up a profile to see what a portion is worth against your daily targets.
+        </p>
       )}
 
-      <main>
+      <main className="app__main">
         {tab === 'calc' && <CalcScreen profile={profile} />}
         {tab === 'profile' && <ProfileScreen onSaved={(p) => { setProfile(p); setTab('calc'); }} />}
       </main>
 
-      <nav role="tablist">
+      <nav role="tablist" className="tabbar">
         {TABS.map((t) => (
           <button
             key={t.id}
             role="tab"
+            className="tab"
             aria-selected={tab === t.id}
             disabled={t.phase !== undefined}
             title={t.phase !== undefined ? `Arrives in Phase ${t.phase}` : undefined}
             onClick={() => selectTab(t.id)}
           >
-            {t.label}
+            <span>{t.label}</span>
+            {t.phase !== undefined && (
+              <span className="tab__phase" aria-hidden="true">Phase {t.phase}</span>
+            )}
           </button>
         ))}
       </nav>

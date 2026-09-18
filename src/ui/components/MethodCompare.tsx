@@ -1,5 +1,6 @@
 import type { MethodRow } from '../../core/methodCompare';
 import type { NutrientKey } from '../../core/types';
+import { METHOD_LABELS } from '../labels';
 
 const SOURCE_NOTE: Record<MethodRow['yieldSource'], string> = {
   measured: 'your cooks',
@@ -9,7 +10,7 @@ const SOURCE_NOTE: Record<MethodRow['yieldSource'], string> = {
 
 export function MethodCompare({ rows, highlight }: { rows: readonly MethodRow[]; highlight: readonly NutrientKey[] }) {
   return (
-    <table aria-label="Method comparison">
+    <table aria-label="Method comparison" className="method-compare">
       <thead>
         <tr>
           <th scope="col">Method</th>
@@ -21,7 +22,7 @@ export function MethodCompare({ rows, highlight }: { rows: readonly MethodRow[];
       <tbody>
         {rows.map((r) => (
           <tr key={r.method}>
-            <th scope="row">{r.method}</th>
+            <th scope="row">{METHOD_LABELS[r.method]}</th>
             <td>{Math.round(r.weightKeptPct)}%</td>
             {highlight.map((k) => (
               <td key={k}>

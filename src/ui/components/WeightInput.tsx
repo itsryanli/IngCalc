@@ -47,22 +47,32 @@ export function WeightInput({ value, unit, label, onChange, onUnitChange }: Prop
   };
 
   return (
-    <div>
+    <div className="field">
       <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        type="number"
-        inputMode="decimal"
-        min={0}
-        step={unit === 'kg' ? 0.01 : 1}
-        value={rawText}
-        onChange={(e) => handle(e.target.value)}
-      />
-      {(['g', 'kg'] as const).map((u) => (
-        <button key={u} type="button" aria-pressed={unit === u} onClick={() => onUnitChange(u)}>
-          {u}
-        </button>
-      ))}
+      <div className="weight__row">
+        <input
+          id={id}
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step={unit === 'kg' ? 0.01 : 1}
+          value={rawText}
+          onChange={(e) => handle(e.target.value)}
+        />
+        <div className="seg">
+          {(['g', 'kg'] as const).map((u) => (
+            <button
+              key={u}
+              type="button"
+              className="seg__btn"
+              aria-pressed={unit === u}
+              onClick={() => onUnitChange(u)}
+            >
+              {u}
+            </button>
+          ))}
+        </div>
+      </div>
       {error !== null && <p role="alert">{error}</p>}
     </div>
   );

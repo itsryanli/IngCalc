@@ -79,46 +79,63 @@ export function ProfileScreen({ onSaved, today = new Date() }: { onSaved: (p: Pr
   };
 
   return (
-    <section>
+    <section className="screen">
       <h2>Profile</h2>
+      <p className="screen__hint">Your body stats produce the calorie and protein targets every other screen measures food against.</p>
 
-      <label htmlFor="name">Name</label>
-      <input id="name" value={draft.name} onChange={(e) => set('name', e.target.value)} />
+      <div className="field">
+        <label htmlFor="name">Name</label>
+        <input id="name" value={draft.name} onChange={(e) => set('name', e.target.value)} />
+      </div>
 
       <fieldset>
         <legend>Sex (used for the BMR formula)</legend>
+        <div className="choice-row">
         {(['male', 'female'] as const).map((s) => (
-          <label key={s}>
+          <label key={s} className="choice">
             <input type="radio" name="sex" value={s} checked={draft.sex === s} onChange={() => set('sex', s)} />
             {s}
           </label>
         ))}
+        </div>
       </fieldset>
 
-      <label htmlFor="birthYear">Birth year</label>
-      <input id="birthYear" type="number" value={draft.birthYear} onChange={(e) => set('birthYear', e.target.value)} />
+      <div className="field">
+        <label htmlFor="birthYear">Birth year</label>
+        <input id="birthYear" type="number" value={draft.birthYear} onChange={(e) => set('birthYear', e.target.value)} />
+      </div>
 
-      <label htmlFor="heightCm">Height (cm)</label>
-      <input id="heightCm" type="number" value={draft.heightCm} onChange={(e) => set('heightCm', e.target.value)} />
+      <div className="field">
+        <label htmlFor="heightCm">Height (cm)</label>
+        <input id="heightCm" type="number" value={draft.heightCm} onChange={(e) => set('heightCm', e.target.value)} />
+      </div>
 
-      <label htmlFor="weightKg">Weight (kg)</label>
-      <input id="weightKg" type="number" value={draft.weightKg} onChange={(e) => set('weightKg', e.target.value)} />
+      <div className="field">
+        <label htmlFor="weightKg">Weight (kg)</label>
+        <input id="weightKg" type="number" value={draft.weightKg} onChange={(e) => set('weightKg', e.target.value)} />
+      </div>
 
-      <label htmlFor="sessions">Exercise sessions per week</label>
-      <input id="sessions" type="number" min={0} max={21} value={draft.sessionsPerWeek} onChange={(e) => set('sessionsPerWeek', e.target.value)} />
+      <div className="field">
+        <label htmlFor="sessions">Exercise sessions per week</label>
+        <input id="sessions" type="number" min={0} max={21} value={draft.sessionsPerWeek} onChange={(e) => set('sessionsPerWeek', e.target.value)} />
+      </div>
 
-      <label htmlFor="goal">Goal</label>
-      <select id="goal" value={draft.goal} onChange={(e) => set('goal', e.target.value as Goal)}>
-        <option value="cut">Cut</option>
-        <option value="maintain">Maintain</option>
-        <option value="bulk">Bulk</option>
-      </select>
+      <div className="field">
+        <label htmlFor="goal">Goal</label>
+        <select id="goal" value={draft.goal} onChange={(e) => set('goal', e.target.value as Goal)}>
+          <option value="cut">Cut</option>
+          <option value="maintain">Maintain</option>
+          <option value="bulk">Bulk</option>
+        </select>
+      </div>
 
-      <label htmlFor="proteinOverride">Protein target override (g/kg, optional)</label>
-      <input id="proteinOverride" type="number" step={0.1} value={draft.proteinGPerKg} onChange={(e) => set('proteinGPerKg', e.target.value)} />
+      <div className="field">
+        <label htmlFor="proteinOverride">Protein target override (g/kg, optional)</label>
+        <input id="proteinOverride" type="number" step={0.1} value={draft.proteinGPerKg} onChange={(e) => set('proteinGPerKg', e.target.value)} />
+      </div>
 
       {preview !== null && (
-        <dl>
+        <dl className="card">
           <dt>BMR</dt><dd data-testid="bmr">{preview.bmr} kcal</dd>
           <dt>TDEE</dt><dd data-testid="tdee">{preview.tdee} kcal</dd>
           <dt>Daily calorie target</dt><dd data-testid="calorie-target">{preview.calories} kcal</dd>
@@ -130,7 +147,9 @@ export function ProfileScreen({ onSaved, today = new Date() }: { onSaved: (p: Pr
       )}
 
       {error !== null && <p role="alert">{error}</p>}
-      <button type="button" onClick={() => void submit()}>Save profile</button>
+      <div className="btn-row">
+        <button type="button" className="btn btn--primary" onClick={() => void submit()}>Save profile</button>
+      </div>
     </section>
   );
 }
