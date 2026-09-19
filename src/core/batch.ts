@@ -1,5 +1,5 @@
 import { flagYield } from './calibration';
-import type { Batch, CookMethod, CookSession, Ingredient, IsoDate, NutrientProfile } from './types';
+import type { Batch, CookMethod, CookSession, Ingredient, IsoDate, MealEntry, NutrientProfile } from './types';
 import { NUTRIENT_KEYS } from './types';
 import { formatG, g, type Grams } from './units';
 import type { CategoryYield } from './yieldResolver';
@@ -126,6 +126,93 @@ export function validateCook(
 /** Portions are a view over grams, so the UI converts before validating. */
 export const portionsToGrams = (session: CookSession, portions: number): Grams =>
   g(portionWeightG(session) * portions);
+
+/**
+ * `ingredient` and `quick` entries reference no cook session and so consume
+ * nothing from one. Narrowing on the kinds rather than on the presence of the
+ * field keeps the check tied to the union rather than to a property name.
+ */
+export const isSessionEntry = (e: MealEntry): e is MealEntry & { cookSessionId: string } =>
+  e.kind === 'portion' || e.kind === 'weight';
+
+/**
+ * How much of a session one entry consumes.
+ *
+ * Zero for the kinds that consume nothing, so callers can reduce over a mixed
+ * day without filtering first. Note the asymmetry it hides: a `weight` entry is
+ * absolute, a `portion` entry is a share of a weight that can later be
+ * corrected. `consumedFromSessionAt` is where that matters.
+ */
+export function entrySessionGrams(entry: MealEntry, session: CookSession): Grams {
+  switch (entry.kind) {
+    case 'portion': return portionsToGrams(session, entry.portions);
+    case 'weight': return entry.grams;
+    default: return g(0);
+  }
+}
+
+/**
+ * What a session would have lost if it had been weighed at `cookedWeightG` and
+ * cut into `portionCount`.
+ *
+ * Portion entries are recomputed at the hypothetical values and weight entries
+ * are not, because that is what the two kinds mean: "one container" follows the
+ * pan, "180g on the scale" does not. Correcting a cook is the only caller that
+ * needs the distinction, and it is the caller that would be wrong without it.
+ */
+export function consumedFromSessionAt(
+  session: CookSession,
+  entries: readonly MealEntry[],
+  cookedWeightG: Grams,
+  portionCount: number,
+): Grams {
+  const mine = entries.filter((e) => isSessionEntry(e) && e.cookSessionId === session.id);
+  const weighed = mine.reduce((sum, e) => sum + (e.kind === 'weight' ? e.grams : 0), 0);
+  const portions = mine.reduce((sum, e) => sum + (e.kind === 'portion' ? e.portions : 0), 0);
+  if (portionCount < 1) {
+    throw new RangeError(`portionCount must be at least 1, got ${portionCount}`);
+  }
+  return g(weighed + (cookedWeightG / portionCount) * portions);
+}
+
+export const consumedFromSession = (
+  session: CookSession,
+  entries: readonly MealEntry[],
+): Grams => consumedFromSessionAt(session, entries, session.cookedWeightG, session.portionCount);
+
+/**
+ * Derived, not stored. Phase 2 stored it because eating wrote no record;
+ * meals are now that record, so the execution record's own rule applies —
+ * derive what has an event log. Deleting an entry restores the remainder with
+ * no compensating write, and there is no second number left to drift.
+ */
+export function cookedRemainingG(session: CookSession, entries: readonly MealEntry[]): Grams {
+  return g(Math.max(0, session.cookedWeightG - consumedFromSession(session, entries)));
+}
+
+/**
+ * A cook may be corrected in any way that still accounts for what has been
+ * eaten out of it.
+ *
+ * Under a stored remainder this case was `rescaleCookedRemaining`'s job, which
+ * preserved the fraction eaten. Under derivation the entries are fixed events
+ * and it is the remainder that moves, so the same correction can drive it
+ * negative — the guard moves to the edit rather than disappearing with the field.
+ */
+export function validateCookEdit(
+  session: CookSession,
+  entries: readonly MealEntry[],
+  draft: CookDraft,
+): Validation {
+  const consumed = consumedFromSessionAt(session, entries, draft.cookedWeightG, draft.portionCount);
+  if (consumed > draft.cookedWeightG + EPSILON) {
+    return no(
+      `${formatG(consumed)} of this cook has already been eaten, so it cannot ` +
+      `come to less than that.`,
+    );
+  }
+  return ok;
+}
 
 export function validateEat(session: CookSession, grams: Grams): Validation {
   if (grams <= 0) return no('Enter how much you ate.');
