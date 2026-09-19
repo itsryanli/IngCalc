@@ -1,8 +1,10 @@
-import type { CookMethod, MealEntry, MealLabel } from '../core/types';
+import type { CookMethod, CookSession, MealEntry, MealLabel } from '../core/types';
 import type { BatchState } from '../core/batch';
+import { portionsRemaining } from '../core/batch';
 import type { MealContext } from '../core/meals';
 import type { ResolvedYield } from '../core/yieldResolver';
 import { formatG } from '../core/units';
+import type { Grams } from '../core/units';
 
 /**
  * Human-readable cooking method names.
@@ -49,6 +51,25 @@ export function describeEntry(entry: MealEntry, ctx: MealContext): string {
     : formatG(entry.grams);
 
   return `${name}, ${method} — ${amount}`;
+}
+
+/**
+ * What an available-to-eat cook says on the entry form's kitchen list. Lives
+ * beside `describeEntry` rather than in the component, for the same reason:
+ * one place where a session is turned into words the user reads.
+ */
+export function describeAvailable(
+  session: CookSession,
+  left: Grams,
+  entries: readonly MealEntry[],
+  ctx: MealContext,
+): string {
+  const batch = ctx.batches.find((b) => b.id === session.batchId);
+  const name = (batch === undefined ? undefined : ctx.ingredientById(batch.ingredientId)?.name)
+    ?? 'Unknown ingredient';
+  const portions = portionsRemaining(session, entries);
+  return `${name}, ${METHOD_LABELS[session.method].toLowerCase()} — ${formatG(left)} left ` +
+         `· ${portions.toFixed(1)} portions`;
 }
 
 export const STATE_LABELS: Record<BatchState, string> = {
