@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Profile } from '../core/types';
 import { isStorageAvailable } from '../storage/db';
-import { listProfiles } from '../storage/profiles';
 import { getSettings } from '../storage/settings';
+import { useProfiles } from './useProfiles';
 import { CalcScreen } from './screens/CalcScreen';
 import { KitchenScreen } from './screens/KitchenScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
@@ -22,7 +21,7 @@ const BUILT: readonly Tab[] = ['kitchen', 'calc', 'profile'];
 
 export function App() {
   const [tab, setTab] = useState<Tab>('calc');
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { profiles, active: profile, storageError, refresh, setActive } = useProfiles();
   const [storageOk, setStorageOk] = useState(true);
   // Guards against the initial settings load clobbering a tab the user has
   // already clicked while that load was still in flight.
@@ -36,12 +35,12 @@ export function App() {
       setStorageOk(ok);
       if (!ok) return;
 
-      const [settings, profiles] = await Promise.all([getSettings(), listProfiles()]);
+      // Profiles are `useProfiles`' job; this only needs the landing tab.
+      const settings = await getSettings();
       if (cancelled) return;
       if (!userNavigated.current) {
         setTab(BUILT.includes(settings.landingTab) ? settings.landingTab : 'calc');
       }
-      setProfile(profiles[0] ?? null);
     })();
     return () => { cancelled = true; };
   }, []);
@@ -75,7 +74,15 @@ export function App() {
       <main className="app__main">
         {tab === 'kitchen' && <KitchenScreen />}
         {tab === 'calc' && <CalcScreen profile={profile} />}
-        {tab === 'profile' && <ProfileScreen onSaved={(p) => { setProfile(p); setTab('calc'); }} />}
+        {tab === 'profile' && (
+          <ProfileScreen
+            profiles={profiles}
+            activeId={profile?.id ?? null}
+            storageError={storageError}
+            onSetActive={(id) => { void setActive(id); }}
+            onChanged={() => { void refresh(); }}
+          />
+        )}
       </main>
 
       <nav role="tablist" className="tabbar">

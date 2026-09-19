@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Goal, Profile, Sex } from '../../core/types';
 import { bmr, calorieTarget, proteinGPerKgFor, proteinGPerLb, proteinTargetG, tdee, explainTargets } from '../../core/targets';
 import { saveProfile } from '../../storage/profiles';
-import { ExplainedValue } from '../components/ExplainedValue';
+import { ExplainedValue } from './ExplainedValue';
 
 /** Matches the thousands-separator convention NutrientTable already uses. */
 const kcal = (v: number): string => `${v.toLocaleString('en-MY')} kcal`;
@@ -18,9 +18,27 @@ const EMPTY: Draft = {
   weightKg: '', sessionsPerWeek: '0', goal: 'maintain', proteinGPerKg: '',
 };
 
-function toProfile(d: Draft): Profile {
+/** An absent override stays an empty field, so clearing it can drop it again. */
+const draftFrom = (p: Profile): Draft => ({
+  name: p.name,
+  sex: p.sex,
+  birthYear: `${p.birthYear}`,
+  heightCm: `${p.heightCm}`,
+  weightKg: `${p.weightKg}`,
+  sessionsPerWeek: `${p.sessionsPerWeek}`,
+  goal: p.goal,
+  proteinGPerKg: p.proteinGPerKg === undefined ? '' : `${p.proteinGPerKg}`,
+});
+
+/**
+ * `existingId` is the whole of the create-vs-edit distinction. Without it every
+ * save minted a fresh id, so editing your weight added a second profile rather
+ * than correcting the first — and since App picked `profiles[0]`, which one you
+ * then saw came down to UUID sort order.
+ */
+function toProfile(d: Draft, existingId?: string): Profile {
   return {
-    id: newId(),
+    id: existingId ?? newId(),
     name: d.name.trim(),
     sex: d.sex,
     birthYear: Number(d.birthYear),
@@ -47,14 +65,23 @@ function validate(d: Draft, currentYear: number): string | null {
   return null;
 }
 
-export function ProfileScreen({ onSaved, today = new Date() }: { onSaved: (p: Profile) => void; today?: Date }) {
-  const [draft, setDraft] = useState<Draft>(EMPTY);
+interface Props {
+  /** Absent means create; present means edit that profile in place. */
+  profile?: Profile;
+  onSaved: (p: Profile) => void;
+  /** Absent when the form is the whole screen and there is nothing to go back to. */
+  onCancel?: () => void;
+  today?: Date;
+}
+
+export function ProfileForm({ profile, onSaved, onCancel, today = new Date() }: Props) {
+  const [draft, setDraft] = useState<Draft>(() => (profile === undefined ? EMPTY : draftFrom(profile)));
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
   const preview = useMemo(() => {
     if (validate(draft, today.getUTCFullYear()) !== null) return null;
-    const p = toProfile(draft);
+    const p = toProfile(draft, profile?.id);
     return {
       bmr: Math.round(bmr(p, today)),
       tdee: Math.round(tdee(p, today)),
@@ -64,13 +91,13 @@ export function ProfileScreen({ onSaved, today = new Date() }: { onSaved: (p: Pr
       gPerLb: proteinGPerLb(p),
       explain: explainTargets(p, today),
     };
-  }, [draft, today]);
+  }, [draft, today, profile]);
 
   const submit = async () => {
     const problem = validate(draft, today.getUTCFullYear());
     if (problem !== null) { setError(problem); return; }
     setError(null);
-    const p = toProfile(draft);
+    const p = toProfile(draft, profile?.id);
     try {
       await saveProfile(p);
     } catch {
@@ -166,6 +193,9 @@ export function ProfileScreen({ onSaved, today = new Date() }: { onSaved: (p: Pr
       {error !== null && <p role="alert">{error}</p>}
       <div className="btn-row">
         <button type="button" className="btn btn--primary" onClick={() => void submit()}>Save profile</button>
+        {onCancel !== undefined && (
+          <button type="button" className="btn btn--secondary" onClick={onCancel}>Cancel</button>
+        )}
       </div>
     </section>
   );

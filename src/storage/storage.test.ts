@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { db, isStorageAvailable } from './db';
 import { listProfiles, saveProfile, deleteProfile } from './profiles';
-import { getSettings, saveSettings } from './settings';
+import { getSettings, saveSettings, setActiveProfile } from './settings';
 import { listUserIngredients, saveUserIngredient, archiveUserIngredient } from './userIngredients';
 import { zeroNutrients } from '../core/nutrients';
 import type { Profile, Ingredient } from '../core/types';
@@ -68,6 +68,24 @@ describe('storage', () => {
   it('persists settings', async () => {
     await saveSettings({ id: 'singleton', activeProfileId: 'p1', landingTab: 'calc', defaultWeightUnit: 'kg' });
     expect((await getSettings()).landingTab).toBe('calc');
+  });
+
+  it('sets the active profile without disturbing the other settings', async () => {
+    await saveSettings({ id: 'singleton', activeProfileId: null, landingTab: 'calc', defaultWeightUnit: 'kg' });
+
+    await setActiveProfile('p1');
+
+    const after = await getSettings();
+    expect(after.activeProfileId).toBe('p1');
+    // A whole-object put built from DEFAULTS would silently reset these two.
+    expect(after.landingTab).toBe('calc');
+    expect(after.defaultWeightUnit).toBe('kg');
+  });
+
+  it('clears the active profile when the last one is deleted', async () => {
+    await setActiveProfile('p1');
+    await setActiveProfile(null);
+    expect((await getSettings()).activeProfileId).toBeNull();
   });
 
   it('archives a user ingredient instead of deleting it', async () => {
