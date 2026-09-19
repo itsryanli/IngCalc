@@ -54,7 +54,7 @@ describe('App', () => {
   });
 
   it('falls back to Calc when the stored landing tab is not built yet', async () => {
-    await saveSettings({ id: 'singleton', activeProfileId: null, landingTab: 'today', defaultWeightUnit: 'g' });
+    await saveSettings({ id: 'singleton', activeProfileId: null, landingTab: 'log', defaultWeightUnit: 'g' });
     render(<App />);
     expect(await screen.findByRole('tab', { name: 'Calc' })).toHaveAttribute('aria-selected', 'true');
   });

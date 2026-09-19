@@ -101,6 +101,63 @@ export interface CookSession {
   excludeFromCalibration: boolean;
 }
 
+/**
+ * A population-table target for one micronutrient. Lives here rather than in
+ * `targets.ts` because `DayLog` embeds it, and `targets.ts` already imports
+ * from this module — the other direction would be a cycle.
+ */
+export interface MicroTarget {
+  rni?: number;
+  dv?: number;
+}
+
+export const MEAL_LABEL_KEYS = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
+export type MealLabel = (typeof MEAL_LABEL_KEYS)[number];
+
+interface MealEntryBase {
+  id: string;
+  profileId: string;
+  /** Local calendar date. Built with `todayIso`, never `toISOString()`. */
+  date: IsoDate;
+  label: MealLabel;
+  /** Orders entries within a label. */
+  createdAt: number;
+}
+
+/**
+ * The part of an entry a form produces, before it is given an id and a day.
+ * Split out so `EntryDraft` and `MealEntry` cannot drift: `Omit` does not
+ * distribute over a discriminated union, so composing is the only safe way.
+ */
+export type MealEntryFields =
+  | { kind: 'portion'; cookSessionId: string; portions: number }
+  | { kind: 'weight'; cookSessionId: string; grams: Grams }
+  | { kind: 'ingredient'; ingredientId: string; method: CookMethod; cookedG: Grams }
+  /** `name`, not `label` — `label` is already the meal slot on the base. */
+  | { kind: 'quick'; name: string; kcal: number; proteinG?: number };
+
+export type MealEntry = MealEntryBase & MealEntryFields;
+
+export interface DayLogTargets {
+  kcal: number;
+  proteinG: number;
+  micros: Partial<Record<NutrientKey, MicroTarget>>;
+}
+
+/**
+ * The targets frozen at the moment a day's first entry was written.
+ *
+ * Without this, editing a profile's weight silently re-reads the entire
+ * history: last Tuesday's "78% of target" would start meaning something else.
+ */
+export interface DayLog {
+  /** `${profileId}:${date}` — a natural key, so a duplicate row is impossible. */
+  id: string;
+  profileId: string;
+  date: IsoDate;
+  targets: DayLogTargets;
+}
+
 export interface YieldSample {
   ingredientId: string;
   method: CookMethod;

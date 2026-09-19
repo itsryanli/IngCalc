@@ -1,4 +1,8 @@
-import { MICRONUTRIENT_KEYS, type CalcStep, type Goal, type NutrientKey, type Profile, type Sex } from './types';
+import { MICRONUTRIENT_KEYS, type CalcStep, type Goal, type MicroTarget, type NutrientKey, type Profile, type Sex } from './types';
+
+// Re-exported so existing importers keep working; the type itself now lives in types.ts,
+// because DayLog embeds it and types.ts cannot import from here.
+export type { MicroTarget };
 
 const KG_PER_LB = 2.20462;
 
@@ -37,11 +41,6 @@ export const proteinTargetG = (profile: Profile): number =>
 
 export const proteinGPerLb = (profile: Profile): number =>
   proteinGPerKgFor(profile) / KG_PER_LB;
-
-export interface MicroTarget {
-  rni?: number;
-  dv?: number;
-}
 
 export type RniLookup = (sex: Sex, age: number) => Partial<Record<NutrientKey, number>>;
 

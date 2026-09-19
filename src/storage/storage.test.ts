@@ -61,8 +61,12 @@ describe('storage', () => {
 
   it('returns default settings when none are stored', async () => {
     expect(await getSettings()).toEqual({
-      id: 'singleton', activeProfileId: null, landingTab: 'today', defaultWeightUnit: 'g',
+      id: 'singleton', activeProfileId: null, landingTab: 'log', defaultWeightUnit: 'g',
     });
+  });
+
+  it('defaults to the Log tab when nothing is stored', async () => {
+    expect((await getSettings()).landingTab).toBe('log');
   });
 
   it('persists settings', async () => {

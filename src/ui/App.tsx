@@ -6,7 +6,7 @@ import { CalcScreen } from './screens/CalcScreen';
 import { KitchenScreen } from './screens/KitchenScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 
-type Tab = 'today' | 'kitchen' | 'calc' | 'costs' | 'profile';
+type Tab = 'today' | 'log' | 'kitchen' | 'calc' | 'costs' | 'profile';
 
 const TABS: { id: Tab; label: string; phase?: number }[] = [
   { id: 'today', label: 'Today', phase: 3 },
