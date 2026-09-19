@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import 'fake-indexeddb/auto';
 import { db } from '../storage/db';
 import { addEntry, dayLogId } from '../storage/meals';
+import * as mealsModule from '../storage/meals';
 import { useLog } from './useLog';
 import type { DayLog, MealEntry } from '../core/types';
 
@@ -72,6 +73,57 @@ describe('useLog', () => {
     const { result } = renderHook(() => useLog('p1', '2026-09-19'));
     await waitFor(() => expect(result.current.storageError).not.toBeNull());
     await db.open();
+  });
+
+  it('discards a stale load that resolves after a newer one has already landed', async () => {
+    // Regression test for the generation counter: without it, a slow load for
+    // the day being navigated away from can resolve after the fast load for
+    // the new day and clobber it with stale entries.
+    await addEntry(entry({ id: 'stale', date: '2026-09-19' }),
+      { id: dayLogId('p1', '2026-09-19'), profileId: 'p1', date: '2026-09-19', targets });
+    await addEntry(entry({ id: 'fresh', date: '2026-09-18' }),
+      { id: dayLogId('p1', '2026-09-18'), profileId: 'p1', date: '2026-09-18', targets });
+
+    const originalLoadDay = mealsModule.loadDay;
+    let releaseStaleLoad: () => void = () => {};
+    const staleLoadHeldOpen = new Promise<void>((resolve) => { releaseStaleLoad = resolve; });
+
+    // The first render's load (for 2026-09-19) is held open until released
+    // below. The second render's load (for 2026-09-18, after the rerender)
+    // is not intercepted by mockImplementationOnce, so it runs — and
+    // resolves — normally, landing well before the stale one is released.
+    const spy = vi.spyOn(mealsModule, 'loadDay').mockImplementationOnce(async (profileId, date) => {
+      await staleLoadHeldOpen;
+      return originalLoadDay(profileId, date);
+    });
+
+    try {
+      const { result, rerender } = renderHook(({ d }) => useLog('p1', d), {
+        initialProps: { d: '2026-09-19' },
+      });
+
+      rerender({ d: '2026-09-18' });
+      // The render-phase loading reset (not the effect) is what flips this
+      // back to true on a prop change — asserted here since it would
+      // otherwise go untested.
+      expect(result.current.loading).toBe(true);
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.entries.map((e) => e.id)).toEqual(['fresh']);
+
+      // Let the stale 2026-09-19 load finally resolve, well after the fresh
+      // one already landed.
+      await act(async () => {
+        releaseStaleLoad();
+        await staleLoadHeldOpen;
+        await Promise.resolve();
+      });
+
+      // The stale result must not have clobbered the fresh one.
+      expect(result.current.entries.map((e) => e.id)).toEqual(['fresh']);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('picks up an entry written after the first load, on refresh', async () => {
