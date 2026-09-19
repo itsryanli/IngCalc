@@ -149,6 +149,8 @@ everything that reads it has a replacement.
 - Modify: `src/storage/settings.ts:3-8`
 - Test: `src/storage/migration.test.ts`
 - Test: `src/storage/storage.test.ts`
+- Modify: `src/ui/App.tsx:9,42` (widen `Tab`; see Step 6)
+- Test: `src/ui/App.test.tsx:57` (a `landingTab: 'today'` fixture)
 
 **Interfaces:**
 - Consumes: nothing.
@@ -391,23 +393,43 @@ at the time of writing — grep for `landingTab` rather than trusting the number
   });
 ```
 
-- [ ] **Step 6: Run the three commands**
+- [ ] **Step 6: Keep the build green in `App`**
+
+Widening `Settings.landingTab` breaks two things in `src/ui/App.tsx`, both because its
+local `Tab` union still says `'today'` and not `'log'`:
+
+- `BUILT.includes(settings.landingTab)` at line 42 — `BUILT` is `readonly Tab[]`, so
+  passing a value that may be `'log'` is a type error.
+- `setTab(settings.landingTab)` in the same expression, for the same reason.
+
+Make the **minimal** change: add `'log'` to the union, leaving `'today'` out.
+
+```ts
+type Tab = 'log' | 'kitchen' | 'calc' | 'costs' | 'profile';
+```
+
+Change nothing else in `App.tsx`. `TABS` still lists `today`, `BUILT` still excludes
+`'log'`, and the tab is still not rendered — Task 16 turns it on. A stored `'log'` falls
+back to `'calc'` in the meantime, which is correct: Log does not exist yet.
+
+In `src/ui/App.test.tsx:57`, the fixture `landingTab: 'today'` no longer type-checks.
+Change it to `'kitchen'` — the test is about honouring a stored tab, and `'kitchen'` is a
+built one, so it keeps testing that. Do not change it to `'log'`; that tab is not built
+until Task 16 and the test would assert a fallback instead of what it means to assert.
+
+- [ ] **Step 7: Run the three commands**
 
 ```bash
 npm test && npm run build && npm run lint
 ```
 Expected: all tests pass (513 + 4 new), clean build, one pre-existing lint warning.
 
-`App.tsx` still compares `settings.landingTab` against `BUILT` — that array is typed
-`readonly Tab[]` where `Tab` includes `'log'`? It does not yet. If the build complains
-about the comparison, leave `App.tsx` alone and note it for Task 16; if it does not, also
-leave it alone. Do not widen `Tab` here.
-
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add src/core/types.ts src/core/targets.ts src/storage/db.ts src/storage/settings.ts \
-        src/storage/migration.test.ts src/storage/storage.test.ts
+        src/storage/migration.test.ts src/storage/storage.test.ts \
+        src/ui/App.tsx src/ui/App.test.tsx
 git commit -m "feat: add meal entry and day log types at schema v3
 
 Additive only: CookSession.cookedRemainingG stays until everything that
@@ -422,7 +444,10 @@ MealEntryFields is split from the base so EntryDraft and MealEntry
 cannot drift: Omit does not distribute over a discriminated union.
 
 landingTab widens to 'log' | 'kitchen' | 'calc' and defaults to 'log'.
-The stored value has never matched the rendered tab bar."
+The stored value has never matched the rendered tab bar. App's Tab union
+gains 'log' so the comparison still type-checks; the tab itself stays
+off until Task 16, so a stored 'log' falls back to Calc for now, which
+is correct while Log does not exist."
 ```
 
 ---
@@ -1535,6 +1560,7 @@ reader at once, which is the point: the compiler finds them all.
 - Modify: `src/ui/components/BatchCard.tsx`, `src/ui/components/BatchCard.test.tsx`
 - Modify: `src/ui/components/CookSessionForm.tsx`, `src/ui/components/CookSessionForm.test.tsx`
 - Modify: `src/ui/screens/KitchenScreen.tsx`, `src/ui/screens/KitchenScreen.test.tsx`
+- Modify: `src/core/meals.test.ts` (its `session` fixture carries the field — added in Task 4)
 - Modify: `src/storage/kitchen.test.ts`, `src/storage/migration.test.ts` (fixtures)
 - Delete: `src/ui/components/EatControl.tsx`, `src/ui/components/EatControl.test.tsx`
 
@@ -1694,7 +1720,9 @@ to that memo's dependency array), and pass it to every `BatchCard` and `CookSess
 - [ ] **Step 8: Fix every test fixture**
 
 Remove `cookedRemainingG` from every `CookSession` literal in the test files the build
-named. Where a test previously set up a partly eaten cook by lowering that field, set it up
+named. **This includes the fixtures Tasks 3 and 4 added** — `batch.test.ts`'s `cook()` and
+`meals.test.ts`'s `session` both set it, because the field still existed when they were
+written. Where a test previously set up a partly eaten cook by lowering that field, set it up
 by passing meal entries instead — that is the behaviour under test now.
 
 - [ ] **Step 9: Run the three commands**
@@ -3993,12 +4021,20 @@ Expected: no output. Any diff at all is a finding, not a cleanup.
 - [ ] **Step 3: Confirm the stored remainder is really gone**
 
 ```bash
-grep -rn "cookedRemainingG" src/ | grep -v "core/batch.ts" | grep -v "\.test\."
+grep -rn "cookedRemainingG" src/
 ```
 
-Expected: no hits outside `core/batch.ts`, where it is the derivation function rather than
-a field. Hits in test files are fine if they call the function; a hit that reads a property
-off a session object is a survivor.
+Expected: every hit is the **function** — its definition in `core/batch.ts`, and calls or
+imports of it (`AddEntryForm.tsx`, `SessionRow.tsx`, `BatchCard.tsx`, and tests). A hit
+reading it as a **property** off a session object is a survivor and must be fixed. The
+distinguishing shape is `session.cookedRemainingG` or `cookedRemainingG:` in an object
+literal:
+
+```bash
+grep -rn "\.cookedRemainingG\|cookedRemainingG:" src/
+```
+
+Expected: no output.
 
 ```bash
 grep -rn "applyEat\|validateEat\|rescaleCookedRemaining\|EatControl\|log this as a batch" src/
