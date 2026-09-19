@@ -227,6 +227,47 @@ describe('AddEntryForm', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('keeps the previous entry\'s draft on a bare rerender with a new `editing` prop', () => {
+    // This is the footgun documented on AddEntryForm's own Props: every field
+    // is seeded from `editing` inside a `useState` initializer, which React
+    // runs exactly once per mount. A caller that swaps `editing` on the SAME
+    // element — rather than giving it `key={editing?.id ?? 'new'}` to force a
+    // remount, as LogScreen does — gets a form that silently keeps showing
+    // the first entry's values under the second entry's identity.
+    //
+    // This test pins that mechanism directly, in the file that owns it,
+    // because it is unreachable through LogScreen's own UI: LogScreen's view
+    // state machine always unmounts the form between edits regardless of the
+    // key (see LogScreen.test.tsx's "switches drafts..." test and its
+    // comment), so no test driven through LogScreen's rendered screen can
+    // ever exercise this rerender path.
+    const entryA = {
+      id: 'a', profileId: 'p1', date: '2026-09-19', label: 'lunch', createdAt: 1,
+      kind: 'quick', name: 'Nasi lemak', kcal: 500,
+    } as MealEntry;
+    const entryB = {
+      id: 'b', profileId: 'p1', date: '2026-09-19', label: 'lunch', createdAt: 2,
+      kind: 'quick', name: 'Roti canai', kcal: 300,
+    } as MealEntry;
+
+    const { rerender } = renderForm({ editing: entryA, allEntries: [entryA, entryB] });
+    expect(screen.getByLabelText(/what was it/i)).toHaveValue('Nasi lemak');
+
+    // No key on this element and no unmount in between — deliberately the one
+    // thing a caller must not do.
+    rerender(
+      <AddEntryForm
+        profileId="p1" date="2026-09-19" label="lunch" ctx={ctx} catalogue={[chicken]}
+        allEntries={[entryA, entryB]} targets={targets} editing={entryB}
+        onSaved={vi.fn()} onCancel={vi.fn()}
+      />,
+    );
+
+    // Still A's name, not B's — the exact silent wrong-row footgun the
+    // caller's `key` prop exists to prevent.
+    expect(screen.getByLabelText(/what was it/i)).toHaveValue('Nasi lemak');
+  });
+
   it('does not report success when the write fails', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     db.close();
