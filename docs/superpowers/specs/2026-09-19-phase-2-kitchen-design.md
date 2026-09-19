@@ -55,11 +55,32 @@ fix one already recorded.
 |---|---|
 | Edit a batch's purchase fields | Allowed — price, location and date carry no derived remainder |
 | Edit a batch's `rawWeightG` | Allowed down to the total already cooked; below that it is blocked, naming that total |
-| Edit a session's method | Allowed freely — method affects calibration, not any remainder |
+| Edit a session's method | Allowed, subject to §2.4's impossible band **for the new method** — see note below |
+| Edit a batch's `ingredientId` | Allowed, and it re-keys every cook of that batch onto the new ingredient — see note below |
 | Edit a session's `cookedWeightG` | Allowed; `cookedRemainingG` is rescaled to preserve the fraction already eaten (see below) |
 | Edit a session's `rawUsedG` | Allowed only while it does not exceed the batch's raw remainder excluding this session |
 | Delete a session | Allowed; returns its raw to the batch's derived remainder |
 | Delete a batch | Allowed, cascading its sessions, behind a confirmation that names how many sessions and how much cooked food will go with it |
+
+**On editing a method.** An earlier draft of this table said method edits were
+"allowed freely — method affects calibration, not any remainder". The
+implementation is stricter, and deliberately so: an edit re-runs the full guard,
+so changing the method re-checks the observed yield against the *new* method's
+reference factor. A boiled rolled-oats cook at 6.65 cannot be relabelled
+steamed, because steamed oats are published at 2.2 and 6.65 is outside
+`[0.73, 6.6]`. That is correct — 6.65 is not a plausible steamed-oats yield —
+but it means a method edit can be refused, which the earlier wording denied.
+
+**On editing a batch's ingredient.** This is permitted and has a consequence
+worth stating plainly: `toYieldSamples` keys each sample by its batch's
+*current* `ingredientId`, so reassigning a batch moves every cook it contains
+into the new ingredient's yield average. That is the right behaviour for a
+genuinely mislabelled purchase, which is why it is allowed. The risk is that it
+can be silent: a chicken-breast cook at 0.71 reassigned to rolled oats sits only
+25% from `CATEGORY_YIELD.grain.roasted` (0.95), inside the ±35% band, so no flag
+appears anywhere. A confirmation naming what moves — *"This batch has 1 cook.
+Changing the ingredient moves it into your rolled oats yields."* — is the
+cheapest mitigation and is not yet implemented.
 
 Rescaling a corrected cooked weight preserves the fraction eaten rather than
 the grams eaten, because the grams were always a reading of the same food:
