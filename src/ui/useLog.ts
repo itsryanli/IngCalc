@@ -60,10 +60,13 @@ export function useLog(profileId: string | null, date: IsoDate): Log {
     }
   }, [profileId, date]);
 
-  // Re-runs on profileId or date, via fetchDay's identity. The generation is
-  // bumped on entry as well as teardown: unlike useKitchen and useProfiles,
-  // this hook re-runs on a prop change, so a load in flight for the previous
-  // day must not be allowed to land after the new one has started.
+  // Re-runs on profileId or date, via fetchDay's identity. The teardown bump is
+  // what makes a load in flight for the previous day unable to land after the
+  // new one starts: React runs the previous effect's cleanup before the next
+  // effect body, for a dependency-driven rerun as much as for an unmount. The
+  // bump on entry is therefore defensive redundancy rather than a second half
+  // of the guard — it costs nothing and holds if this effect is ever reached
+  // by a path that skips the cleanup.
   useEffect(() => {
     const gen = ++generationRef.current;
     void fetchDay(gen);

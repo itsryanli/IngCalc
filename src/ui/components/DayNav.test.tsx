@@ -50,4 +50,29 @@ describe('DayNav', () => {
     setup();
     expect(screen.getByLabelText(/jump to a date/i)).toHaveAttribute('max', '2026-09-19');
   });
+
+  it('ignores a future date typed past the max attribute', () => {
+    // `max` on <input type="date"> is a validity constraint, not a filter: the
+    // change event still fires. Without the handler's own guard the diary
+    // moves to tomorrow and accepts a future-dated entry.
+    const { onChange } = setup();
+    fireEvent.change(screen.getByLabelText(/jump to a date/i), {
+      target: { value: '2026-09-20' },
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('ignores a cleared date field', () => {
+    const { onChange } = setup();
+    fireEvent.change(screen.getByLabelText(/jump to a date/i), { target: { value: '' } });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('still accepts today itself', () => {
+    const { onChange } = setup('2026-09-15');
+    fireEvent.change(screen.getByLabelText(/jump to a date/i), {
+      target: { value: '2026-09-19' },
+    });
+    expect(onChange).toHaveBeenLastCalledWith('2026-09-19');
+  });
 });

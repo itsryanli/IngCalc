@@ -148,6 +148,28 @@ describe('AddEntryForm', () => {
     expect(await db.mealEntries.count()).toBe(0);
   });
 
+  it('honours the kg toggle on the kitchen weighed-amount input', async () => {
+    // It was hard-coded to unit="g" with a no-op onUnitChange, so the kg button
+    // did nothing and its aria-pressed never moved — while the ingredient path
+    // of the same component had a working one.
+    renderForm();
+    await userEvent.click(screen.getByTestId('available-s1'));
+    await userEvent.click(screen.getByRole('button', { name: /a weighed amount/i }));
+
+    const kg = screen.getByRole('button', { name: 'kg' });
+    expect(kg).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(kg);
+    expect(kg).toHaveAttribute('aria-pressed', 'true');
+
+    const field = screen.getByLabelText(/how much/i);
+    await userEvent.clear(field);
+    await userEvent.type(field, '0.142');
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    const [entry] = await db.mealEntries.toArray();
+    expect(entry).toMatchObject({ kind: 'weight', grams: 142 });
+  });
+
   it('shows what an ingredient entry comes to before it is saved', async () => {
     renderForm();
     await userEvent.click(screen.getByRole('button', { name: /any ingredient/i }));

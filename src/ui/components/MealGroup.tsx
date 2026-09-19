@@ -21,8 +21,18 @@ export function MealGroup({ label, entries, ctx, onAdd, onEdit, onChanged }: Pro
     <section className="meal-group">
       <div className="meal-group__head">
         <h3>{MEAL_LABELS[label]}</h3>
-        <button type="button" className="btn btn--secondary btn--small" onClick={onAdd}>
-          Add to {MEAL_LABELS[label].toLowerCase()}
+        {/* "+ Add" visibly, per spec section 6's mockup: the full phrase is what
+            forced this button to 264px beside its own heading, and LogScreen
+            already offers a full-width "Add something". The aria-label keeps
+            the unambiguous name for anyone who hears the button out of
+            context. */}
+        <button
+          type="button"
+          className="btn btn--secondary btn--small"
+          aria-label={`Add to ${MEAL_LABELS[label].toLowerCase()}`}
+          onClick={onAdd}
+        >
+          + Add
         </button>
       </div>
 

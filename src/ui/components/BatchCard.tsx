@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { batchState, cookedRemainingG, rawRemainingG, sessionsOf } from '../../core/batch';
+import {
+  batchState, cookedRemainingTotalG, EPSILON, rawRemainingG, sessionsOf,
+} from '../../core/batch';
 import {
   costPerKgCooked, costPerKgRaw, proteinPerMYRRaw, proteinPerMYRRetained,
 } from '../../core/cost';
 import type { Batch, CookSession, Ingredient, MealEntry } from '../../core/types';
-import { formatG, formatMYR, g } from '../../core/units';
+import { formatG, formatMYR } from '../../core/units';
 import { RETENTION } from '../../data/retentionTable';
 import { deleteBatchCascade } from '../../storage/kitchen';
 import { formatIsoDate } from '../dates';
@@ -38,7 +40,7 @@ export function BatchCard({
   const mine = sessionsOf(batch.id, sessions);
   const state = batchState(batch, sessions, entries);
   const remaining = rawRemainingG(batch, sessions);
-  const cookedLeft = g(mine.reduce((sum, s) => sum + cookedRemainingG(s, entries), 0));
+  const cookedLeft = cookedRemainingTotalG(batch, sessions, entries);
 
   const perKgRaw = costPerKgRaw(batch);
   const perKgCooked = costPerKgCooked(batch, sessions);
@@ -75,7 +77,10 @@ export function BatchCard({
 
       <p className="batch__remaining" data-testid="batch-remaining">
         {formatG(remaining)} raw left
-        {cookedLeft > 0 && ` · ${formatG(cookedLeft)} cooked left`}
+        {/* EPSILON, not 0: `batchState` calls this batch 'finished' at the same
+            threshold, and a float residue of 1e-14g left over from a portion
+            split used to make the header read 'Finished · 0g cooked left'. */}
+        {cookedLeft > EPSILON && ` · ${formatG(cookedLeft)} cooked left`}
       </p>
 
       <p className="batch__purchase" data-testid="batch-purchase">

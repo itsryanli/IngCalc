@@ -978,7 +978,11 @@ body {
 
 .available__item--on { border-color: var(--accent); }
 
-.btn--small { padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); }
+/* `width: auto` overrides the `width: 100%` that .btn--secondary sets; without
+   it "+ Add" stretched to 68% of a 390px viewport beside its heading. It does
+   not disturb button rows: `.btn-row .btn` at >=30rem is more specific.
+   min-height stays — that is the 48px tap target. */
+.btn--small { width: auto; padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); }
 
 .field__hint {
   margin: var(--sp-2) 0 0;

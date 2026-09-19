@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { cookedRemainingG, portionsRemaining } from '../../core/batch';
+import { cookedRemainingG, EPSILON, portionsRemaining } from '../../core/batch';
 import { flagYield } from '../../core/calibration';
 import { costPerPortion } from '../../core/cost';
 import type { Batch, CookSession, Ingredient, MealEntry } from '../../core/types';
@@ -89,7 +89,11 @@ export function SessionRow({ batch, ingredient, session, entries, onChanged, onE
       </label>
 
       <p className="session__remaining" data-testid="remaining">
-        {remaining <= 0
+        {/* EPSILON, not 0: eating every portion of a cook whose portion weight
+            does not divide exactly (460g over 7) leaves a residue of ~6e-14g,
+            which read as "0g left · 0.0 portions" under a bare zero while the
+            card header above it — on `batchState`'s EPSILON — read "Finished". */}
+        {remaining <= EPSILON
           ? 'All eaten'
           : `${formatG(remaining)} left · ${portionsLeft.toFixed(1)} portions`}
       </p>

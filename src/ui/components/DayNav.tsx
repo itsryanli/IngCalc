@@ -45,7 +45,13 @@ export function DayNav({ date, today, onChange }: Props) {
           type="date"
           value={date}
           max={today}
-          onChange={(e) => { if (e.target.value !== '') onChange(e.target.value); }}
+          // `max` is only a validity constraint: the browser still fires change
+          // for a typed future date, and a picker can be bypassed entirely. The
+          // guard, not the attribute, is what keeps the diary out of tomorrow.
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value !== '' && value <= today) onChange(value);
+          }}
         />
       </div>
     </div>

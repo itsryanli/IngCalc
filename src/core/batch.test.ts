@@ -3,7 +3,7 @@ import type { Batch, CookSession, MealEntry, NutrientProfile } from './types';
 import { NUTRIENT_KEYS } from './types';
 import { g, myr } from './units';
 import {
-  batchState, consumedFromSession, consumedFromSessionAt, cookedRawTotalG, cookedRemainingG, entrySessionGrams, isSessionEntry, perPortion, portionsRemaining, portionWeightG, portionsToGrams, rawRemainingG, sessionsOf, validateCook, validateCookEdit, validateRawUsedEdit, validateRawWeightEdit, type CookDraft,
+  batchState, consumedFromSession, cookedRemainingTotalG, EPSILON, consumedFromSessionAt, cookedRawTotalG, cookedRemainingG, entrySessionGrams, isSessionEntry, perPortion, portionsRemaining, portionWeightG, portionsToGrams, rawRemainingG, sessionsOf, validateCook, validateCookEdit, validateRawUsedEdit, validateRawWeightEdit, type CookDraft,
 } from './batch';
 import type { Ingredient } from './types';
 import { INGREDIENTS } from '../data/ingredients';
@@ -56,6 +56,12 @@ const eaten = (grams: number, over: Partial<MealEntry> = {}): MealEntry => ({
   id: 'm1', profileId: 'p1', date: '2026-09-19', label: 'lunch', createdAt: 1,
   kind: 'weight', cookSessionId: 's1', grams: g(grams), ...over,
 } as MealEntry);
+
+/** A portion entry against `s1`, for the float-residue cases. */
+const atePortions = (portions: number): MealEntry => ({
+  id: 'm1', profileId: 'p1', date: '2026-09-19', label: 'lunch', createdAt: 1,
+  kind: 'portion', cookSessionId: 's1', portions,
+});
 
 describe('sessionsOf', () => {
   it('keeps only the sessions belonging to the batch', () => {
@@ -114,6 +120,36 @@ describe('batchState', () => {
   it('treats a sub-epsilon remainder as fully cooked, not as a sliver left over', () => {
     const s = session({ rawUsedG: g(999.999), cookedWeightG: g(750) });
     expect(batchState(batch(), [s], [])).toBe('cooked');
+  });
+});
+
+describe('cookedRemainingTotalG', () => {
+  it('sums only the batch own sessions', () => {
+    const mine = session({ id: 's1', cookedWeightG: g(300) });
+    const theirs = session({ id: 's2', batchId: 'b2', cookedWeightG: g(500) });
+    expect(cookedRemainingTotalG(batch(), [mine, theirs], [])).toBe(300);
+  });
+
+  it('subtracts what has been eaten', () => {
+    expect(cookedRemainingTotalG(batch(), [session()], [eaten(120)])).toBe(180);
+  });
+
+  it('returns 0 for a batch with no sessions', () => {
+    expect(cookedRemainingTotalG(batch(), [], [])).toBe(0);
+  });
+
+  it('leaves float residue that batchState and the card must both tolerate', () => {
+    // 460g over 7 portions: (460/7)*7 exceeds 460 by ~5.7e-14, so eating every
+    // portion leaves a positive remainder. `> 0` in the card and `> EPSILON` in
+    // batchState made one card read "Finished" and "0g cooked left" at once,
+    // above a session row reading "0g left" instead of "All eaten". One
+    // function, so the two can no longer be compared differently by accident.
+    const s = session({ rawUsedG: g(1000), cookedWeightG: g(460), portionCount: 7 });
+    const ate = atePortions(7);
+    const left = cookedRemainingTotalG(batch(), [s], [ate]);
+    expect(left).toBeGreaterThan(0);
+    expect(left).toBeLessThan(EPSILON);
+    expect(batchState(batch(), [s], [ate])).toBe('finished');
   });
 });
 

@@ -1,4 +1,7 @@
-import { consumedFromSessionAt, entrySessionGrams, EPSILON, type Validation } from './batch';
+import {
+  consumedFromSessionAt, entrySessionGrams, EPSILON, portionsToGrams, portionWeightG,
+  type Validation,
+} from './batch';
 import { addNutrients, mapNutrients, scaleNutrients, zeroNutrients } from './nutrients';
 import { computeCooked, computeRaw, rawFromCooked } from './nutrition';
 import { retentionFor, type RetentionLookup } from './retention';
@@ -58,10 +61,16 @@ const ingredientForSession = (
 };
 
 /**
- * Total, never throwing: an entry whose session, batch or ingredient cannot be
- * resolved contributes zero rather than taking the day's totals down with it.
- * Deletion cascades, so this should be unreachable — but it is the landing
- * screen's arithmetic, and a thrown error there costs the user the whole day.
+ * An entry whose session, batch or ingredient cannot be resolved contributes
+ * zero rather than taking the day's totals down with it. Deletion cascades, so
+ * that should be unreachable — but it is the landing screen's arithmetic, and
+ * a thrown error there costs the user the whole day.
+ *
+ * Not literally total, though: a malformed stored row can still throw, via
+ * `portionsToGrams` → `portionWeightG` (`RangeError` on a `portionCount` below
+ * one) or via `g()` on a negative product. Neither is writable through the UI,
+ * and a corrupt row is what the ErrorBoundary is for; the unresolvable-
+ * reference path above is the one this function absorbs.
  */
 export function entryNutrients(entry: MealEntry, ctx: MealContext): NutrientProfile {
   if (entry.kind === 'quick') {
@@ -163,12 +172,16 @@ export function validateEntry(
   );
   const remaining = g(Math.max(0, session.cookedWeightG - consumed));
 
+  // `portionsToGrams`/`portionWeightG`, never the division inline: spec §3.2
+  // keeps the portions-are-a-view-over-grams rule in `core/batch.ts` alone.
+  // The inline form also differed in behaviour, yielding Infinity where
+  // `portionWeightG` throws on a portionCount below 1.
   const wanted = draft.kind === 'weight'
     ? draft.grams
-    : g((session.cookedWeightG / session.portionCount) * draft.portions);
+    : portionsToGrams(session, draft.portions);
 
   if (wanted > remaining + EPSILON) {
-    const portionsLeft = remaining / (session.cookedWeightG / session.portionCount);
+    const portionsLeft = remaining / portionWeightG(session);
     return no(`Only ${formatG(remaining)} is left — about ${portionsLeft.toFixed(1)} portions.`);
   }
 

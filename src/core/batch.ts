@@ -35,8 +35,26 @@ export function batchState(
   const mine = sessionsOf(batch.id, sessions);
   if (mine.length === 0) return 'raw';
   if (rawRemainingG(batch, sessions) > EPSILON) return 'partiallyCooked';
-  const left = g(mine.reduce((sum, s) => sum + cookedRemainingG(s, entries), 0));
-  return left > EPSILON ? 'cooked' : 'finished';
+  return cookedRemainingTotalG(batch, sessions, entries) > EPSILON ? 'cooked' : 'finished';
+}
+
+/**
+ * How much cooked food a batch still has, across all its cooks.
+ *
+ * Extracted because `BatchCard` computed the same reduce independently and the
+ * two drifted: the card tested it with `> 0` while `batchState` tested the same
+ * number with `> EPSILON`, so one card could read "Finished" and "cooked left"
+ * at once. One sum, one tolerance, one place to change either.
+ *
+ * The `g()` wrap is load-bearing: a bare `.reduce()` is `number`, not `Grams`.
+ */
+export function cookedRemainingTotalG(
+  batch: Batch,
+  sessions: readonly CookSession[],
+  entries: readonly MealEntry[],
+): Grams {
+  return g(sessionsOf(batch.id, sessions)
+    .reduce((sum, s) => sum + cookedRemainingG(s, entries), 0));
 }
 
 export function portionWeightG(session: CookSession): Grams {

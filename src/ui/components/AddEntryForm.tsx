@@ -60,6 +60,10 @@ export function AddEntryForm({
   const [byWeight, setByWeight] = useState(editing?.kind === 'weight');
   const [portions, setPortions] = useState(editing?.kind === 'portion' ? `${editing.portions}` : '1');
   const [grams, setGrams] = useState<Grams>(editing?.kind === 'weight' ? editing.grams : g(0));
+  // Its own unit, not the ingredient path's: WeightInput renders the g/kg
+  // control unconditionally, so a hard-coded 'g' with a no-op handler left the
+  // kg button inert and its aria-pressed permanently wrong.
+  const [kitchenUnit, setKitchenUnit] = useState<WeightUnit>('g');
 
   // Any-ingredient
   const [ingredientId, setIngredientId] = useState(
@@ -220,8 +224,8 @@ export function AddEntryForm({
               </div>
 
               {byWeight ? (
-                <WeightInput value={grams} unit="g" label="How much did you eat?"
-                             onChange={setGrams} onUnitChange={() => {}} />
+                <WeightInput value={grams} unit={kitchenUnit} label="How much did you eat?"
+                             onChange={setGrams} onUnitChange={setKitchenUnit} />
               ) : (
                 <div className="field">
                   <label htmlFor={`${ids}-portions`}>How many portions?</label>

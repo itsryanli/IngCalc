@@ -32,6 +32,12 @@ const eaten = (grams: number, over: Partial<MealEntry> = {}): MealEntry => ({
   kind: 'weight', cookSessionId: 's1', grams: g(grams), ...over,
 } as MealEntry);
 
+/** A portion entry against `s1`, for the float-residue case. */
+const atePortions = (portions: number): MealEntry => ({
+  id: 'm1', profileId: 'p1', date: '2026-09-19', label: 'lunch', createdAt: 1,
+  kind: 'portion', cookSessionId: 's1', portions,
+});
+
 const props = {
   batch, ingredient: bundled('chicken-breast'), entries: [] as readonly MealEntry[],
   onChanged: vi.fn(), onEdit: vi.fn(),
@@ -109,6 +115,20 @@ describe('SessionRow', () => {
 
   it('says a cook is all eaten once the entries account for the whole of it', () => {
     render(<SessionRow {...props} entries={[eaten(284)]} session={session()} />);
+    expect(screen.getByTestId('remaining')).toHaveTextContent(/all eaten/i);
+  });
+
+  it('says all eaten over the float residue a portion split leaves behind', () => {
+    // 460g over 7 portions: (460/7)*7 overshoots by ~5.7e-14, so a bare `> 0`
+    // rendered "0g left · 0.0 portions" under a card header already reading
+    // "Finished", which uses EPSILON. Same tolerance on both now.
+    render(
+      <SessionRow
+        {...props}
+        entries={[atePortions(7)]}
+        session={session({ cookedWeightG: g(460), portionCount: 7 })}
+      />,
+    );
     expect(screen.getByTestId('remaining')).toHaveTextContent(/all eaten/i);
   });
 
