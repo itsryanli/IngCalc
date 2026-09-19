@@ -293,3 +293,119 @@ describe('CalcScreen calibration', () => {
     expect(await screen.findByLabelText(/^name/i)).toBeInTheDocument();
   });
 });
+
+/* ==========================================================================
+   The portion split
+
+   Figures follow from the suite's already-verified ones: 1000g raw chicken
+   breast roasted = 710g cooked, 1140 kcal, 220.5g protein, against targets of
+   2633.0625 kcal and 135g protein. Divided by 4: 177.5g ("178g" at formatG's
+   zero fraction digits above 10), 285 kcal (10.82% -> 11%), 55.125g protein
+   (40.83% -> 41%, and "55.1g" in the table).
+   ========================================================================== */
+
+const splitInto = (portions: string) =>
+  fireEvent.change(screen.getByLabelText(/split into/i), { target: { value: portions } });
+
+describe('CalcScreen portion split', () => {
+  it('defaults to a single portion, leaving the whole-cook figures showing', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+
+    await waitFor(() => expect(screen.getByLabelText(/split into/i)).toHaveValue(1));
+    expect(screen.getByTestId('calorie-share')).toHaveTextContent('43%');
+    expect(screen.getByTestId('calorie-share')).toHaveTextContent('163%');
+  });
+
+  it('shows the weight of one portion', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    splitInto('4');
+
+    await waitFor(() => expect(screen.getByTestId('portion-weight')).toHaveTextContent('178g'));
+  });
+
+  it('divides the share of the daily targets by the portion count', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    splitInto('4');
+
+    await waitFor(() => expect(screen.getByTestId('calorie-share')).toHaveTextContent('11%'));
+    expect(screen.getByTestId('calorie-share')).toHaveTextContent('41%');
+  });
+
+  it('divides the nutrient table amounts by the portion count', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    await waitFor(() => expect(screen.getByText('220.5g')).toBeInTheDocument());
+
+    splitInto('4');
+
+    await waitFor(() => expect(screen.getByText('55.1g')).toBeInTheDocument());
+    expect(screen.queryByText('220.5g')).not.toBeInTheDocument();
+  });
+
+  it('says the nutrients are per portion once the cook is split', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    splitInto('4');
+
+    await waitFor(() => expect(screen.getByText(/nutrients.*per portion/i)).toBeInTheDocument());
+  });
+
+  it('divides the cooked weight, not the entered weight, when a cooked weight was entered', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    fireEvent.click(screen.getByRole('radio', { name: /cooked/i }));
+    splitInto('4');
+
+    // 1000g cooked / 0.71 = 1408.45g raw, which cooks back to 1000g: 250g a portion.
+    // Dividing the 1,408g raw figure instead would read "352g".
+    await waitFor(() => expect(screen.getByTestId('portion-weight')).toHaveTextContent('250g'));
+  });
+
+  it('keeps the split when the cooking method changes', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    splitInto('4');
+    await waitFor(() => expect(screen.getByTestId('portion-weight')).toHaveTextContent('178g'));
+
+    fireEvent.change(screen.getByRole('combobox', { name: /method/i }), { target: { value: 'boiled' } });
+
+    await waitFor(() => expect(screen.getByLabelText(/split into/i)).toHaveValue(4));
+    expect(screen.getByText(/nutrients.*per portion/i)).toBeInTheDocument();
+  });
+
+  it('falls back to one portion when the field is cleared, rather than dividing by nothing', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    splitInto('4');
+    await waitFor(() => expect(screen.getByTestId('calorie-share')).toHaveTextContent('11%'));
+
+    splitInto('');
+
+    // Number('') is 0, and 1140/0 is Infinity: "Infinity%" is the failure this guards.
+    await waitFor(() => expect(screen.getByTestId('calorie-share')).toHaveTextContent('43%'));
+    expect(screen.getByTestId('calorie-share')).not.toHaveTextContent('Infinity');
+  });
+
+  it('splits the cook without a profile, showing portion weight but no target share', async () => {
+    render(<CalcScreen profile={null} today={today} />);
+    await selectChicken();
+    splitInto('4');
+
+    await waitFor(() => expect(screen.getByTestId('portion-weight')).toHaveTextContent('178g'));
+    expect(screen.getByText(/nutrients.*per portion/i)).toBeInTheDocument();
+    // Targets come from the profile, so there is nothing to show a share against.
+    expect(screen.queryByTestId('calorie-share')).not.toBeInTheDocument();
+  });
+
+  it('ignores a fractional portion count rather than splitting into half a container', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    splitInto('2.5');
+
+    // Portions are whole containers; 2.5 is held as the previous valid count.
+    await waitFor(() => expect(screen.getByTestId('portion-weight')).toHaveTextContent('710g'));
+  });
+});

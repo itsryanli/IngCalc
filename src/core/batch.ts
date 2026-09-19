@@ -1,5 +1,6 @@
 import { flagYield } from './calibration';
-import type { Batch, CookMethod, CookSession, Ingredient, IsoDate } from './types';
+import type { Batch, CookMethod, CookSession, Ingredient, IsoDate, NutrientProfile } from './types';
+import { NUTRIENT_KEYS } from './types';
 import { formatG, g, type Grams } from './units';
 import type { CategoryYield } from './yieldResolver';
 
@@ -39,6 +40,28 @@ export function portionWeightG(session: CookSession): Grams {
     throw new RangeError(`portionCount must be at least 1, got ${session.portionCount}`);
   }
   return g(session.cookedWeightG / session.portionCount);
+}
+
+/**
+ * One portion's share of a cook's nutrients, for the calculator's split view.
+ *
+ * The same "grams are authoritative, portions are a view over them" rule as
+ * `portionWeightG`, applied to the nutrient profile rather than the weight —
+ * which is why it lives here rather than in a module of its own. Division is
+ * exact; rounding belongs to the formatter at the point of display, so a
+ * micronutrient that survives as 0.004mg per portion is still reported as a
+ * nonzero amount rather than being rounded away mid-calculation.
+ */
+export function perPortion(totals: NutrientProfile, portionCount: number): NutrientProfile {
+  // `< 1` alone would let NaN through (every NaN comparison is false) and
+  // silently turn every nutrient into NaN. The calculator feeds this straight
+  // from a text input, so that path is reachable.
+  if (!Number.isFinite(portionCount) || portionCount < 1) {
+    throw new RangeError(`portionCount must be a finite number of at least 1, got ${portionCount}`);
+  }
+  const out = {} as NutrientProfile;
+  for (const key of NUTRIENT_KEYS) out[key] = totals[key] / portionCount;
+  return out;
 }
 
 /**

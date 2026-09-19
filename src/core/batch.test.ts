@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { Batch, CookSession } from './types';
+import type { Batch, CookSession, NutrientProfile } from './types';
+import { NUTRIENT_KEYS } from './types';
 import { g, myr } from './units';
 import {
-  applyEat, batchState, cookedRawTotalG, portionsRemaining, portionWeightG, portionsToGrams, rawRemainingG, rescaleCookedRemaining, sessionsOf, validateCook, validateEat, validateRawUsedEdit, validateRawWeightEdit, type CookDraft,
+  applyEat, batchState, cookedRawTotalG, perPortion, portionsRemaining, portionWeightG, portionsToGrams, rawRemainingG, rescaleCookedRemaining, sessionsOf, validateCook, validateEat, validateRawUsedEdit, validateRawWeightEdit, type CookDraft,
 } from './batch';
 import type { Ingredient } from './types';
 import { INGREDIENTS } from '../data/ingredients';
@@ -315,5 +316,43 @@ describe('rescaleCookedRemaining', () => {
   it('treats a session that recorded no cooked weight as wholly remaining', () => {
     const s = session({ cookedWeightG: g(0), cookedRemainingG: g(0) });
     expect(rescaleCookedRemaining(s, g(500))).toBe(500);
+  });
+});
+
+/* ==========================================================================
+   perPortion — the calculator's split view
+   ========================================================================== */
+
+/** Distinct values per key, so a transposed or copied field cannot pass. */
+const wholeCook = (): NutrientProfile => ({
+  kcal: 1240, protein: 168, carbs: 44, fibre: 8, fat: 26,
+  potassium: 1520, iron: 6.4, magnesium: 220, zinc: 9.6, calcium: 120, sodium: 480,
+});
+
+describe('perPortion', () => {
+  it('divides every nutrient by the portion count', () => {
+    const whole = wholeCook();
+    const one = perPortion(whole, 4);
+    for (const key of NUTRIENT_KEYS) {
+      expect(one[key]).toBeCloseTo(whole[key] / 4, 10);
+    }
+  });
+
+  it('leaves a single portion equal to the whole cook', () => {
+    expect(perPortion(wholeCook(), 1)).toEqual(wholeCook());
+  });
+
+  it('does not mutate the totals it was given', () => {
+    const whole = wholeCook();
+    perPortion(whole, 4);
+    expect(whole).toEqual(wholeCook());
+  });
+
+  it('rejects a portion count below one', () => {
+    expect(() => perPortion(wholeCook(), 0)).toThrow(RangeError);
+  });
+
+  it('rejects a portion count that is not a finite number', () => {
+    expect(() => perPortion(wholeCook(), Number.NaN)).toThrow(RangeError);
   });
 });

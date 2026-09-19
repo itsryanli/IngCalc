@@ -380,6 +380,24 @@ body {
 .weight__row { display: flex; gap: var(--sp-2); align-items: stretch; }
 .weight__row input { flex: 1; min-width: 0; }
 
+/* Portion split: the same row shape as the weight input, with a static unit
+   in place of the segmented toggle. */
+.portion-split__unit {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-3);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+
+.portion-split__readout {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
 .seg {
   display: flex;
   flex: none;

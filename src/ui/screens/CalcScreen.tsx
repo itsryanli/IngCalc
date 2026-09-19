@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { COOK_METHODS, type CookMethod, type Ingredient, type NutrientKey, type Profile } from '../../core/types';
 import { formatG, g, type Grams } from '../../core/units';
 import { computeCooked, rawFromCooked } from '../../core/nutrition';
+import { perPortion } from '../../core/batch';
 import { compareMethods } from '../../core/methodCompare';
 import { ageFrom, calorieTarget, microTargets, proteinTargetG } from '../../core/targets';
 import { CATEGORY_YIELD } from '../../data/categoryYield';
@@ -17,6 +18,7 @@ import { NutrientTable } from '../components/NutrientTable';
 import { MethodCompare } from '../components/MethodCompare';
 import { IngredientPicker } from '../components/IngredientPicker';
 import { AddBatchForm } from '../components/AddBatchForm';
+import { PortionSplit } from '../components/PortionSplit';
 import { AddIngredientScreen } from './AddIngredientScreen';
 import { METHOD_LABELS } from '../labels';
 
@@ -30,6 +32,8 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
   const [loggingBatch, setLoggingBatch] = useState(false);
   const [loggedMessage, setLoggedMessage] = useState<string | null>(null);
   const [ingredientId, setIngredientId] = useState('');
+  /** Whole containers, at least one. `PortionSplit` guarantees both, so dividing by it is safe. */
+  const [portionCount, setPortionCount] = useState(1);
   const [weight, setWeight] = useState<Grams>(g(0));
   const [unit, setUnit] = useState<WeightUnit>('g');
   const [entered, setEntered] = useState<'raw' | 'cooked'>('raw');
@@ -97,6 +101,12 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
     });
     return { cooked, shownWeight: entered === 'raw' ? cooked.cookedWeightG : rawG };
   }, [ingredient, weight, entered, method, samples]);
+
+  // Kept apart from `result` so changing the split does not recompute the cook.
+  const shownTotals = useMemo(
+    () => (result === null ? null : perPortion(result.cooked.totals, portionCount)),
+    [result, portionCount],
+  );
 
   const rows = useMemo(
     () => (ingredient === null ? [] : compareMethods(ingredient, samples, CATEGORY_YIELD, RETENTION, HIGHLIGHT)),
@@ -189,6 +199,12 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
                 <CalcTrace steps={result.cooked.steps} />
               </div>
 
+              <PortionSplit
+                value={portionCount}
+                cookedWeightG={result.cooked.cookedWeightG}
+                onChange={setPortionCount}
+              />
+
               <div className="btn-row">
                 <button
                   type="button"
@@ -204,10 +220,12 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
               )}
 
               <div className="card">
-                <h3 className="card__title">Nutrients</h3>
+                <h3 className="card__title">
+                  Nutrients{portionCount > 1 && ' (per portion)'}
+                </h3>
                 <div className="table-scroll">
               <NutrientTable
-                totals={result.cooked.totals}
+                totals={shownTotals ?? result.cooked.totals}
                 targets={targets}
                 assumedRetentionFor={result.cooked.assumedRetentionFor}
                 belowRniAge={belowRniAge}
@@ -217,8 +235,9 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
 
               {profile !== null && (
                 <p className="share" data-testid="calorie-share">
-                  {Math.round((result.cooked.totals.kcal / calorieTarget(profile, today)) * 100)}% of your daily
-                  calories · {Math.round((result.cooked.totals.protein / proteinTargetG(profile)) * 100)}% of your protein
+                  {portionCount > 1 && 'One portion = '}
+                  {Math.round(((shownTotals ?? result.cooked.totals).kcal / calorieTarget(profile, today)) * 100)}% of your daily
+                  calories · {Math.round(((shownTotals ?? result.cooked.totals).protein / proteinTargetG(profile)) * 100)}% of your protein
                 </p>
               )}
 
