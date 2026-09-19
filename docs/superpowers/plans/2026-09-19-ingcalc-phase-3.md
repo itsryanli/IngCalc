@@ -56,6 +56,10 @@ places the Phase 2 plan was wrong and the rulings this phase inherits.
   `--estimate`/`--estimate-soft`. Inventing a token name with a hard-coded hex fallback
   renders correctly in light mode and wrongly in dark, and no test can catch it
   (execution record §1.5). Check `src/index.css` before using a token.
+- **`@testing-library/user-event` is a declared dev dependency from Task 8 onward.** The
+  repo previously used only `fireEvent`; this phase's test snippets use `userEvent`, which
+  Task 13's multi-step typing genuinely needs. It is already in `package.json` — do not
+  add it again, and do not swap it back to `fireEvent` in a snippet that uses it.
 - **Commit after every task**, conventional-commit style, with the reasoning in the body.
 
 ---
