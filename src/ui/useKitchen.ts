@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toYieldSamples } from '../core/calibration';
-import type { Batch, CookSession, YieldSample } from '../core/types';
+import type { Batch, CookSession, MealEntry, YieldSample } from '../core/types';
 import { loadKitchen } from '../storage/kitchen';
 
 export interface Kitchen {
   batches: Batch[];
   sessions: CookSession[];
+  entries: MealEntry[];
   /** Fed to `resolveYield`, which is what turns published factors into measured ones. */
   samples: YieldSample[];
   loading: boolean;
@@ -21,6 +22,7 @@ export interface Kitchen {
 export function useKitchen(): Kitchen {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [sessions, setSessions] = useState<CookSession[]>([]);
+  const [entries, setEntries] = useState<MealEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [storageError, setStorageError] = useState<string | null>(null);
   const generationRef = useRef(0);
@@ -31,6 +33,7 @@ export function useKitchen(): Kitchen {
       if (gen !== generationRef.current) return;
       setBatches(loaded.batches);
       setSessions(loaded.sessions);
+      setEntries(loaded.entries);
       setStorageError(null);
     } catch (err) {
       console.error('Loading the kitchen failed', err);
@@ -54,5 +57,5 @@ export function useKitchen(): Kitchen {
 
   const samples = useMemo(() => toYieldSamples(batches, sessions), [batches, sessions]);
 
-  return { batches, sessions, samples, loading, storageError, refresh };
+  return { batches, sessions, entries, samples, loading, storageError, refresh };
 }
