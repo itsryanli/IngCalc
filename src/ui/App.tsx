@@ -2,25 +2,27 @@ import { useEffect, useRef, useState } from 'react';
 import { isStorageAvailable } from '../storage/db';
 import { getSettings } from '../storage/settings';
 import { useProfiles } from './useProfiles';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { CalcScreen } from './screens/CalcScreen';
 import { KitchenScreen } from './screens/KitchenScreen';
+import { LogScreen } from './screens/LogScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 
-type Tab = 'today' | 'log' | 'kitchen' | 'calc' | 'costs' | 'profile';
+type Tab = 'log' | 'kitchen' | 'calc' | 'costs' | 'profile';
 
 const TABS: { id: Tab; label: string; phase?: number }[] = [
-  { id: 'today', label: 'Today', phase: 3 },
+  { id: 'log', label: 'Log' },
   { id: 'kitchen', label: 'Kitchen' },
   { id: 'calc', label: 'Calc' },
   { id: 'costs', label: 'Costs', phase: 4 },
   { id: 'profile', label: 'Profile' },
 ];
 
-/** Tabs that actually exist. A stored preference for any other tab falls back to Calc. */
-const BUILT: readonly Tab[] = ['kitchen', 'calc', 'profile'];
+/** Tabs that actually exist. A stored preference for any other tab falls back to Log. */
+const BUILT: readonly Tab[] = ['log', 'kitchen', 'calc', 'profile'];
 
 export function App() {
-  const [tab, setTab] = useState<Tab>('calc');
+  const [tab, setTab] = useState<Tab>('log');
   const { profiles, active: profile, storageError, refresh, setActive } = useProfiles();
   const [storageOk, setStorageOk] = useState(true);
   // Guards against the initial settings load clobbering a tab the user has
@@ -39,7 +41,7 @@ export function App() {
       const settings = await getSettings();
       if (cancelled) return;
       if (!userNavigated.current) {
-        setTab(BUILT.includes(settings.landingTab) ? settings.landingTab : 'calc');
+        setTab(BUILT.includes(settings.landingTab) ? settings.landingTab : 'log');
       }
     })();
     return () => { cancelled = true; };
@@ -72,17 +74,20 @@ export function App() {
       )}
 
       <main className="app__main">
-        {tab === 'kitchen' && <KitchenScreen />}
-        {tab === 'calc' && <CalcScreen profile={profile} />}
-        {tab === 'profile' && (
-          <ProfileScreen
-            profiles={profiles}
-            activeId={profile?.id ?? null}
-            storageError={storageError}
-            onSetActive={(id) => { void setActive(id); }}
-            onChanged={() => { void refresh(); }}
-          />
-        )}
+        <ErrorBoundary resetKey={tab} onReset={() => selectTab('log')}>
+          {tab === 'log' && <LogScreen profile={profile} />}
+          {tab === 'kitchen' && <KitchenScreen />}
+          {tab === 'calc' && <CalcScreen profile={profile} />}
+          {tab === 'profile' && (
+            <ProfileScreen
+              profiles={profiles}
+              activeId={profile?.id ?? null}
+              storageError={storageError}
+              onSetActive={(id) => { void setActive(id); }}
+              onChanged={() => { void refresh(); }}
+            />
+          )}
+        </ErrorBoundary>
       </main>
 
       <nav role="tablist" className="tabbar">

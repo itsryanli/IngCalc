@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { db } from '../storage/db';
 import { saveSettings, setActiveProfile } from '../storage/settings';
 import { saveProfile } from '../storage/profiles';
-import type { Profile } from '../core/types';
+import { g, myr } from '../core/units';
+import type { Batch, Profile } from '../core/types';
 
 beforeEach(async () => {
   await db.profiles.clear();
@@ -22,15 +24,27 @@ beforeEach(async () => {
 describe('App', () => {
   it('shows all four tabs', async () => {
     render(<App />);
-    for (const name of ['Today', 'Kitchen', 'Calc', 'Costs']) {
+    for (const name of ['Log', 'Kitchen', 'Calc', 'Costs']) {
       expect(await screen.findByRole('tab', { name })).toBeInTheDocument();
     }
   });
 
   it('disables the tabs that arrive in later phases', async () => {
     render(<App />);
-    expect(await screen.findByRole('tab', { name: 'Today' })).toBeDisabled();
+    expect(await screen.findByRole('tab', { name: 'Costs' })).toBeDisabled();
     expect(await screen.findByRole('tab', { name: 'Calc' })).toBeEnabled();
+  });
+
+  it('lands on the Log', async () => {
+    await saveSettings({ id: 'singleton', activeProfileId: null, landingTab: 'log', defaultWeightUnit: 'g' });
+    render(<App />);
+    expect(await screen.findByRole('tab', { name: /log/i })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('renames the Today tab to Log', async () => {
+    render(<App />);
+    expect(screen.queryByRole('tab', { name: /today/i })).toBeNull();
+    expect(screen.getByRole('tab', { name: /log/i })).toBeEnabled();
   });
 
   it('prompts for a profile when none exists', async () => {
@@ -50,13 +64,21 @@ describe('App', () => {
   it('opens on the tab stored in settings', async () => {
     await saveSettings({ id: 'singleton', activeProfileId: null, landingTab: 'calc', defaultWeightUnit: 'g' });
     render(<App />);
-    expect(await screen.findByRole('tab', { name: 'Calc' })).toHaveAttribute('aria-selected', 'true');
+    // The tab button exists from the very first render (the initial state is
+    // 'log'), so `findByRole` alone would resolve before the async settings
+    // load has a chance to flip it — the assertion has to wait for that too.
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Calc' })).toHaveAttribute('aria-selected', 'true');
+    });
   });
 
-  it('falls back to Calc when the stored landing tab is not built yet', async () => {
-    await saveSettings({ id: 'singleton', activeProfileId: null, landingTab: 'log', defaultWeightUnit: 'g' });
+  it('falls back to the Log when the stored tab is one that does not exist', async () => {
+    await saveSettings({
+      id: 'singleton', activeProfileId: null,
+      landingTab: 'costs' as never, defaultWeightUnit: 'g',
+    });
     render(<App />);
-    expect(await screen.findByRole('tab', { name: 'Calc' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByRole('tab', { name: /log/i })).toHaveAttribute('aria-selected', 'true');
   });
 });
 
@@ -74,10 +96,9 @@ describe('App Kitchen tab', () => {
     expect(await screen.findByRole('heading', { name: /^kitchen$/i })).toBeInTheDocument();
   });
 
-  it('still marks Today and Costs as future phases', async () => {
+  it('still marks Costs as a future phase', async () => {
     render(<App />);
-    expect(await screen.findByRole('tab', { name: /today/i })).toBeDisabled();
-    expect(screen.getByRole('tab', { name: /costs/i })).toBeDisabled();
+    expect(await screen.findByRole('tab', { name: /costs/i })).toBeDisabled();
   });
 });
 
@@ -178,5 +199,41 @@ describe('App active profile', () => {
     await waitFor(() => {
       expect(screen.getByTestId('profile-p2')).toHaveAttribute('aria-current', 'true');
     });
+  });
+});
+
+// `batchState` is called unconditionally while grouping batches for display, so
+// mocking it to throw is a clean, honest way to make Kitchen fail mid-render
+// without reaching into React internals or corrupting stored data.
+describe('App error boundary', () => {
+  const brokenBatch: Batch = {
+    id: 'b1', ingredientId: 'chicken-breast', rawWeightG: g(1000),
+    purchase: { pricePaidMYR: myr(20), location: 'Pasar', date: '2026-09-19' },
+    createdAt: 0,
+  };
+
+  it('keeps the rest of the app usable when a screen throws', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await db.batches.put(brokenBatch);
+    vi.doMock('../core/batch', async () => {
+      const actual = await vi.importActual<typeof import('../core/batch')>('../core/batch');
+      return {
+        ...actual,
+        batchState: () => { throw new Error('bad batch row'); },
+      };
+    });
+
+    try {
+      const { App: AppWithBrokenKitchen } = await import('./App');
+      render(<AppWithBrokenKitchen />);
+
+      await userEvent.click(await screen.findByRole('tab', { name: /kitchen/i }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(/could not be shown/i);
+
+      await userEvent.click(screen.getByRole('tab', { name: /calc/i }));
+      expect(screen.queryByRole('alert')).toBeNull();
+    } finally {
+      vi.doUnmock('../core/batch');
+    }
   });
 });
