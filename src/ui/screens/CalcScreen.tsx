@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { COOK_METHODS, type CookMethod, type Ingredient, type NutrientKey, type Profile } from '../../core/types';
-import { g, type Grams } from '../../core/units';
+import { formatG, g, type Grams } from '../../core/units';
 import { computeCooked, rawFromCooked } from '../../core/nutrition';
+import { perPortion } from '../../core/batch';
 import { compareMethods } from '../../core/methodCompare';
 import { ageFrom, calorieTarget, microTargets, proteinTargetG } from '../../core/targets';
 import { CATEGORY_YIELD } from '../../data/categoryYield';
@@ -10,11 +11,14 @@ import { RNI_MIN_AGE, rniFor } from '../../data/rniMY';
 import { DV_US } from '../../data/dvUS';
 import { listUserIngredients } from '../../storage/userIngredients';
 import { useCatalogue } from '../useCatalogue';
+import { useKitchen } from '../useKitchen';
 import { WeightInput, type WeightUnit } from '../components/WeightInput';
 import { CalcTrace } from '../components/CalcTrace';
 import { NutrientTable } from '../components/NutrientTable';
 import { MethodCompare } from '../components/MethodCompare';
 import { IngredientPicker } from '../components/IngredientPicker';
+import { AddBatchForm } from '../components/AddBatchForm';
+import { PortionSplit } from '../components/PortionSplit';
 import { AddIngredientScreen } from './AddIngredientScreen';
 import { METHOD_LABELS } from '../labels';
 
@@ -22,7 +26,14 @@ const HIGHLIGHT: NutrientKey[] = ['potassium', 'iron', 'magnesium'];
 
 export function CalcScreen({ profile, today = new Date() }: { profile: Profile | null; today?: Date }) {
   const { catalogue, refresh } = useCatalogue();
+  // The point of Phase 2: resolveYield's `measured` branch has been
+  // unreachable since Phase 1 because nothing produced samples.
+  const { sessions, samples, storageError: kitchenError, refresh: refreshKitchen } = useKitchen();
+  const [loggingBatch, setLoggingBatch] = useState(false);
+  const [loggedMessage, setLoggedMessage] = useState<string | null>(null);
   const [ingredientId, setIngredientId] = useState('');
+  /** Whole containers, at least one. `PortionSplit` guarantees both, so dividing by it is safe. */
+  const [portionCount, setPortionCount] = useState(1);
   const [weight, setWeight] = useState<Grams>(g(0));
   const [unit, setUnit] = useState<WeightUnit>('g');
   const [entered, setEntered] = useState<'raw' | 'cooked'>('raw');
@@ -35,6 +46,10 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
   const ingredient = catalogue.find((i) => i.id === ingredientId) ?? null;
 
   const handleAddNew = (typedName: string) => {
+    // The batch form renders its own picker wired to this same handler. Without
+    // clearing loggingBatch, its branch keeps winning the ternary below and the
+    // add-ingredient screen never renders — the affordance silently does nothing.
+    setLoggingBatch(false);
     setAddIngredientError(null);
     setAddInitialName(typedName);
     setAddingIngredient(true);
@@ -80,16 +95,22 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
     if (ingredient === null || weight <= 0) return null;
     const rawG = entered === 'raw'
       ? weight
-      : rawFromCooked(ingredient, weight, method, [], CATEGORY_YIELD).rawWeightG;
+      : rawFromCooked(ingredient, weight, method, samples, CATEGORY_YIELD).rawWeightG;
     const cooked = computeCooked({
-      ingredient, rawG, method, samples: [], categoryYield: CATEGORY_YIELD, retention: RETENTION,
+      ingredient, rawG, method, samples, categoryYield: CATEGORY_YIELD, retention: RETENTION,
     });
     return { cooked, shownWeight: entered === 'raw' ? cooked.cookedWeightG : rawG };
-  }, [ingredient, weight, entered, method]);
+  }, [ingredient, weight, entered, method, samples]);
+
+  // Kept apart from `result` so changing the split does not recompute the cook.
+  const shownTotals = useMemo(
+    () => (result === null ? null : perPortion(result.cooked.totals, portionCount)),
+    [result, portionCount],
+  );
 
   const rows = useMemo(
-    () => (ingredient === null ? [] : compareMethods(ingredient, [], CATEGORY_YIELD, RETENTION, HIGHLIGHT)),
-    [ingredient],
+    () => (ingredient === null ? [] : compareMethods(ingredient, samples, CATEGORY_YIELD, RETENTION, HIGHLIGHT)),
+    [ingredient, samples],
   );
 
   const targets = useMemo(
@@ -105,7 +126,26 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
     <section className="screen">
       <h2>Calculator</h2>
 
-      {addingIngredient ? (
+      {loggingBatch && ingredient !== null ? (
+        <AddBatchForm
+          catalogue={catalogue}
+          sessions={sessions}
+          initialIngredientId={ingredient.id}
+          initialRawWeightG={result?.cooked.rawWeightG}
+          today={today}
+          onSaved={(batch) => {
+            void (async () => {
+              await refreshKitchen();
+              setLoggingBatch(false);
+              setLoggedMessage(
+                `Logged ${formatG(batch.rawWeightG)} of ${ingredient.name.toLowerCase()} to your kitchen.`,
+              );
+            })();
+          }}
+          onCancel={() => setLoggingBatch(false)}
+          onAddNew={handleAddNew}
+        />
+      ) : addingIngredient ? (
         <AddIngredientScreen
           initialName={addInitialName}
           onSaved={(added) => { void handleIngredientAdded(added); }}
@@ -113,6 +153,12 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
         />
       ) : (
         <>
+          {kitchenError !== null && (
+            <p role="alert" className="banner banner--warn">
+              Your logged cooks could not be read, so these figures use published factors.
+            </p>
+          )}
+
           <IngredientPicker
             catalogue={catalogue}
             value={ingredientId}
@@ -153,11 +199,33 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
                 <CalcTrace steps={result.cooked.steps} />
               </div>
 
+              <PortionSplit
+                value={portionCount}
+                cookedWeightG={result.cooked.cookedWeightG}
+                onChange={setPortionCount}
+              />
+
+              <div className="btn-row">
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => { setLoggedMessage(null); setLoggingBatch(true); }}
+                >
+                  Log this as a batch
+                </button>
+              </div>
+
+              {loggedMessage !== null && (
+                <p className="banner banner--info" role="status">{loggedMessage}</p>
+              )}
+
               <div className="card">
-                <h3 className="card__title">Nutrients</h3>
+                <h3 className="card__title">
+                  Nutrients{portionCount > 1 && ' (per portion)'}
+                </h3>
                 <div className="table-scroll">
               <NutrientTable
-                totals={result.cooked.totals}
+                totals={shownTotals ?? result.cooked.totals}
                 targets={targets}
                 assumedRetentionFor={result.cooked.assumedRetentionFor}
                 belowRniAge={belowRniAge}
@@ -167,8 +235,9 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
 
               {profile !== null && (
                 <p className="share" data-testid="calorie-share">
-                  {Math.round((result.cooked.totals.kcal / calorieTarget(profile, today)) * 100)}% of your daily
-                  calories · {Math.round((result.cooked.totals.protein / proteinTargetG(profile)) * 100)}% of your protein
+                  {portionCount > 1 && 'One portion = '}
+                  {Math.round(((shownTotals ?? result.cooked.totals).kcal / calorieTarget(profile, today)) * 100)}% of your daily
+                  calories · {Math.round(((shownTotals ?? result.cooked.totals).protein / proteinTargetG(profile)) * 100)}% of your protein
                 </p>
               )}
 

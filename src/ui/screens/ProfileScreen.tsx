@@ -1,171 +1,84 @@
-import { useMemo, useState } from 'react';
-import type { Goal, Profile, Sex } from '../../core/types';
-import { bmr, calorieTarget, proteinGPerKgFor, proteinGPerLb, proteinTargetG, tdee, explainTargets } from '../../core/targets';
-import { saveProfile } from '../../storage/profiles';
-import { ExplainedValue } from '../components/ExplainedValue';
+import { useState } from 'react';
+import type { Profile } from '../../core/types';
+import { ProfileCard } from '../components/ProfileCard';
+import { ProfileForm } from '../components/ProfileForm';
 
-/** Matches the thousands-separator convention NutrientTable already uses. */
-const kcal = (v: number): string => `${v.toLocaleString('en-MY')} kcal`;
-import { newId } from '../newId';
-
-interface Draft {
-  name: string; sex: Sex; birthYear: string; heightCm: string;
-  weightKg: string; sessionsPerWeek: string; goal: Goal; proteinGPerKg: string;
+interface Props {
+  profiles: Profile[];
+  activeId: string | null;
+  storageError: string | null;
+  onSetActive: (id: string) => void;
+  /** Re-read storage: a profile was added, edited or deleted. */
+  onChanged: () => void;
+  today?: Date;
 }
 
-const EMPTY: Draft = {
-  name: '', sex: 'male', birthYear: '', heightCm: '',
-  weightKg: '', sessionsPerWeek: '0', goal: 'maintain', proteinGPerKg: '',
-};
+// `profile` absent means the form is adding rather than editing.
+type View = { kind: 'list' } | { kind: 'form'; profile?: Profile };
 
-function toProfile(d: Draft): Profile {
-  return {
-    id: newId(),
-    name: d.name.trim(),
-    sex: d.sex,
-    birthYear: Number(d.birthYear),
-    heightCm: Number(d.heightCm),
-    weightKg: Number(d.weightKg),
-    sessionsPerWeek: Number(d.sessionsPerWeek),
-    goal: d.goal,
-    ...(d.proteinGPerKg.trim() === '' ? {} : { proteinGPerKg: Number(d.proteinGPerKg) }),
-  };
-}
+export function ProfileScreen({
+  profiles, activeId, storageError, onSetActive, onChanged, today = new Date(),
+}: Props) {
+  const [view, setView] = useState<View>({ kind: 'list' });
 
-function validate(d: Draft, currentYear: number): string | null {
-  if (d.name.trim() === '') return 'Please enter a name';
-  const year = Number(d.birthYear);
-  if (!Number.isInteger(year) || year < 1900 || year > currentYear - 10) {
-    return `Please enter a birth year between 1900 and ${currentYear - 10}`;
+  if (view.kind === 'form') {
+    const adding = view.profile === undefined;
+    return (
+      <section className="screen">
+        <ProfileForm
+          profile={view.profile}
+          today={today}
+          onSaved={(saved) => {
+            // A profile you just created is the one you meant to use. Editing an
+            // existing one leaves the active selection alone.
+            if (adding) onSetActive(saved.id);
+            onChanged();
+            setView({ kind: 'list' });
+          }}
+          onCancel={() => setView({ kind: 'list' })}
+        />
+      </section>
+    );
   }
-  const heightCm = Number(d.heightCm);
-  if (!Number.isFinite(heightCm) || heightCm < 80 || heightCm > 250) return 'Please enter a height between 80cm and 250cm';
-  const weightKg = Number(d.weightKg);
-  if (!Number.isFinite(weightKg) || weightKg < 20 || weightKg > 400) return 'Please enter a weight between 20kg and 400kg';
-  const sessions = Number(d.sessionsPerWeek);
-  if (!Number.isFinite(sessions) || sessions < 0 || sessions > 21) return 'Please enter between 0 and 21 sessions per week';
-  return null;
-}
-
-export function ProfileScreen({ onSaved, today = new Date() }: { onSaved: (p: Profile) => void; today?: Date }) {
-  const [draft, setDraft] = useState<Draft>(EMPTY);
-  const [error, setError] = useState<string | null>(null);
-  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
-
-  const preview = useMemo(() => {
-    if (validate(draft, today.getUTCFullYear()) !== null) return null;
-    const p = toProfile(draft);
-    return {
-      bmr: Math.round(bmr(p, today)),
-      tdee: Math.round(tdee(p, today)),
-      calories: Math.round(calorieTarget(p, today)),
-      proteinG: Math.round(proteinTargetG(p)),
-      gPerKg: proteinGPerKgFor(p),
-      gPerLb: proteinGPerLb(p),
-      explain: explainTargets(p, today),
-    };
-  }, [draft, today]);
-
-  const submit = async () => {
-    const problem = validate(draft, today.getUTCFullYear());
-    if (problem !== null) { setError(problem); return; }
-    setError(null);
-    const p = toProfile(draft);
-    try {
-      await saveProfile(p);
-    } catch {
-      // Dexie can reject (private browsing, quota, a blocked upgrade) — without this the
-      // promise rejection would be unhandled, onSaved would never fire, and the user would
-      // tap Save to nothing: no error, no navigation, form unchanged.
-      setError('Could not save your profile — your browser may be blocking storage (for example, private browsing) or storage may be full. Please try again.');
-      return;
-    }
-    onSaved(p);
-  };
 
   return (
     <section className="screen">
       <h2>Profile</h2>
-      <p className="screen__hint">Your body stats produce the calorie and protein targets every other screen measures food against.</p>
+      <p className="screen__hint">
+        Body stats produce the calorie and protein targets every other screen measures
+        food against. Nothing you log is tied to a profile — batches and cooks are
+        household-level, so switching here only changes the yardstick.
+      </p>
 
-      <div className="field">
-        <label htmlFor="name">Name</label>
-        <input id="name" value={draft.name} onChange={(e) => set('name', e.target.value)} />
-      </div>
+      {storageError !== null && <p role="alert" className="banner banner--warn">{storageError}</p>}
 
-      <fieldset>
-        <legend>Sex (used for the BMR formula)</legend>
-        <div className="choice-row">
-        {(['male', 'female'] as const).map((s) => (
-          <label key={s} className="choice">
-            <input type="radio" name="sex" value={s} checked={draft.sex === s} onChange={() => set('sex', s)} />
-            {s}
-          </label>
-        ))}
-        </div>
-      </fieldset>
-
-      <div className="field">
-        <label htmlFor="birthYear">Birth year</label>
-        <input id="birthYear" type="number" value={draft.birthYear} onChange={(e) => set('birthYear', e.target.value)} />
-      </div>
-
-      <div className="field">
-        <label htmlFor="heightCm">Height (cm)</label>
-        <input id="heightCm" type="number" value={draft.heightCm} onChange={(e) => set('heightCm', e.target.value)} />
-      </div>
-
-      <div className="field">
-        <label htmlFor="weightKg">Weight (kg)</label>
-        <input id="weightKg" type="number" value={draft.weightKg} onChange={(e) => set('weightKg', e.target.value)} />
-      </div>
-
-      <div className="field">
-        <label htmlFor="sessions">Exercise sessions per week</label>
-        <input id="sessions" type="number" min={0} max={21} value={draft.sessionsPerWeek} onChange={(e) => set('sessionsPerWeek', e.target.value)} />
-      </div>
-
-      <div className="field">
-        <label htmlFor="goal">Goal</label>
-        <select id="goal" value={draft.goal} onChange={(e) => set('goal', e.target.value as Goal)}>
-          <option value="cut">Cut</option>
-          <option value="maintain">Maintain</option>
-          <option value="bulk">Bulk</option>
-        </select>
-      </div>
-
-      <div className="field">
-        <label htmlFor="proteinOverride">Protein target override (g/kg, optional)</label>
-        <input id="proteinOverride" type="number" step={0.1} value={draft.proteinGPerKg} onChange={(e) => set('proteinGPerKg', e.target.value)} />
-      </div>
-
-      {preview !== null && (
-        <div className="card">
-          <h3 className="card__title">Your daily targets</h3>
-          <p className="screen__hint explained__intro">Tap any figure to see how it was worked out.</p>
-          <ExplainedValue
-            label="BMR" testId="bmr"
-            value={kcal(preview.bmr)} steps={preview.explain.bmr}
-          />
-          <ExplainedValue
-            label="TDEE" testId="tdee"
-            value={kcal(preview.tdee)} steps={preview.explain.tdee}
-          />
-          <ExplainedValue
-            label="Daily calorie target" testId="calorie-target"
-            value={kcal(preview.calories)} steps={preview.explain.calories}
-          />
-          <ExplainedValue
-            label="Daily protein target" testId="protein-target"
-            value={`${preview.proteinG} g (${preview.gPerKg.toFixed(1)} g/kg · ${preview.gPerLb.toFixed(2)} g/lb)`}
-            steps={preview.explain.protein}
-          />
-        </div>
+      {profiles.length === 0 && storageError === null && (
+        <p className="screen__hint" data-testid="profiles-empty">
+          No profiles yet. Add one and the calculator can show what a portion is worth
+          against your daily targets.
+        </p>
       )}
 
-      {error !== null && <p role="alert">{error}</p>}
+      {profiles.map((p) => (
+        <ProfileCard
+          key={p.id}
+          profile={p}
+          active={p.id === activeId}
+          today={today}
+          onSetActive={onSetActive}
+          onEdit={(profile) => setView({ kind: 'form', profile })}
+          onDeleted={onChanged}
+        />
+      ))}
+
       <div className="btn-row">
-        <button type="button" className="btn btn--primary" onClick={() => void submit()}>Save profile</button>
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => setView({ kind: 'form' })}
+        >
+          Add a profile
+        </button>
       </div>
     </section>
   );

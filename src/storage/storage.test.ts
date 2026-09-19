@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { db, isStorageAvailable } from './db';
 import { listProfiles, saveProfile, deleteProfile } from './profiles';
-import { getSettings, saveSettings } from './settings';
+import { getSettings, saveSettings, setActiveProfile } from './settings';
 import { listUserIngredients, saveUserIngredient, archiveUserIngredient } from './userIngredients';
 import { zeroNutrients } from '../core/nutrients';
 import type { Profile, Ingredient } from '../core/types';
@@ -70,11 +70,43 @@ describe('storage', () => {
     expect((await getSettings()).landingTab).toBe('calc');
   });
 
+  it('sets the active profile without disturbing the other settings', async () => {
+    await saveSettings({ id: 'singleton', activeProfileId: null, landingTab: 'calc', defaultWeightUnit: 'kg' });
+
+    await setActiveProfile('p1');
+
+    const after = await getSettings();
+    expect(after.activeProfileId).toBe('p1');
+    // A whole-object put built from DEFAULTS would silently reset these two.
+    expect(after.landingTab).toBe('calc');
+    expect(after.defaultWeightUnit).toBe('kg');
+  });
+
+  it('clears the active profile when the last one is deleted', async () => {
+    await setActiveProfile('p1');
+    await setActiveProfile(null);
+    expect((await getSettings()).activeProfileId).toBeNull();
+  });
+
   it('archives a user ingredient instead of deleting it', async () => {
     await saveUserIngredient(custom);
     await archiveUserIngredient('u1');
     const all = await listUserIngredients();
     expect(all.length).toBe(1);
     expect(all[0]!.archived).toBe(true);
+  });
+
+  it('resolves false rather than hanging when the database never responds', async () => {
+    // The Phase 1 defect: a blocked upgrade leaves Dexie's open promise pending
+    // forever, so the launch banner never renders and the user is never told
+    // their entries are being discarded.
+    const openSpy = vi.spyOn(db, 'open').mockReturnValue(
+      new Promise(() => { /* never settles */ }) as ReturnType<typeof db.open>,
+    );
+    try {
+      expect(await isStorageAvailable(20)).toBe(false);
+    } finally {
+      openSpy.mockRestore();
+    }
   });
 });

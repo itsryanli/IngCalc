@@ -1,159 +1,209 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { ProfileScreen } from './ProfileScreen';
 import { db } from '../../storage/db';
 import * as profilesModule from '../../storage/profiles';
+import type { Profile } from '../../core/types';
 
-// Fixed so the expected values (age 30, TDEE 2633, protein 135g) never drift with the calendar.
+// Fixed so age 30 (and therefore TDEE 2,633 / protein 135g) never drifts with the calendar.
 const FIXED_TODAY = new Date('2026-06-15T00:00:00Z');
+
+const ryan: Profile = {
+  id: 'p1', name: 'Ryan', sex: 'male', birthYear: 1996,
+  heightCm: 175, weightKg: 75, sessionsPerWeek: 4, goal: 'maintain',
+};
+
+const mei: Profile = {
+  id: 'p2', name: 'Mei', sex: 'female', birthYear: 1998,
+  heightCm: 162, weightKg: 55, sessionsPerWeek: 2, goal: 'cut',
+};
 
 beforeEach(async () => { await db.profiles.clear(); });
 
-const fill = () => {
-  fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'Ryan' } });
-  fireEvent.change(screen.getByLabelText(/birth year/i), { target: { value: '1996' } });
-  fireEvent.change(screen.getByLabelText(/height/i), { target: { value: '175' } });
-  fireEvent.change(screen.getByLabelText(/weight/i), { target: { value: '75' } });
-  fireEvent.change(screen.getByLabelText(/sessions per week/i), { target: { value: '4' } });
+const renderScreen = (over: Partial<Parameters<typeof ProfileScreen>[0]> = {}) => {
+  const props = {
+    profiles: [ryan, mei],
+    activeId: 'p1',
+    storageError: null,
+    onSetActive: vi.fn(),
+    onChanged: vi.fn(),
+    today: FIXED_TODAY,
+    ...over,
+  };
+  render(<ProfileScreen {...props} />);
+  return props;
 };
 
-describe('ProfileScreen', () => {
-  it('shows the computed targets as the form is filled in', async () => {
-    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
-    fill();
-    await waitFor(() => {
-      // Displayed with a thousands separator, as NutrientTable already does.
-      expect(screen.getByTestId('tdee')).toHaveTextContent('2,633');
-      expect(screen.getByTestId('calorie-target')).toHaveTextContent('2,633');
-    });
+const row = (id: string) => within(screen.getByTestId(`profile-${id}`));
+
+describe('ProfileScreen list', () => {
+  it('lists every profile with the targets it produces', () => {
+    renderScreen();
+
+    expect(row('p1').getByText(/Ryan/)).toBeInTheDocument();
+    expect(row('p1').getByTestId('profile-targets')).toHaveTextContent('2,633 kcal');
+    expect(row('p1').getByTestId('profile-targets')).toHaveTextContent('135g protein');
+    expect(row('p2').getByText(/Mei/)).toBeInTheDocument();
   });
 
-  it('shows the protein target in both g/kg and g/lb', async () => {
-    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
-    fill();
-    await waitFor(() => {
-      expect(screen.getByTestId('protein-target')).toHaveTextContent('135');
-      expect(screen.getByTestId('protein-target')).toHaveTextContent('g/lb');
-    });
+  it('marks which profile is active', () => {
+    renderScreen();
+
+    expect(screen.getByTestId('profile-p1')).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByTestId('profile-p2')).not.toHaveAttribute('aria-current', 'true');
   });
 
-  it('refuses to save without a name', async () => {
-    const onSaved = vi.fn();
-    render(<ProfileScreen onSaved={onSaved} today={FIXED_TODAY} />);
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/name/i);
-    expect(onSaved).not.toHaveBeenCalled();
+  it('offers to switch only to profiles that are not already active', () => {
+    renderScreen();
+
+    expect(row('p1').queryByRole('button', { name: /use this one/i })).toBeNull();
+    expect(row('p2').getByRole('button', { name: /use this one/i })).toBeInTheDocument();
   });
 
-  it('rejects an implausible birth year', async () => {
-    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
-    fill();
-    fireEvent.change(screen.getByLabelText(/birth year/i), { target: { value: '1700' } });
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/birth year/i);
+  it('switches to another profile', () => {
+    const props = renderScreen();
+
+    fireEvent.click(row('p2').getByRole('button', { name: /use this one/i }));
+
+    expect(props.onSetActive).toHaveBeenCalledWith('p2');
   });
 
-  it('persists the profile and reports it', async () => {
-    const onSaved = vi.fn();
-    render(<ProfileScreen onSaved={onSaved} today={FIXED_TODAY} />);
-    fill();
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
-    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+  it('says so when there are no profiles yet', () => {
+    renderScreen({ profiles: [], activeId: null });
+
+    expect(screen.getByTestId('profiles-empty')).toBeInTheDocument();
+  });
+
+  it('surfaces a storage failure', () => {
+    renderScreen({ storageError: 'Your profiles could not be read from storage.' });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not be read/i);
+  });
+});
+
+describe('ProfileScreen editing and adding', () => {
+  it('opens a blank form to add a profile', () => {
+    renderScreen();
+
+    fireEvent.click(screen.getByRole('button', { name: /add a profile/i }));
+
+    expect(screen.getByLabelText(/name/i)).toHaveValue('');
+  });
+
+  it('opens the chosen profile filled in for editing', () => {
+    renderScreen();
+
+    fireEvent.click(row('p2').getByRole('button', { name: /edit/i }));
+
+    expect(screen.getByLabelText(/name/i)).toHaveValue('Mei');
+  });
+
+  it('returns to the list after saving, and reports the change', async () => {
+    const props = renderScreen();
+
+    fireEvent.click(row('p2').getByRole('button', { name: /edit/i }));
+    fireEvent.change(screen.getByLabelText(/weight/i), { target: { value: '56' } });
+    fireEvent.click(screen.getByRole('button', { name: /save profile/i }));
+
+    await waitFor(() => { expect(props.onChanged).toHaveBeenCalled(); });
+    // Back on the list, not left sitting on the form.
+    expect(screen.getByTestId('profile-p1')).toBeInTheDocument();
+  });
+
+  it('makes a newly added profile the active one', async () => {
+    const props = renderScreen();
+
+    fireEvent.click(screen.getByRole('button', { name: /add a profile/i }));
+    fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'Adik' } });
+    fireEvent.change(screen.getByLabelText(/birth year/i), { target: { value: '2000' } });
+    fireEvent.change(screen.getByLabelText(/height/i), { target: { value: '170' } });
+    fireEvent.change(screen.getByLabelText(/weight/i), { target: { value: '60' } });
+    fireEvent.change(screen.getByLabelText(/sessions per week/i), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: /save profile/i }));
+
+    // You just created it, so it is the one you meant to use.
+    await waitFor(() => { expect(props.onSetActive).toHaveBeenCalled(); });
+  });
+
+  it('abandons the form without reporting a change', () => {
+    const props = renderScreen();
+
+    fireEvent.click(screen.getByRole('button', { name: /add a profile/i }));
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(screen.getByTestId('profile-p1')).toBeInTheDocument();
+    expect(props.onChanged).not.toHaveBeenCalled();
+  });
+});
+
+describe('ProfileScreen deleting', () => {
+  it('asks before deleting', () => {
+    renderScreen();
+
+    fireEvent.click(row('p2').getByRole('button', { name: /delete/i }));
+
+    expect(screen.getByText(/delete .*Mei/i)).toBeInTheDocument();
+    // A question with its own buttons is not an assertive announcement —
+    // role="alert" stays reserved for a failed write (execution record §3.5).
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('keeps the profile when the deletion is declined', async () => {
+    await db.profiles.put(mei);
+    const props = renderScreen();
+
+    fireEvent.click(row('p2').getByRole('button', { name: /delete/i }));
+    fireEvent.click(screen.getByRole('button', { name: /keep it/i }));
+
     expect(await db.profiles.count()).toBe(1);
+    expect(props.onChanged).not.toHaveBeenCalled();
   });
 
-  it('rejects a height just below the lower bound (79cm)', async () => {
-    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
-    fill();
-    fireEvent.change(screen.getByLabelText(/height/i), { target: { value: '79' } });
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/height/i);
+  it('deletes the profile once confirmed', async () => {
+    await db.profiles.put(ryan);
+    await db.profiles.put(mei);
+    const props = renderScreen();
+
+    fireEvent.click(row('p2').getByRole('button', { name: /delete/i }));
+    fireEvent.click(screen.getByRole('button', { name: /yes, delete/i }));
+
+    await waitFor(() => { expect(props.onChanged).toHaveBeenCalled(); });
+    expect(await db.profiles.get('p2')).toBeUndefined();
+    expect(await db.profiles.get('p1')).toBeDefined();
   });
 
-  it('accepts a height at the lower bound (80cm)', async () => {
-    const onSaved = vi.fn();
-    render(<ProfileScreen onSaved={onSaved} today={FIXED_TODAY} />);
-    fill();
-    fireEvent.change(screen.getByLabelText(/height/i), { target: { value: '80' } });
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
-    await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    expect(screen.queryByRole('alert')).toBeNull();
-  });
-
-  it('rejects a weight just below the lower bound (19kg)', async () => {
-    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
-    fill();
-    fireEvent.change(screen.getByLabelText(/weight/i), { target: { value: '19' } });
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/weight/i);
-  });
-
-  it('accepts a weight at the lower bound (20kg)', async () => {
-    const onSaved = vi.fn();
-    render(<ProfileScreen onSaved={onSaved} today={FIXED_TODAY} />);
-    fill();
-    fireEvent.change(screen.getByLabelText(/weight/i), { target: { value: '20' } });
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
-    await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    expect(screen.queryByRole('alert')).toBeNull();
-  });
-
-  it('rejects sessions just above the upper bound (22/week)', async () => {
-    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
-    fill();
-    fireEvent.change(screen.getByLabelText(/sessions per week/i), { target: { value: '22' } });
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/sessions/i);
-  });
-
-  it('accepts sessions at the upper bound (21/week)', async () => {
-    const onSaved = vi.fn();
-    render(<ProfileScreen onSaved={onSaved} today={FIXED_TODAY} />);
-    fill();
-    fireEvent.change(screen.getByLabelText(/sessions per week/i), { target: { value: '21' } });
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
-    await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    expect(screen.queryByRole('alert')).toBeNull();
-  });
-
-  it('shows a plain-language error and does not call onSaved when saving fails', async () => {
-    // Dexie can reject (private browsing, quota, a blocked upgrade). Without a try/catch
-    // around the save, that rejection is unhandled, onSaved never fires, and the user taps
-    // Save to absolutely nothing: no error, no navigation, form unchanged.
-    const onSaved = vi.fn();
-    const spy = vi.spyOn(profilesModule, 'saveProfile').mockRejectedValue(new Error('storage unavailable'));
+  it('shows a failed delete as the only alert, and keeps the profile listed', async () => {
+    const spy = vi.spyOn(profilesModule, 'deleteProfile').mockRejectedValue(new Error('quota'));
     try {
-      render(<ProfileScreen onSaved={onSaved} today={FIXED_TODAY} />);
-      fill();
-      fireEvent.click(screen.getByRole('button', { name: /save/i }));
-      expect(await screen.findByRole('alert')).toHaveTextContent(/could not save/i);
-      expect(onSaved).not.toHaveBeenCalled();
+      const props = renderScreen();
+
+      fireEvent.click(row('p2').getByRole('button', { name: /delete/i }));
+      fireEvent.click(screen.getByRole('button', { name: /yes, delete/i }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/could not delete/i);
+      expect(props.onChanged).not.toHaveBeenCalled();
+      expect(screen.getByTestId('profile-p2')).toBeInTheDocument();
     } finally {
       spy.mockRestore();
     }
   });
 
-  it('explains a target on demand, with the user\'s own numbers in the working', async () => {
-    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
-    fill();
+  it('clears a previous delete error when the prompt is reopened and cancelled', async () => {
+    const spy = vi.spyOn(profilesModule, 'deleteProfile').mockRejectedValue(new Error('quota'));
+    try {
+      renderScreen();
+      fireEvent.click(row('p2').getByRole('button', { name: /delete/i }));
+      fireEvent.click(screen.getByRole('button', { name: /yes, delete/i }));
+      await screen.findByRole('alert');
 
-    const toggle = await screen.findByRole('button', { name: /how BMR is worked out/i });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      // Both confirm transitions clear the error, so a stale failure cannot
+      // resurface beside a fresh prompt (execution record §3.5).
+      fireEvent.click(row('p2').getByRole('button', { name: /delete/i }));
 
-    fireEvent.click(toggle);
-
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    // Not a generic formula — the profile's own height, weight and age.
-    expect(screen.getByText(/10 × 75kg \+ 6.25 × 175cm − 5 × 30 \+ 5/)).toBeInTheDocument();
-    // Named in both the step label and its source note, hence getAllByText.
-    expect(screen.getAllByText(/Mifflin-St Jeor/i).length).toBeGreaterThan(0);
-  });
-
-  it('keeps the working hidden until asked for', () => {
-    render(<ProfileScreen onSaved={vi.fn()} today={FIXED_TODAY} />);
-    fill();
-    // The panel exists in the DOM but is hidden, so nothing reads it out or shows it.
-    expect(screen.getAllByText(/Mifflin-St Jeor/i)[0]).not.toBeVisible();
+      expect(screen.queryByRole('alert')).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

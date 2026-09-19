@@ -380,6 +380,39 @@ body {
 .weight__row { display: flex; gap: var(--sp-2); align-items: stretch; }
 .weight__row input { flex: 1; min-width: 0; }
 
+/* Profile list: one card per profile, the active one marked. */
+.profile-card[aria-current='true'] { border-color: var(--accent); }
+
+.profile-card__active {
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.profile-card__targets {
+  margin: 0 0 var(--sp-3);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+/* Portion split: the same row shape as the weight input, with a static unit
+   in place of the segmented toggle. */
+.portion-split__unit {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-3);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+
+.portion-split__readout {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
 .seg {
   display: flex;
   flex: none;
@@ -766,4 +799,82 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
+}
+
+/* --- Kitchen ------------------------------------------------------------ */
+
+.kitchen__group {
+  margin-block: var(--sp-4);
+}
+
+.kitchen__group h3 {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.batch__state {
+  display: inline-block;
+  padding: 0.125rem var(--sp-2);
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.batch__remaining {
+  font-weight: 600;
+}
+
+.batch__purchase,
+.batch__cost,
+.session__summary,
+.session__cost {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+.batch__sessions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.session {
+  padding-block: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+/* Advisory, not an error: a deviation flag must read as "worth a look", never
+   as a failure, because the cook it describes is kept either way. */
+.flag {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+  background: var(--estimate-soft);
+  color: var(--estimate);
+}
+
+/* An impossible reading is blocked at entry, so a stored one is a real problem. */
+.flag--implausible {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.eat__remaining {
+  font-weight: 600;
+}
+
+.yield-badge {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+/* A category fallback is a rough estimate, and the spec is explicit that the
+   app must never display precision it does not have. */
+.yield-badge--categoryDefault {
+  font-style: italic;
+  color: var(--estimate);
 }

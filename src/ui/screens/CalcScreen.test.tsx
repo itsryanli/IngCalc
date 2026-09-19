@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CalcScreen } from './CalcScreen';
 import { db } from '../../storage/db';
 import * as userIngredientsModule from '../../storage/userIngredients';
+import * as kitchenStorageModule from '../../storage/kitchen';
 import type { Profile } from '../../core/types';
+import { g, myr } from '../../core/units';
 
 // The ingredient control is a typeahead combobox, not a <select>, so it is driven by
 // typing and pressing a listbox option rather than by setting a value. Options activate
@@ -170,5 +172,240 @@ describe('CalcScreen', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe('CalcScreen calibration', () => {
+  beforeEach(async () => {
+    await db.batches.clear();
+    await db.cookSessions.clear();
+  });
+
+  afterEach(async () => {
+    await db.batches.clear();
+    await db.cookSessions.clear();
+  });
+
+  it('uses the published factor while the user has no cooks logged', async () => {
+    render(<CalcScreen profile={null} />);
+    await selectChicken();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('result-weight')).toHaveTextContent('710g');
+    });
+    expect(screen.getByText(/published factor/i)).toBeInTheDocument();
+  });
+
+  it('switches to the user own measured average once a cook is logged', async () => {
+    // One cook at 0.60 rather than the published 0.71.
+    await db.batches.put({
+      id: 'b1', ingredientId: 'chicken-breast', rawWeightG: g(1000),
+      purchase: { pricePaidMYR: myr(20), location: 'Pasar', date: '2026-09-19' },
+      createdAt: 0,
+    });
+    await db.cookSessions.put({
+      id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(1000),
+      cookedWeightG: g(600), cookedRemainingG: g(600), cookedAt: '2026-09-19',
+      portionCount: 4, excludeFromCalibration: false,
+    });
+
+    render(<CalcScreen profile={null} />);
+    await selectChicken();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('result-weight')).toHaveTextContent('600g');
+    });
+    expect(screen.getByText(/your average across 1 cook/i)).toBeInTheDocument();
+  });
+
+  it('honours an excluded cook, falling back to the published factor', async () => {
+    await db.batches.put({
+      id: 'b1', ingredientId: 'chicken-breast', rawWeightG: g(1000),
+      purchase: { pricePaidMYR: myr(20), location: 'Pasar', date: '2026-09-19' },
+      createdAt: 0,
+    });
+    await db.cookSessions.put({
+      id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(1000),
+      cookedWeightG: g(600), cookedRemainingG: g(600), cookedAt: '2026-09-19',
+      portionCount: 4, excludeFromCalibration: true,
+    });
+
+    render(<CalcScreen profile={null} />);
+    await selectChicken();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('result-weight')).toHaveTextContent('710g');
+    });
+  });
+
+  it('offers to log the calculated weight as a batch', async () => {
+    render(<CalcScreen profile={null} today={today} />);
+    await selectChicken();
+
+    fireEvent.click(await screen.findByRole('button', { name: /log this as a batch/i }));
+
+    // Prefilled from the calculator, so the user does not retype it.
+    expect(screen.getByLabelText(/^raw weight/i)).toHaveValue(1000);
+    // CalcScreen's own injected `today` must reach the batch form, not the form's
+    // own `new Date()` fallback, so the purchase date stays testable/pinnable.
+    expect(screen.getByLabelText(/^date/i)).toHaveValue('2026-06-15');
+  });
+
+  it('warns when the kitchen could not be read, and falls back to the published factor', async () => {
+    // A logged cook exists (0.60 measured), but loadKitchen rejects before it can be
+    // read — an empty kitchen and an unreadable one must not look the same on screen.
+    await db.batches.put({
+      id: 'b1', ingredientId: 'chicken-breast', rawWeightG: g(1000),
+      purchase: { pricePaidMYR: myr(20), location: 'Pasar', date: '2026-09-19' },
+      createdAt: 0,
+    });
+    await db.cookSessions.put({
+      id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(1000),
+      cookedWeightG: g(600), cookedRemainingG: g(600), cookedAt: '2026-09-19',
+      portionCount: 4, excludeFromCalibration: false,
+    });
+
+    const spy = vi.spyOn(kitchenStorageModule, 'loadKitchen').mockRejectedValue(new Error('quota'));
+    try {
+      render(<CalcScreen profile={null} />);
+      await selectChicken();
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not be read/i));
+      // The user's own 0.60 figure is unreachable, so this must read 710g (published
+      // factor), not 600g (their measured one) or a silently blank result.
+      expect(screen.getByTestId('result-weight')).toHaveTextContent('710g');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('still reaches the add-ingredient form when "add new" is opened from inside the batch form', async () => {
+    render(<CalcScreen profile={null} />);
+    await selectChicken();
+
+    fireEvent.click(await screen.findByRole('button', { name: /log this as a batch/i }));
+    // AddBatchForm renders its own IngredientPicker wired to the same onAddNew handler
+    // as the calculator's — that's the composition this test exercises, not just reads.
+    await openAddIngredient();
+
+    // Without clearing loggingBatch, the batch-form branch keeps winning the ternary
+    // and this never appears: the picker just closes with no visible effect.
+    expect(await screen.findByLabelText(/^name/i)).toBeInTheDocument();
+  });
+});
+
+/* ==========================================================================
+   The portion split
+
+   Figures follow from the suite's already-verified ones: 1000g raw chicken
+   breast roasted = 710g cooked, 1140 kcal, 220.5g protein, against targets of
+   2633.0625 kcal and 135g protein. Divided by 4: 177.5g ("178g" at formatG's
+   zero fraction digits above 10), 285 kcal (10.82% -> 11%), 55.125g protein
+   (40.83% -> 41%, and "55.1g" in the table).
+   ========================================================================== */
+
+const splitInto = (portions: string) =>
+  fireEvent.change(screen.getByLabelText(/split into/i), { target: { value: portions } });
+
+describe('CalcScreen portion split', () => {
+  it('defaults to a single portion, leaving the whole-cook figures showing', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+
+    await waitFor(() => expect(screen.getByLabelText(/split into/i)).toHaveValue(1));
+    expect(screen.getByTestId('calorie-share')).toHaveTextContent('43%');
+    expect(screen.getByTestId('calorie-share')).toHaveTextContent('163%');
+  });
+
+  it('shows the weight of one portion', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    splitInto('4');
+
+    await waitFor(() => expect(screen.getByTestId('portion-weight')).toHaveTextContent('178g'));
+  });
+
+  it('divides the share of the daily targets by the portion count', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    splitInto('4');
+
+    await waitFor(() => expect(screen.getByTestId('calorie-share')).toHaveTextContent('11%'));
+    expect(screen.getByTestId('calorie-share')).toHaveTextContent('41%');
+  });
+
+  it('divides the nutrient table amounts by the portion count', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    await waitFor(() => expect(screen.getByText('220.5g')).toBeInTheDocument());
+
+    splitInto('4');
+
+    await waitFor(() => expect(screen.getByText('55.1g')).toBeInTheDocument());
+    expect(screen.queryByText('220.5g')).not.toBeInTheDocument();
+  });
+
+  it('says the nutrients are per portion once the cook is split', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    splitInto('4');
+
+    await waitFor(() => expect(screen.getByText(/nutrients.*per portion/i)).toBeInTheDocument());
+  });
+
+  it('divides the cooked weight, not the entered weight, when a cooked weight was entered', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    fireEvent.click(screen.getByRole('radio', { name: /cooked/i }));
+    splitInto('4');
+
+    // 1000g cooked / 0.71 = 1408.45g raw, which cooks back to 1000g: 250g a portion.
+    // Dividing the 1,408g raw figure instead would read "352g".
+    await waitFor(() => expect(screen.getByTestId('portion-weight')).toHaveTextContent('250g'));
+  });
+
+  it('keeps the split when the cooking method changes', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    splitInto('4');
+    await waitFor(() => expect(screen.getByTestId('portion-weight')).toHaveTextContent('178g'));
+
+    fireEvent.change(screen.getByRole('combobox', { name: /method/i }), { target: { value: 'boiled' } });
+
+    await waitFor(() => expect(screen.getByLabelText(/split into/i)).toHaveValue(4));
+    expect(screen.getByText(/nutrients.*per portion/i)).toBeInTheDocument();
+  });
+
+  it('falls back to one portion when the field is cleared, rather than dividing by nothing', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    splitInto('4');
+    await waitFor(() => expect(screen.getByTestId('calorie-share')).toHaveTextContent('11%'));
+
+    splitInto('');
+
+    // Number('') is 0, and 1140/0 is Infinity: "Infinity%" is the failure this guards.
+    await waitFor(() => expect(screen.getByTestId('calorie-share')).toHaveTextContent('43%'));
+    expect(screen.getByTestId('calorie-share')).not.toHaveTextContent('Infinity');
+  });
+
+  it('splits the cook without a profile, showing portion weight but no target share', async () => {
+    render(<CalcScreen profile={null} today={today} />);
+    await selectChicken();
+    splitInto('4');
+
+    await waitFor(() => expect(screen.getByTestId('portion-weight')).toHaveTextContent('178g'));
+    expect(screen.getByText(/nutrients.*per portion/i)).toBeInTheDocument();
+    // Targets come from the profile, so there is nothing to show a share against.
+    expect(screen.queryByTestId('calorie-share')).not.toBeInTheDocument();
+  });
+
+  it('ignores a fractional portion count rather than splitting into half a container', async () => {
+    render(<CalcScreen profile={profile} today={today} />);
+    await selectChicken();
+    splitInto('2.5');
+
+    // Portions are whole containers; 2.5 is held as the previous valid count.
+    await waitFor(() => expect(screen.getByTestId('portion-weight')).toHaveTextContent('710g'));
   });
 });

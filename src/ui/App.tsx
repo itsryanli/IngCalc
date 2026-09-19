@@ -1,27 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Profile } from '../core/types';
 import { isStorageAvailable } from '../storage/db';
-import { listProfiles } from '../storage/profiles';
 import { getSettings } from '../storage/settings';
+import { useProfiles } from './useProfiles';
 import { CalcScreen } from './screens/CalcScreen';
+import { KitchenScreen } from './screens/KitchenScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 
 type Tab = 'today' | 'kitchen' | 'calc' | 'costs' | 'profile';
 
 const TABS: { id: Tab; label: string; phase?: number }[] = [
   { id: 'today', label: 'Today', phase: 3 },
-  { id: 'kitchen', label: 'Kitchen', phase: 2 },
+  { id: 'kitchen', label: 'Kitchen' },
   { id: 'calc', label: 'Calc' },
   { id: 'costs', label: 'Costs', phase: 4 },
   { id: 'profile', label: 'Profile' },
 ];
 
-/** Tabs that actually exist in Phase 1. A stored preference for any other tab falls back to Calc. */
-const BUILT: readonly Tab[] = ['calc', 'profile'];
+/** Tabs that actually exist. A stored preference for any other tab falls back to Calc. */
+const BUILT: readonly Tab[] = ['kitchen', 'calc', 'profile'];
 
 export function App() {
   const [tab, setTab] = useState<Tab>('calc');
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { profiles, active: profile, storageError, refresh, setActive } = useProfiles();
   const [storageOk, setStorageOk] = useState(true);
   // Guards against the initial settings load clobbering a tab the user has
   // already clicked while that load was still in flight.
@@ -35,12 +35,12 @@ export function App() {
       setStorageOk(ok);
       if (!ok) return;
 
-      const [settings, profiles] = await Promise.all([getSettings(), listProfiles()]);
+      // Profiles are `useProfiles`' job; this only needs the landing tab.
+      const settings = await getSettings();
       if (cancelled) return;
       if (!userNavigated.current) {
         setTab(BUILT.includes(settings.landingTab) ? settings.landingTab : 'calc');
       }
-      setProfile(profiles[0] ?? null);
     })();
     return () => { cancelled = true; };
   }, []);
@@ -72,8 +72,17 @@ export function App() {
       )}
 
       <main className="app__main">
+        {tab === 'kitchen' && <KitchenScreen />}
         {tab === 'calc' && <CalcScreen profile={profile} />}
-        {tab === 'profile' && <ProfileScreen onSaved={(p) => { setProfile(p); setTab('calc'); }} />}
+        {tab === 'profile' && (
+          <ProfileScreen
+            profiles={profiles}
+            activeId={profile?.id ?? null}
+            storageError={storageError}
+            onSetActive={(id) => { void setActive(id); }}
+            onChanged={() => { void refresh(); }}
+          />
+        )}
       </main>
 
       <nav role="tablist" className="tabbar">
