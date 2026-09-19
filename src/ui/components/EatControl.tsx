@@ -29,7 +29,8 @@ export function EatControl({
     const updated = applyEat(session, grams);
     try {
       await saveCookSession(updated);
-    } catch {
+    } catch (err) {
+      console.error('Recording eaten amount failed', err);
       setError(
         'Could not record that — your browser may be blocking storage ' +
         '(for example, private browsing) or storage may be full. Please try again.',

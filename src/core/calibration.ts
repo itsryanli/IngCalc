@@ -56,7 +56,10 @@ export const observedFactor = (obs: YieldObservation): number =>
 export interface OutlierFlag {
   kind: 'deviation' | 'implausible';
   observedFactor: number;
-  /** Context only when `kind` is 'implausible'; the bounds did the deciding. */
+  /**
+   * Always present, for both kinds. For an 'implausible' flag, the bounds
+   * derived from this value are what decided it.
+   */
   referenceFactor: number;
   /** Shown to the user verbatim. */
   reason: string;

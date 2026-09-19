@@ -164,4 +164,20 @@ describe('CookSessionForm', () => {
       spy.mockRestore();
     }
   });
+
+  it('keeps a deliberately excluded cook excluded through an edit', async () => {
+    // excludeFromCalibration sits in the same object literal as rescaleCookedRemaining's
+    // call (line 96-98) — exactly where Phase 3's meal work lands. If a refactor there
+    // dropped this flag, a deliberately-excluded bad reading would silently rejoin the
+    // yield average and corrupt every later calculation for this ingredient.
+    const excluded = session({ excludeFromCalibration: true });
+    const onSaved = vi.fn();
+    render(<CookSessionForm {...props} sessions={[excluded]} session={excluded} onSaved={onSaved} />);
+
+    fireEvent.change(screen.getByLabelText(/cooked weight/i), { target: { value: '250' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect((await db.cookSessions.toArray())[0]!.excludeFromCalibration).toBe(true);
+  });
 });

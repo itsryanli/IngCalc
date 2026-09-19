@@ -103,7 +103,8 @@ export function CookSessionForm({
 
     try {
       await saveCookSession(saved);
-    } catch {
+    } catch (err) {
+      console.error('Saving a cook session failed', err);
       // Dexie can reject (private browsing, quota, a blocked upgrade) —
       // without this the promise rejection would be unhandled, onSaved would
       // never fire, and the user would tap Save to nothing: no error, no

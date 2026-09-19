@@ -30,7 +30,8 @@ export function SessionRow({ batch, ingredient, session, onChanged, onEdit }: Pr
   const toggleExclude = async () => {
     try {
       await saveCookSession({ ...session, excludeFromCalibration: !session.excludeFromCalibration });
-    } catch {
+    } catch (err) {
+      console.error('Toggling exclude-from-calibration failed', err);
       setError('Could not update this cook — storage may be blocked or full. Please try again.');
       return;
     }
@@ -41,7 +42,8 @@ export function SessionRow({ batch, ingredient, session, onChanged, onEdit }: Pr
   const remove = async () => {
     try {
       await deleteCookSession(session.id);
-    } catch {
+    } catch (err) {
+      console.error('Deleting a cook session failed', err);
       setConfirming(false);
       setError('Could not delete this cook — storage may be blocked or full. Please try again.');
       return;

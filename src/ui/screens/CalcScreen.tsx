@@ -26,7 +26,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
   const { catalogue, refresh } = useCatalogue();
   // The point of Phase 2: resolveYield's `measured` branch has been
   // unreachable since Phase 1 because nothing produced samples.
-  const { sessions, samples, refresh: refreshKitchen } = useKitchen();
+  const { sessions, samples, storageError: kitchenError, refresh: refreshKitchen } = useKitchen();
   const [loggingBatch, setLoggingBatch] = useState(false);
   const [loggedMessage, setLoggedMessage] = useState<string | null>(null);
   const [ingredientId, setIngredientId] = useState('');
@@ -122,6 +122,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
           sessions={sessions}
           initialIngredientId={ingredient.id}
           initialRawWeightG={result?.cooked.rawWeightG}
+          today={today}
           onSaved={(batch) => {
             void (async () => {
               await refreshKitchen();
@@ -142,6 +143,12 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
         />
       ) : (
         <>
+          {kitchenError !== null && (
+            <p role="alert" className="banner banner--warn">
+              Your logged cooks could not be read, so these figures use published factors.
+            </p>
+          )}
+
           <IngredientPicker
             catalogue={catalogue}
             value={ingredientId}

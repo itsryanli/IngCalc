@@ -48,7 +48,8 @@ export function BatchCard({
   const remove = async () => {
     try {
       await deleteBatchCascade(batch.id);
-    } catch {
+    } catch (err) {
+      console.error('Deleting a batch failed', err);
       // Dexie can reject (private browsing, quota, a blocked upgrade). Without
       // this, onChanged would never fire — fine on its own — but the promise
       // rejection would go unhandled and the user would tap "Yes, delete it"

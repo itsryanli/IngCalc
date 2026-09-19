@@ -32,7 +32,8 @@ export function useKitchen(): Kitchen {
       setBatches(loaded.batches);
       setSessions(loaded.sessions);
       setStorageError(null);
-    } catch {
+    } catch (err) {
+      console.error('Loading the kitchen failed', err);
       if (gen !== generationRef.current) return;
       setStorageError('Your kitchen could not be read from storage, so nothing is shown here.');
     } finally {

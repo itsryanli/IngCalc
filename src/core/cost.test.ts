@@ -97,10 +97,15 @@ describe('proteinPerMYRRaw', () => {
 
 describe('proteinPerMYRRetained', () => {
   it('charges the apportioned price against the protein that survived cooking', () => {
-    // 400g raw -> 92g protein; meat/roasted protein retention is applied; RM8.
+    // attributablePriceMYR: RM20 * (400/1000) = RM8.
+    // proteinG: (400/100) * 23 = 92g raw protein.
+    // meat/roasted protein retention (MACROS_DRIP.protein) = 0.98 -> 92 * 0.98 = 90.16g.
+    // value: 90.16 / 8 = 11.27.
+    // A > 10 / < 11.5 range previously passed for ANY retention factor from
+    // roughly 0.87 to 1.0 — it pinned "retention was applied" but not "the
+    // right factor for protein specifically".
     const value = proteinPerMYRRetained(batch(), chicken, [session()], RETENTION)!;
-    expect(value).toBeGreaterThan(10);
-    expect(value).toBeLessThan(11.5);
+    expect(value).toBeCloseTo(11.27, 10);
   });
 
   it('is null before anything has been cooked', () => {

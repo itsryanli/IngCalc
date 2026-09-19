@@ -78,7 +78,8 @@ export function AddBatchForm({
 
     try {
       await saveBatch(saved);
-    } catch {
+    } catch (err) {
+      console.error('Saving a batch failed', err);
       // Dexie can reject (private browsing, quota, a blocked upgrade) — without this the
       // promise rejection would be unhandled, onSaved would never fire, and the user would
       // tap Save to nothing: no error, no navigation, form unchanged.

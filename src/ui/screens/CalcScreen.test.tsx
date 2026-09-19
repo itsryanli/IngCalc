@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CalcScreen } from './CalcScreen';
 import { db } from '../../storage/db';
 import * as userIngredientsModule from '../../storage/userIngredients';
+import * as kitchenStorageModule from '../../storage/kitchen';
 import type { Profile } from '../../core/types';
 import { g, myr } from '../../core/units';
 
@@ -238,13 +239,44 @@ describe('CalcScreen calibration', () => {
   });
 
   it('offers to log the calculated weight as a batch', async () => {
-    render(<CalcScreen profile={null} />);
+    render(<CalcScreen profile={null} today={today} />);
     await selectChicken();
 
     fireEvent.click(await screen.findByRole('button', { name: /log this as a batch/i }));
 
     // Prefilled from the calculator, so the user does not retype it.
     expect(screen.getByLabelText(/^raw weight/i)).toHaveValue(1000);
+    // CalcScreen's own injected `today` must reach the batch form, not the form's
+    // own `new Date()` fallback, so the purchase date stays testable/pinnable.
+    expect(screen.getByLabelText(/^date/i)).toHaveValue('2026-06-15');
+  });
+
+  it('warns when the kitchen could not be read, and falls back to the published factor', async () => {
+    // A logged cook exists (0.60 measured), but loadKitchen rejects before it can be
+    // read — an empty kitchen and an unreadable one must not look the same on screen.
+    await db.batches.put({
+      id: 'b1', ingredientId: 'chicken-breast', rawWeightG: g(1000),
+      purchase: { pricePaidMYR: myr(20), location: 'Pasar', date: '2026-09-19' },
+      createdAt: 0,
+    });
+    await db.cookSessions.put({
+      id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(1000),
+      cookedWeightG: g(600), cookedRemainingG: g(600), cookedAt: '2026-09-19',
+      portionCount: 4, excludeFromCalibration: false,
+    });
+
+    const spy = vi.spyOn(kitchenStorageModule, 'loadKitchen').mockRejectedValue(new Error('quota'));
+    try {
+      render(<CalcScreen profile={null} />);
+      await selectChicken();
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not be read/i));
+      // The user's own 0.60 figure is unreachable, so this must read 710g (published
+      // factor), not 600g (their measured one) or a silently blank result.
+      expect(screen.getByTestId('result-weight')).toHaveTextContent('710g');
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('still reaches the add-ingredient form when "add new" is opened from inside the batch form', async () => {

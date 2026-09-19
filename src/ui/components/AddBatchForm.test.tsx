@@ -146,6 +146,9 @@ describe('AddBatchForm editing', () => {
     expect(saved).toHaveLength(1);
     expect(saved[0]!.id).toBe('b1');
     expect(saved[0]!.purchase.pricePaidMYR).toBe(21);
+    // createdAt is KitchenScreen's sort key (newest purchase first) — a regression
+    // here would silently jump every edited batch to the top of the kitchen.
+    expect(saved[0]!.createdAt).toBe(0);
   });
 
   it('blocks shrinking the weight below what has already been cooked', async () => {
@@ -160,5 +163,13 @@ describe('AddBatchForm editing', () => {
     // change that batch to it, so initialIngredientId must win over batch.ingredientId.
     render(<AddBatchForm {...props} batch={existing} sessions={[]} initialIngredientId="petai" />);
     expect(screen.getByRole('combobox', { name: /ingredient/i })).toHaveValue('Petai');
+  });
+
+  it('shows the batch\'s own ingredient on a plain edit, with no initialIngredientId', () => {
+    // Guards `initialIngredientId ?? batch?.ingredientId ?? ''` (a fix that took a
+    // round to get right): a plain edit must still resolve to the batch's own
+    // ingredient, not fall through to the blank sentinel.
+    render(<AddBatchForm {...props} batch={existing} sessions={[]} />);
+    expect(screen.getByRole('combobox', { name: /ingredient/i })).toHaveValue('Chicken breast');
   });
 });

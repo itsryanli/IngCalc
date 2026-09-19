@@ -30,7 +30,7 @@ export function batchState(batch: Batch, sessions: readonly CookSession[]): Batc
   const mine = sessionsOf(batch.id, sessions);
   if (mine.length === 0) return 'raw';
   if (rawRemainingG(batch, sessions) > EPSILON) return 'partiallyCooked';
-  const left = mine.reduce((sum, s) => sum + s.cookedRemainingG, 0);
+  const left = g(mine.reduce((sum, s) => sum + s.cookedRemainingG, 0));
   return left > EPSILON ? 'cooked' : 'finished';
 }
 
