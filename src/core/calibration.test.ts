@@ -108,7 +108,7 @@ describe('toYieldSamples', () => {
 
   const session = (id: string, batchId: string, over: Partial<CookSession> = {}): CookSession => ({
     id, batchId, method: 'roasted', rawUsedG: g(400), cookedWeightG: g(300),
-    cookedRemainingG: g(300), cookedAt: '2026-09-19', portionCount: 2,
+    cookedAt: '2026-09-19', portionCount: 2,
     excludeFromCalibration: false, ...over,
   });
 

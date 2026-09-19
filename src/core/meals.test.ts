@@ -19,7 +19,7 @@ const batch: Batch = {
 // 400g raw roasted to 284g, cut into 4 portions of 71g.
 const session: CookSession = {
   id: 's1', batchId: 'b1', method: 'roasted',
-  rawUsedG: g(400), cookedWeightG: g(284), cookedRemainingG: g(284),
+  rawUsedG: g(400), cookedWeightG: g(284),
   cookedAt: '2026-09-19', portionCount: 4, excludeFromCalibration: false,
 };
 

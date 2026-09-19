@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import {
-  rawRemainingG, rescaleCookedRemaining, validateCook, validateRawUsedEdit,
+  rawRemainingG, validateCook, validateCookEdit, validateRawUsedEdit,
 } from '../../core/batch';
 import { flagYield } from '../../core/calibration';
-import { COOK_METHODS, type Batch, type CookMethod, type CookSession, type Ingredient, type YieldSample } from '../../core/types';
+import { COOK_METHODS, type Batch, type CookMethod, type CookSession, type Ingredient, type MealEntry, type YieldSample } from '../../core/types';
 import { g, type Grams } from '../../core/units';
 import { resolveYield } from '../../core/yieldResolver';
 import { CATEGORY_YIELD } from '../../data/categoryYield';
@@ -21,6 +21,8 @@ interface Props {
   sessions: readonly CookSession[];
   /** All samples across the kitchen, so the badge can show a measured factor. */
   samples: readonly YieldSample[];
+  /** Every meal entry in the kitchen; a correction must still account for what was eaten. */
+  entries: readonly MealEntry[];
   /** Present when editing. */
   session?: CookSession;
   today?: Date;
@@ -29,7 +31,7 @@ interface Props {
 }
 
 export function CookSessionForm({
-  batch, ingredient, sessions, samples, session, today = new Date(), onSaved, onCancel,
+  batch, ingredient, sessions, samples, entries, session, today = new Date(), onSaved, onCancel,
 }: Props) {
   const editing = session !== undefined;
 
@@ -81,6 +83,10 @@ export function CookSessionForm({
         CATEGORY_YIELD,
       );
       if (!rest.ok) { setError(rest.message); return; }
+
+      // Editing only: a correction must still account for what has been eaten.
+      const editCheck = validateCookEdit(session, entries, draft);
+      if (!editCheck.ok) { setError(editCheck.message); return; }
     }
 
     setError(null);
@@ -90,12 +96,6 @@ export function CookSessionForm({
       method,
       rawUsedG,
       cookedWeightG,
-      // A new session has eaten nothing. An edited one keeps the fraction
-      // already eaten rather than the grams, which were a reading of the
-      // same food.
-      cookedRemainingG: editing
-        ? rescaleCookedRemaining(session, cookedWeightG)
-        : cookedWeightG,
       cookedAt,
       portionCount,
       excludeFromCalibration: session?.excludeFromCalibration ?? false,

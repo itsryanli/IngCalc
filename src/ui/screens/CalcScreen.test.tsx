@@ -205,7 +205,7 @@ describe('CalcScreen calibration', () => {
     });
     await db.cookSessions.put({
       id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(1000),
-      cookedWeightG: g(600), cookedRemainingG: g(600), cookedAt: '2026-09-19',
+      cookedWeightG: g(600), cookedAt: '2026-09-19',
       portionCount: 4, excludeFromCalibration: false,
     });
 
@@ -226,7 +226,7 @@ describe('CalcScreen calibration', () => {
     });
     await db.cookSessions.put({
       id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(1000),
-      cookedWeightG: g(600), cookedRemainingG: g(600), cookedAt: '2026-09-19',
+      cookedWeightG: g(600), cookedAt: '2026-09-19',
       portionCount: 4, excludeFromCalibration: true,
     });
 
@@ -261,7 +261,7 @@ describe('CalcScreen calibration', () => {
     });
     await db.cookSessions.put({
       id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(1000),
-      cookedWeightG: g(600), cookedRemainingG: g(600), cookedAt: '2026-09-19',
+      cookedWeightG: g(600), cookedAt: '2026-09-19',
       portionCount: 4, excludeFromCalibration: false,
     });
 

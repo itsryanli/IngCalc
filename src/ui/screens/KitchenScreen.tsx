@@ -24,7 +24,7 @@ type View =
 
 export function KitchenScreen({ today = new Date() }: { today?: Date }) {
   const { catalogue, refresh: refreshCatalogue } = useCatalogue();
-  const { batches, sessions, samples, loading, storageError, refresh } = useKitchen();
+  const { batches, sessions, samples, entries, loading, storageError, refresh } = useKitchen();
   const [view, setView] = useState<View>({ kind: 'list' });
   const [showFinished, setShowFinished] = useState(false);
 
@@ -33,9 +33,9 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
     // Newest purchase first within each group: the thing you just bought is
     // the thing you are most likely to be looking for.
     const ordered = [...batches].sort((a, b) => b.createdAt - a.createdAt);
-    for (const b of ordered) out.get(batchState(b, sessions))!.push(b);
+    for (const b of ordered) out.get(batchState(b, sessions, entries))!.push(b);
     return out;
-  }, [batches, sessions]);
+  }, [batches, sessions, entries]);
 
   const ingredientFor = (batch: Batch) =>
     catalogue.find((i) => i.id === batch.ingredientId) ?? null;
@@ -109,6 +109,7 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
           ingredient={ingredient}
           sessions={sessions}
           samples={samples}
+          entries={entries}
           session={view.session}
           today={today}
           onSaved={() => { void afterChange(); }}
@@ -155,6 +156,7 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
               batch={b}
               ingredient={ingredientFor(b)}
               sessions={sessions}
+              entries={entries}
               onChanged={() => { void refresh(); }}
               onCook={(batch) => setView({ kind: 'cookForm', batch })}
               onEditBatch={(batch) => setView({ kind: 'batchForm', batch })}

@@ -3,7 +3,7 @@ import type { Batch, CookSession, MealEntry, NutrientProfile } from './types';
 import { NUTRIENT_KEYS } from './types';
 import { g, myr } from './units';
 import {
-  applyEat, batchState, consumedFromSession, consumedFromSessionAt, cookedRawTotalG, cookedRemainingG, entrySessionGrams, isSessionEntry, perPortion, portionsRemaining, portionWeightG, portionsToGrams, rawRemainingG, rescaleCookedRemaining, sessionsOf, validateCook, validateCookEdit, validateEat, validateRawUsedEdit, validateRawWeightEdit, type CookDraft,
+  batchState, consumedFromSession, consumedFromSessionAt, cookedRawTotalG, cookedRemainingG, entrySessionGrams, isSessionEntry, perPortion, portionsRemaining, portionWeightG, portionsToGrams, rawRemainingG, sessionsOf, validateCook, validateCookEdit, validateRawUsedEdit, validateRawWeightEdit, type CookDraft,
 } from './batch';
 import type { Ingredient } from './types';
 import { INGREDIENTS } from '../data/ingredients';
@@ -41,12 +41,21 @@ const session = (over: Partial<CookSession> = {}): CookSession => ({
   method: 'roasted',
   rawUsedG: g(400),
   cookedWeightG: g(300),
-  cookedRemainingG: g(300),
   cookedAt: '2026-09-19',
   portionCount: 2,
   excludeFromCalibration: false,
   ...over,
 });
+
+/**
+ * A weighed meal entry against session `s1`. Partly eaten cooks used to be set
+ * up by lowering `cookedRemainingG`; the remainder is derived now, so the
+ * entries are the setup.
+ */
+const eaten = (grams: number, over: Partial<MealEntry> = {}): MealEntry => ({
+  id: 'm1', profileId: 'p1', date: '2026-09-19', label: 'lunch', createdAt: 1,
+  kind: 'weight', cookSessionId: 's1', grams: g(grams), ...over,
+} as MealEntry);
 
 describe('sessionsOf', () => {
   it('keeps only the sessions belonging to the batch', () => {
@@ -80,31 +89,31 @@ describe('rawRemainingG', () => {
 
 describe('batchState', () => {
   it('is raw when no session exists', () => {
-    expect(batchState(batch(), [])).toBe('raw');
+    expect(batchState(batch(), [], [])).toBe('raw');
   });
 
   it('is partiallyCooked while raw weight is left', () => {
-    expect(batchState(batch(), [session({ rawUsedG: g(400) })])).toBe('partiallyCooked');
+    expect(batchState(batch(), [session({ rawUsedG: g(400) })], [])).toBe('partiallyCooked');
   });
 
   it('is cooked once all the raw is used but food remains', () => {
-    const s = session({ rawUsedG: g(1000), cookedWeightG: g(750), cookedRemainingG: g(750) });
-    expect(batchState(batch(), [s])).toBe('cooked');
+    const s = session({ rawUsedG: g(1000), cookedWeightG: g(750) });
+    expect(batchState(batch(), [s], [])).toBe('cooked');
   });
 
   it('is finished when all the raw is used and nothing is left to eat', () => {
-    const s = session({ rawUsedG: g(1000), cookedWeightG: g(750), cookedRemainingG: g(0) });
-    expect(batchState(batch(), [s])).toBe('finished');
+    const s = session({ rawUsedG: g(1000), cookedWeightG: g(750) });
+    expect(batchState(batch(), [s], [eaten(750)])).toBe('finished');
   });
 
   it('stays partiallyCooked when raw is left even if every cooked portion is gone', () => {
-    const s = session({ rawUsedG: g(400), cookedRemainingG: g(0) });
-    expect(batchState(batch(), [s])).toBe('partiallyCooked');
+    const s = session({ rawUsedG: g(400) });
+    expect(batchState(batch(), [s], [eaten(300)])).toBe('partiallyCooked');
   });
 
   it('treats a sub-epsilon remainder as fully cooked, not as a sliver left over', () => {
-    const s = session({ rawUsedG: g(999.999), cookedWeightG: g(750), cookedRemainingG: g(750) });
-    expect(batchState(batch(), [s])).toBe('cooked');
+    const s = session({ rawUsedG: g(999.999), cookedWeightG: g(750) });
+    expect(batchState(batch(), [s], [])).toBe('cooked');
   });
 });
 
@@ -121,12 +130,12 @@ describe('portionWeightG', () => {
 describe('portionsRemaining', () => {
   it('follows grams rather than whole portions', () => {
     // The parent spec's awkward case: a 100g serving out of a 148g portion.
-    const s = session({ cookedWeightG: g(296), portionCount: 2, cookedRemainingG: g(196) });
-    expect(portionsRemaining(s)).toBeCloseTo(1.324, 3);
+    const s = session({ cookedWeightG: g(296), portionCount: 2 });
+    expect(portionsRemaining(s, [eaten(100)])).toBeCloseTo(1.324, 3);
   });
 
   it('is zero for a session that produced nothing', () => {
-    expect(portionsRemaining(session({ cookedWeightG: g(0), cookedRemainingG: g(0) }))).toBe(0);
+    expect(portionsRemaining(session({ cookedWeightG: g(0) }), [])).toBe(0);
   });
 });
 
@@ -197,44 +206,6 @@ describe('portionsToGrams', () => {
   });
 });
 
-describe('validateEat', () => {
-  it('accepts eating less than what is left', () => {
-    expect(validateEat(session({ cookedRemainingG: g(300) }), g(100))).toEqual({ ok: true });
-  });
-
-  it('accepts eating exactly what is left', () => {
-    expect(validateEat(session({ cookedRemainingG: g(300) }), g(300))).toEqual({ ok: true });
-  });
-
-  it('blocks eating more than is left, reporting grams and portions', () => {
-    const s = session({ cookedWeightG: g(296), portionCount: 2, cookedRemainingG: g(148) });
-    const result = validateEat(s, g(200));
-    expect(result.ok).toBe(false);
-    expect(result.ok === false && result.message).toContain('148g');
-    expect(result.ok === false && result.message).toContain('1.0');
-  });
-
-  it('blocks eating nothing', () => {
-    expect(validateEat(session(), g(0)).ok).toBe(false);
-  });
-});
-
-describe('applyEat', () => {
-  it('subtracts the eaten grams from what remains', () => {
-    expect(applyEat(session({ cookedRemainingG: g(300) }), g(100)).cookedRemainingG).toBe(200);
-  });
-
-  it('leaves the original session untouched', () => {
-    const before = session({ cookedRemainingG: g(300) });
-    applyEat(before, g(100));
-    expect(before.cookedRemainingG).toBe(300);
-  });
-
-  it('never leaves a negative remainder even when floats disagree', () => {
-    expect(applyEat(session({ cookedRemainingG: g(148) }), g(148.0000001)).cookedRemainingG).toBe(0);
-  });
-});
-
 describe('cookedRawTotalG', () => {
   it('sums the raw weight every session of this batch consumed', () => {
     const sessions = [
@@ -290,35 +261,6 @@ describe('validateRawUsedEdit', () => {
   });
 });
 
-describe('rescaleCookedRemaining', () => {
-  it('preserves the fraction eaten rather than the grams eaten', () => {
-    // 80g logged for what was really 800g, half eaten. Correcting the weight
-    // should leave it half remaining, not 40g remaining out of 800g.
-    const s = session({ cookedWeightG: g(80), cookedRemainingG: g(40) });
-    expect(rescaleCookedRemaining(s, g(800))).toBe(400);
-  });
-
-  it('keeps an untouched session whole', () => {
-    const s = session({ cookedWeightG: g(300), cookedRemainingG: g(300) });
-    expect(rescaleCookedRemaining(s, g(750))).toBe(750);
-  });
-
-  it('keeps a finished session finished', () => {
-    const s = session({ cookedWeightG: g(300), cookedRemainingG: g(0) });
-    expect(rescaleCookedRemaining(s, g(750))).toBe(0);
-  });
-
-  it('never exceeds the corrected cooked weight', () => {
-    const s = session({ cookedWeightG: g(300), cookedRemainingG: g(300) });
-    expect(rescaleCookedRemaining(s, g(100))).toBe(100);
-  });
-
-  it('treats a session that recorded no cooked weight as wholly remaining', () => {
-    const s = session({ cookedWeightG: g(0), cookedRemainingG: g(0) });
-    expect(rescaleCookedRemaining(s, g(500))).toBe(500);
-  });
-});
-
 /* ==========================================================================
    perPortion — the calculator's split view
    ========================================================================== */
@@ -364,7 +306,7 @@ describe('perPortion', () => {
 // 284g cooked in 4 portions = 71g per portion.
 const cook = (over: Partial<CookSession> = {}): CookSession => ({
   id: 's1', batchId: 'b1', method: 'roasted',
-  rawUsedG: g(400), cookedWeightG: g(284), cookedRemainingG: g(284),
+  rawUsedG: g(400), cookedWeightG: g(284),
   cookedAt: '2026-09-19', portionCount: 4, excludeFromCalibration: false, ...over,
 });
 

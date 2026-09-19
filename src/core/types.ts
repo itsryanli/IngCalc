@@ -82,6 +82,12 @@ export interface Batch {
  * One cooking event, and simultaneously one yield observation: it records the
  * ingredient (through its batch), the method, the raw weight in and the cooked
  * weight out. That is why Phase 2 needs no separate calibration table.
+ *
+ * There is deliberately no `cookedRemainingG` field. Meal entries are an event
+ * log of consumption, so the remainder is always recoverable from them —
+ * storing it too would be a second source of truth that editing could put out
+ * of step. Phase 2 did store it, correctly, because eating wrote no record
+ * then. See `cookedRemainingG()` in `./batch`.
  */
 export interface CookSession {
   id: string;
@@ -90,11 +96,6 @@ export interface CookSession {
   rawUsedG: Grams;
   /** Measured by the user on a scale, never derived from a yield factor. */
   cookedWeightG: Grams;
-  /**
-   * Authoritative remaining quantity. Stored rather than derived because
-   * eating writes no record until Phase 3 introduces meals.
-   */
-  cookedRemainingG: Grams;
   cookedAt: IsoDate;
   portionCount: number;
   /** The day you forgot to drain it: kept, but excluded from the yield mean. */

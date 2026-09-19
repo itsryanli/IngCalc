@@ -6,7 +6,7 @@ import { db } from '../../storage/db';
 import { g, myr } from '../../core/units';
 import { INGREDIENTS } from '../../data/ingredients';
 import * as kitchen from '../../storage/kitchen';
-import type { Batch, CookSession, Ingredient } from '../../core/types';
+import type { Batch, CookSession, Ingredient, MealEntry } from '../../core/types';
 
 const bundled = (id: string): Ingredient => {
   const found = INGREDIENTS.find((i) => i.id === id);
@@ -22,12 +22,18 @@ const batch = (over: Partial<Batch> = {}): Batch => ({
 
 const session = (id: string, over: Partial<CookSession> = {}): CookSession => ({
   id, batchId: 'b1', method: 'roasted', rawUsedG: g(400), cookedWeightG: g(284),
-  cookedRemainingG: g(284), cookedAt: '2026-09-19', portionCount: 2,
+  cookedAt: '2026-09-19', portionCount: 2,
   excludeFromCalibration: false, ...over,
 });
 
+/** A weighed entry against one cook: how a partly eaten batch is set up now. */
+const eaten = (cookSessionId: string, grams: number): MealEntry => ({
+  id: `m-${cookSessionId}-${grams}`, profileId: 'p1', date: '2026-09-19',
+  label: 'lunch', createdAt: 1, kind: 'weight', cookSessionId, grams: g(grams),
+});
+
 const props = {
-  ingredient: bundled('chicken-breast'),
+  ingredient: bundled('chicken-breast'), entries: [] as readonly MealEntry[],
   onChanged: vi.fn(), onCook: vi.fn(), onEditBatch: vi.fn(), onEditSession: vi.fn(),
 };
 
@@ -91,6 +97,25 @@ describe('BatchCard', () => {
   it('stops offering to cook once the batch is used up', () => {
     render(<BatchCard {...props} batch={batch()} sessions={[session('s1', { rawUsedG: g(1000) })]} />);
     expect(screen.queryByRole('button', { name: /cook/i })).toBeNull();
+  });
+
+  it('derives the cooked-left figure from the meal entries', () => {
+    render(
+      <BatchCard {...props} batch={batch()} sessions={[session('s1')]} entries={[eaten('s1', 100)]} />,
+    );
+    expect(screen.getByTestId('batch-remaining')).toHaveTextContent('184g cooked left');
+  });
+
+  it('reports the batch finished once the entries account for all the cooked food', () => {
+    render(
+      <BatchCard
+        {...props}
+        batch={batch()}
+        sessions={[session('s1', { rawUsedG: g(1000) })]}
+        entries={[eaten('s1', 284)]}
+      />,
+    );
+    expect(screen.getByTestId('batch-state')).toHaveTextContent('Finished');
   });
 
   it('names what a delete will take with it', () => {

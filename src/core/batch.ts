@@ -27,11 +27,15 @@ export function rawRemainingG(batch: Batch, sessions: readonly CookSession[]): G
  * Never stored, per the parent spec. A stored status would have to be updated
  * at every transition, and the transitions are exactly where it would go wrong.
  */
-export function batchState(batch: Batch, sessions: readonly CookSession[]): BatchState {
+export function batchState(
+  batch: Batch,
+  sessions: readonly CookSession[],
+  entries: readonly MealEntry[],
+): BatchState {
   const mine = sessionsOf(batch.id, sessions);
   if (mine.length === 0) return 'raw';
   if (rawRemainingG(batch, sessions) > EPSILON) return 'partiallyCooked';
-  const left = g(mine.reduce((sum, s) => sum + s.cookedRemainingG, 0));
+  const left = g(mine.reduce((sum, s) => sum + cookedRemainingG(s, entries), 0));
   return left > EPSILON ? 'cooked' : 'finished';
 }
 
@@ -69,9 +73,12 @@ export function perPortion(totals: NutrientProfile, portionCount: number): Nutri
  * portion has to mean something, and "0.68 portions gone" is the only answer
  * consistent with the grams actually leaving the container.
  */
-export function portionsRemaining(session: CookSession): number {
+export function portionsRemaining(
+  session: CookSession,
+  entries: readonly MealEntry[],
+): number {
   if (session.cookedWeightG <= 0) return 0;
-  return session.cookedRemainingG / portionWeightG(session);
+  return cookedRemainingG(session, entries) / portionWeightG(session);
 }
 
 export type Validation = { ok: true } | { ok: false; message: string };
@@ -214,22 +221,6 @@ export function validateCookEdit(
   return ok;
 }
 
-export function validateEat(session: CookSession, grams: Grams): Validation {
-  if (grams <= 0) return no('Enter how much you ate.');
-
-  if (grams > session.cookedRemainingG + EPSILON) {
-    const portions = portionsRemaining(session);
-    return no(`Only ${formatG(session.cookedRemainingG)} is left — about ${portions.toFixed(1)} portions.`);
-  }
-
-  return ok;
-}
-
-/** Returns a new session; callers persist it. Validate first. */
-export function applyEat(session: CookSession, grams: Grams): CookSession {
-  return { ...session, cookedRemainingG: g(Math.max(0, session.cookedRemainingG - grams)) };
-}
-
 export const cookedRawTotalG = (batch: Batch, sessions: readonly CookSession[]): Grams =>
   g(sessionsOf(batch.id, sessions).reduce((sum, s) => sum + s.rawUsedG, 0));
 
@@ -274,19 +265,4 @@ export function validateRawUsedEdit(
   }
 
   return ok;
-}
-
-/**
- * Rescales what is left after a cooked weight is corrected, preserving the
- * FRACTION eaten rather than the grams eaten — the grams were always a reading
- * of the same food, so weighing 800g as 80g and fixing it later should leave a
- * half-eaten batch still half remaining.
- */
-export function rescaleCookedRemaining(session: CookSession, newCookedWeightG: Grams): Grams {
-  // Nothing was eaten out of a session that never recorded a weight, so the
-  // corrected weight is entirely remaining.
-  if (session.cookedWeightG <= 0) return newCookedWeightG;
-
-  const fractionLeft = session.cookedRemainingG / session.cookedWeightG;
-  return g(Math.min(newCookedWeightG, Math.max(0, newCookedWeightG * fractionLeft)));
 }

@@ -17,7 +17,7 @@ const batch = (id: string, over: Partial<Batch> = {}): Batch => ({
 
 const session = (id: string, batchId: string, over: Partial<CookSession> = {}): CookSession => ({
   id, batchId, method: 'roasted', rawUsedG: g(400), cookedWeightG: g(284),
-  cookedRemainingG: g(284), cookedAt: '2026-09-19', portionCount: 2,
+  cookedAt: '2026-09-19', portionCount: 2,
   excludeFromCalibration: false, ...over,
 });
 

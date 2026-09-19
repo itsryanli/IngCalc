@@ -863,7 +863,7 @@ body {
   color: var(--danger);
 }
 
-.eat__remaining {
+.session__remaining {
   font-weight: 600;
 }
 

@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { batchState, rawRemainingG, sessionsOf } from '../../core/batch';
+import { batchState, cookedRemainingG, rawRemainingG, sessionsOf } from '../../core/batch';
 import {
   costPerKgCooked, costPerKgRaw, proteinPerMYRRaw, proteinPerMYRRetained,
 } from '../../core/cost';
-import type { Batch, CookSession, Ingredient } from '../../core/types';
+import type { Batch, CookSession, Ingredient, MealEntry } from '../../core/types';
 import { formatG, formatMYR, g } from '../../core/units';
 import { RETENTION } from '../../data/retentionTable';
 import { deleteBatchCascade } from '../../storage/kitchen';
@@ -21,6 +21,8 @@ interface Props {
   ingredient: Ingredient | null;
   /** Every session in the kitchen; the card filters to its own. */
   sessions: readonly CookSession[];
+  /** Every meal entry in the kitchen; the cooked remainder is derived from them. */
+  entries: readonly MealEntry[];
   onChanged: () => void;
   onCook: (batch: Batch) => void;
   onEditBatch: (batch: Batch) => void;
@@ -28,15 +30,15 @@ interface Props {
 }
 
 export function BatchCard({
-  batch, ingredient, sessions, onChanged, onCook, onEditBatch, onEditSession,
+  batch, ingredient, sessions, entries, onChanged, onCook, onEditBatch, onEditSession,
 }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const mine = sessionsOf(batch.id, sessions);
-  const state = batchState(batch, sessions);
+  const state = batchState(batch, sessions, entries);
   const remaining = rawRemainingG(batch, sessions);
-  const cookedLeft = g(mine.reduce((sum, s) => sum + s.cookedRemainingG, 0));
+  const cookedLeft = g(mine.reduce((sum, s) => sum + cookedRemainingG(s, entries), 0));
 
   const perKgRaw = costPerKgRaw(batch);
   const perKgCooked = costPerKgCooked(batch, sessions);
@@ -100,6 +102,7 @@ export function BatchCard({
           batch={batch}
           ingredient={ingredient}
           session={mine[0]!}
+          entries={entries}
           onChanged={onChanged}
           onEdit={(s) => onEditSession(batch, s)}
         />
@@ -113,6 +116,7 @@ export function BatchCard({
                 batch={batch}
                 ingredient={ingredient}
                 session={s}
+                entries={entries}
                 onChanged={onChanged}
                 onEdit={(edited) => onEditSession(batch, edited)}
               />

@@ -1,25 +1,30 @@
 import { useState } from 'react';
+import { cookedRemainingG, portionsRemaining } from '../../core/batch';
 import { flagYield } from '../../core/calibration';
 import { costPerPortion } from '../../core/cost';
-import type { Batch, CookSession, Ingredient } from '../../core/types';
+import type { Batch, CookSession, Ingredient, MealEntry } from '../../core/types';
 import { formatG, formatMYR } from '../../core/units';
 import { CATEGORY_YIELD } from '../../data/categoryYield';
 import { deleteCookSession, saveCookSession } from '../../storage/kitchen';
 import { formatIsoDate } from '../dates';
 import { METHOD_LABELS } from '../labels';
-import { EatControl } from './EatControl';
 
 interface Props {
   batch: Batch;
   ingredient: Ingredient | null;
   session: CookSession;
+  /** Every entry in the kitchen; the remainder is derived from the ones that cite this cook. */
+  entries: readonly MealEntry[];
   onChanged: () => void;
   onEdit: (session: CookSession) => void;
 }
 
-export function SessionRow({ batch, ingredient, session, onChanged, onEdit }: Props) {
+export function SessionRow({ batch, ingredient, session, entries, onChanged, onEdit }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const remaining = cookedRemainingG(session, entries);
+  const portionsLeft = portionsRemaining(session, entries);
 
   // Ingredients are archived, never deleted, precisely because batches like
   // this one reference them — but useCatalogue filters archived ones out, so
@@ -83,14 +88,18 @@ export function SessionRow({ batch, ingredient, session, onChanged, onEdit }: Pr
         Ignore this cook when working out my yields
       </label>
 
-      <EatControl session={session} onEaten={onChanged} />
+      <p className="session__remaining" data-testid="remaining">
+        {remaining <= 0
+          ? 'All eaten'
+          : `${formatG(remaining)} left · ${portionsLeft.toFixed(1)} portions`}
+      </p>
 
       {confirming ? (
         <>
           {/* A question with its own buttons, not an assertive announcement — plain
               text, so role="alert" stays free to mean "a write just failed". */}
           <p>
-            Delete this cook? {formatG(session.cookedRemainingG)} of it is still
+            Delete this cook? {formatG(remaining)} of it is still
             unaccounted for, and its raw weight goes back to the batch.
           </p>
           <div className="btn-row">
