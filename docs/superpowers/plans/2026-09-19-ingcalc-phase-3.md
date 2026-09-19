@@ -402,20 +402,26 @@ local `Tab` union still says `'today'` and not `'log'`:
   passing a value that may be `'log'` is a type error.
 - `setTab(settings.landingTab)` in the same expression, for the same reason.
 
-Make the **minimal** change: add `'log'` to the union, leaving `'today'` out.
+Make the **minimal** change: add `'log'` to the union, keeping every existing member.
 
 ```ts
-type Tab = 'log' | 'kitchen' | 'calc' | 'costs' | 'profile';
+type Tab = 'today' | 'log' | 'kitchen' | 'calc' | 'costs' | 'profile';
 ```
 
-Change nothing else in `App.tsx`. `TABS` still lists `today`, `BUILT` still excludes
-`'log'`, and the tab is still not rendered — Task 16 turns it on. A stored `'log'` falls
-back to `'calc'` in the meantime, which is correct: Log does not exist yet.
+`'today'` has to stay: `TABS` still contains `{ id: 'today', label: 'Today', phase: 3 }`,
+so dropping it from the union fails to typecheck that literal.
+
+Change nothing else in `App.tsx`. `BUILT` still excludes `'log'` and the tab is still not
+rendered — Task 16 turns it on. A stored `'log'` falls back to `'calc'` in the meantime,
+which is correct: Log does not exist yet.
 
 In `src/ui/App.test.tsx:57`, the fixture `landingTab: 'today'` no longer type-checks.
-Change it to `'kitchen'` — the test is about honouring a stored tab, and `'kitchen'` is a
-built one, so it keeps testing that. Do not change it to `'log'`; that tab is not built
-until Task 16 and the test would assert a fallback instead of what it means to assert.
+That line sits in the test *"falls back to Calc when the stored landing tab is not built
+yet"*, so its value must be a tab that is **not** in `BUILT` — which after the Phase 2
+merge is `['kitchen', 'calc', 'profile']`. Change it to `'log'`: of the three values
+`Settings.landingTab` can now hold, it is the only one not built, so it is the only one
+that exercises the fallback the test is named for. (`'kitchen'` would make the app
+navigate to Kitchen and the assertion fail.)
 
 - [ ] **Step 7: Run the three commands**
 
