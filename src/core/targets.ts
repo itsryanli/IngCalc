@@ -1,4 +1,4 @@
-import { MICRONUTRIENT_KEYS, type CalcStep, type Goal, type MicroTarget, type NutrientKey, type Profile, type Sex } from './types';
+import { MICRONUTRIENT_KEYS, type CalcStep, type DayLogTargets, type Goal, type MicroTarget, type NutrientKey, type Profile, type Sex } from './types';
 
 // Re-exported so existing importers keep working; the type itself now lives in types.ts,
 // because DayLog embeds it and types.ts cannot import from here.
@@ -60,6 +60,24 @@ export function microTargets(
     if (entry.rni !== undefined || entry.dv !== undefined) out[k] = entry;
   }
   return out;
+}
+
+/**
+ * The targets to freeze into a `DayLog` when a day's first entry is written.
+ * Assembled here rather than in the UI so the three figures cannot be gathered
+ * inconsistently by different callers.
+ */
+export function snapshotTargets(
+  profile: Profile,
+  today: Date,
+  rniLookup: RniLookup,
+  dvTable: Partial<Record<NutrientKey, number>>,
+): DayLogTargets {
+  return {
+    kcal: calorieTarget(profile, today),
+    proteinG: proteinTargetG(profile),
+    micros: microTargets(profile, today, rniLookup, dvTable),
+  };
 }
 
 /* ==========================================================================
