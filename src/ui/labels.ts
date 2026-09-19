@@ -1,6 +1,8 @@
-import type { CookMethod } from '../core/types';
+import type { CookMethod, MealEntry, MealLabel } from '../core/types';
 import type { BatchState } from '../core/batch';
+import type { MealContext } from '../core/meals';
 import type { ResolvedYield } from '../core/yieldResolver';
+import { formatG } from '../core/units';
 
 /**
  * Human-readable cooking method names.
@@ -18,6 +20,36 @@ export const METHOD_LABELS: Record<CookMethod, string> = {
   roasted: 'Roasted',
   grilled: 'Grilled',
 };
+
+export const MEAL_LABELS: Record<MealLabel, string> = {
+  breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snacks',
+};
+
+/**
+ * What an entry says on the Log. Lives beside METHOD_LABELS rather than in the
+ * component so the four kinds are described in one place and read consistently.
+ */
+export function describeEntry(entry: MealEntry, ctx: MealContext): string {
+  if (entry.kind === 'quick') return `${entry.name} (quick)`;
+
+  if (entry.kind === 'ingredient') {
+    const name = ctx.ingredientById(entry.ingredientId)?.name ?? 'Unknown ingredient';
+    return `${name}, ${METHOD_LABELS[entry.method].toLowerCase()} — ${formatG(entry.cookedG)}`;
+  }
+
+  const session = ctx.sessions.find((s) => s.id === entry.cookSessionId);
+  if (session === undefined) return 'A cook that is no longer in your kitchen';
+
+  const batch = ctx.batches.find((b) => b.id === session.batchId);
+  const name = (batch === undefined ? undefined : ctx.ingredientById(batch.ingredientId)?.name)
+    ?? 'Unknown ingredient';
+  const method = METHOD_LABELS[session.method].toLowerCase();
+  const amount = entry.kind === 'portion'
+    ? `${entry.portions} portion${entry.portions === 1 ? '' : 's'}`
+    : formatG(entry.grams);
+
+  return `${name}, ${method} — ${amount}`;
+}
 
 export const STATE_LABELS: Record<BatchState, string> = {
   raw: 'Raw',
