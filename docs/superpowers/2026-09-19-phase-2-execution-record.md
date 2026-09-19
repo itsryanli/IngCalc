@@ -276,10 +276,13 @@ Nothing here blocks the phase. Each was judged and deferred deliberately.
 
 | Gap | Where | Why deferred |
 |---|---|---|
-| No test covers `excludeFromCalibration` surviving an edit when the flag is `true` | `CookSessionForm` | Code correct by inspection; this is the invariant with the nastiest silent failure mode (a refactor could pull an excluded bad reading back into the yield average). **Highest-value test to add.** |
+| ~~No test covers `excludeFromCalibration` surviving an edit~~ | `CookSessionForm` | **Closed** in the fix wave, with falsification evidence. |
 | No test pins the cook guard's exact `remaining + EPSILON` boundary | `core/batch.ts` | The eat path covers its equivalent. EPSILON is load-bearing for real float input. |
-| `costPerPortion` returning `null` is verified by reading, not rendering | `SessionRow` | "Must render as nothing rather than RM0.00" has no positive test. |
-| Cross-batch isolation test asserts only the rendered session count | `BatchCard` | Not that remaining weight and cost are unaffected by a foreign session. Correct today because every consumer shares `sessionsOf`. |
+| `costPerPortion` returning `null` is verified by reading, not rendering | `SessionRow` | The final review actively **declined** this one: that branch needs `rawWeightG <= 0` or `portionCount < 1`, both blocked upstream, so a test would have to construct a state the app cannot produce. Recorded as defensive code instead. |
+| Cross-batch isolation test asserts only the rendered session count | `BatchCard` | Not that remaining weight and cost are unaffected by a foreign session. Correct today because every consumer shares `sessionsOf`, which four modules now depend on. |
+| Stale-snapshot race: the exclude toggle and `EatControl` both `put` a whole session built from the same prop | `SessionRow`, `EatControl` | Tick-then-eat within the refresh window silently undoes the exclusion; eat-then-tick silently restores the eaten grams. Window is one `toArray()` pair, so a human double-tap usually loses it. Fix is field-scoped `db.cookSessions.update(...)` helpers plus a transaction for `applyEat` — moderate work, best done when Phase 3 multiplies the writers to that row. |
+| No error boundary around `<main>` | `App.tsx` | One malformed stored row makes Kitchen unreachable with no route back to it — and Kitchen is the only screen that can delete the bad row. See §4b: this is now a **prerequisite** for Phase 4's restore, not an optional hardening. |
+| The cook form's live yield badge counts the session being edited | `CookSessionForm` | Reopening a bad 0.45 cook shows "your average across 1 cook: 0.45" as the benchmark to correct it against. Advisory only; the flag beside it uses the reference factor and is correct. A clean fix needs `sessionId` on `YieldSample`, which Phase 3 wants anyway. |
 | The cost line concatenates four separator-carrying fragments | `BatchCard` | Safe only because `rawWeightG > 0` is enforced upstream, which guarantees the first fragment anchors the string. Wants a guard if `cost.ts` invariants loosen. |
 | `storageError` clearing after a successful refresh is untested | `useKitchen` | Verified by inspection. `useCatalogue` has the same gap for its analogous property. |
 | A failed write's real error is discarded | every wrapped write | Quota vs corrupt-DB vs private-mode are indistinguishable when debugging a support report. Matches Phase 1 precedent. |
@@ -289,6 +292,64 @@ Nothing here blocks the phase. Each was judged and deferred deliberately.
 | `CalcScreen.tsx` is 226 lines with three responsibilities | `CalcScreen` | Calculation, add-ingredient flow, batch-logging flow. The batch-logging unit is extractable if Phase 3/4 add more here. |
 
 ---
+
+## 4b. The final whole-branch review, and what it changed
+
+Verdict: **ready to merge**, no Critical and no Important findings. It traced a
+nine-step lifecycle sequence end to end and could not construct a negative
+remainder, an orphaned row, a portion count disagreeing with the grams it is
+derived from, or a mismatched cost denominator. It independently confirmed core
+purity, that all twelve new CSS tokens exist and are redefined in the dark-mode
+block, that every class the new components use is defined, and that no user
+string reaches the DOM unescaped.
+
+A single fix wave of nine small items followed (commit `1fd23ba`), chosen because
+each was cheap *and* guarded something load-bearing. The four worth knowing about:
+
+- **`CalcScreen` was silently discarding `useKitchen`'s `storageError`.** With a
+  logged cook and a failing `loadKitchen()`, Calc fell back to published factors
+  with no warning — while Kitchen showed a banner for the same condition. Now
+  banners.
+- **`excludeFromCalibration` surviving an edit is now tested**, with falsification
+  evidence. This was the highest-value gap on the deferred list, for the reason in
+  §3.1: the field sits in the same object literal as the `rescaleCookedRemaining`
+  call where Phase 3's meal work lands.
+- **All seven wrapped writes now `console.error` the real rejection.** The §3.4
+  ruling justified wrapping them on the grounds that quota, private browsing and
+  blocked upgrades are distinct conditions, then discarded the only thing
+  distinguishing them. Every failure before this fix destroyed information that
+  was unrecoverable by the time a user could report it.
+- **`cost.test.ts` asserted retained protein per ringgit as `> 10 && < 11.5`**,
+  which passes for any protein retention factor between roughly 0.87 and 1.0 — so
+  it pinned "retention was applied at all", not "the right factor for the right
+  nutrient". Now `toBeCloseTo(11.27, 10)`, verified against `MACROS_DRIP.protein`
+  = 0.98 in the real table.
+
+### Two residual risks the fix wave's re-review raised
+
+**A second `role="alert"` is now possible on the calculator.** The new
+`kitchenError` banner can render beside `addIngredientError` when IndexedDB is
+broadly failing. The re-review called this Important-but-narrow, on the grounds
+that it is the same shape as the bug §3.5 describes. **I disagree on severity, and
+the distinction matters for Phase 3.** The `SessionRow` bug was that a *question*
+claimed the alert role, which forced the code to suppress a real error to keep the
+role unambiguous. Here both messages are genuine errors, nothing is suppressed,
+and announcing both is correct behaviour. The only real consequence is that a
+future `getByRole('alert')` query on that screen could become ambiguous — a
+test-fragility note, not a user-facing defect. Left as-is deliberately.
+
+**`batchState` now throws on a corrupt row instead of misclassifying it.** Item 8
+wrapped its cooked-remaining sum in `g()` to close the copy-paste pattern that
+broke the build in §2. The side effect: where a negative or `NaN`
+`cookedRemainingG` previously failed the `> EPSILON` test and landed silently on
+`'finished'`, it now throws during render — and with no error boundary (M5), that
+takes the Kitchen screen down. No path in the app's own UI can produce such a row:
+every write passes `validateCook` and `g()`, and both `applyEat` and
+`rescaleCookedRemaining` clamp. So this is not reachable today.
+
+It does, however, promote the error boundary from a nice-to-have to a
+**prerequisite**: it must land before any feature that writes rows without going
+through the validated forms. Phase 4's JSON restore is the first such feature.
 
 ## 5. What was NOT verified
 
