@@ -106,6 +106,16 @@ describe('AddEntryForm', () => {
     expect(screen.queryByTestId('available-s2')).toBeNull();
   });
 
+  it('keeps a fully-eaten cook in the available list while editing the very entry eating it', () => {
+    // The only thing consuming s1's 284g is the entry now being edited. The
+    // available-cooks list must measure the remainder against `others`
+    // (allEntries minus the entry being edited), not the raw `allEntries` —
+    // otherwise the row the user is trying to edit disappears out from under them.
+    const existing = weightEntry({ id: 'm1', cookSessionId: 's1', grams: g(284) });
+    renderForm({ editing: existing, allEntries: [existing] });
+    expect(screen.getByTestId('available-s1')).toBeInTheDocument();
+  });
+
   it('logs one portion from the kitchen', async () => {
     const onSaved = vi.fn();
     renderForm({ onSaved });
@@ -151,6 +161,21 @@ describe('AddEntryForm', () => {
     // The readout is the whole reason Calc's hand-off was removed: the form
     // answers the question you would otherwise have gone to Calc to ask.
     expect(screen.getByTestId('entry-preview')).toHaveTextContent('44');
+  });
+
+  it('shows a live preview for the kitchen source, not only ingredient', async () => {
+    renderForm();
+    await userEvent.click(screen.getByTestId('available-s1'));
+    // Default portions is '1': a quarter of s1's pan — 120 kcal, 22g protein
+    // (meals.test.ts's own figures for this fixture's portion entry).
+    expect(screen.getByTestId('entry-preview')).toHaveTextContent('22');
+  });
+
+  it('shows a live preview for the quick-add source, not only ingredient', async () => {
+    renderForm();
+    await userEvent.click(screen.getByRole('button', { name: /quick add/i }));
+    await userEvent.type(screen.getByLabelText(/calories/i), '180');
+    expect(screen.getByTestId('entry-preview')).toHaveTextContent('180');
   });
 
   it('logs a quick entry with no protein figure', async () => {

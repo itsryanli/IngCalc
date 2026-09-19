@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react';
-import { cookedRemainingG } from '../../core/batch';
+import { cookedRemainingG, EPSILON } from '../../core/batch';
 import { entryNutrients, validateEntry, type MealContext } from '../../core/meals';
 import { COOK_METHODS, type CookMethod, type DayLogTargets, type Ingredient,
   type IsoDate, type MealEntry, type MealEntryFields, type MealLabel } from '../../core/types';
@@ -20,6 +20,18 @@ const SOURCE_LABELS: Record<Source, string> = {
 const sourceOf = (entry: MealEntry): Source =>
   entry.kind === 'quick' ? 'quick' : entry.kind === 'ingredient' ? 'ingredient' : 'kitchen';
 
+/**
+ * Every field's initial value is read from `editing` in a `useState`
+ * initializer, which React runs exactly once per mount — it is not
+ * re-derived if `editing` changes on an already-mounted instance. A caller
+ * that swaps `editing` (add → edit, or edit-A → edit-B) on the *same* element
+ * therefore keeps the previous draft's text in every field and, at save time,
+ * writes it under the new entry's `id`/`createdAt` — a silent wrong-row
+ * overwrite with no error to surface it.
+ *
+ * The caller must force a remount on every switch between entries, e.g.
+ * `<AddEntryForm key={editing?.id ?? 'new'} editing={editing} .../>`.
+ */
 interface Props {
   profileId: string;
   date: IsoDate;
@@ -74,7 +86,12 @@ export function AddEntryForm({
   const available = useMemo(
     () => ctx.sessions
       .map((s) => ({ session: s, left: cookedRemainingG(s, others) }))
-      .filter((a) => a.left > 0)
+      // EPSILON, not a bare 0: a portion split (e.g. 61g over 7 portions) leaves
+      // float residue on the order of 1e-15g, which is not a portion anyone can
+      // eat. Without the tolerance that residue renders a clickable row reading
+      // "0g left" that Save then refuses — see EPSILON's use in
+      // core/batch.ts's batchState and core/meals.ts's validateEntry.
+      .filter((a) => a.left > EPSILON)
       .sort((a, b) => b.session.cookedAt.localeCompare(a.session.cookedAt)),
     [ctx.sessions, others],
   );
