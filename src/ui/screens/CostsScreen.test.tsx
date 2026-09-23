@@ -78,6 +78,18 @@ describe('CostsScreen', () => {
     expect(within(screen.getByTestId('totals-month')).getByRole('row', { name: /Sep 2026/ })).toHaveTextContent('RM25.00');
   });
 
+  it('reports a failed export instead of failing silently', async () => {
+    await db.batches.put(batch('b1', '2026-09-10'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(downloadText).mockImplementationOnce(() => { throw new Error('disk full'); });
+    renderScreen();
+    await screen.findByTestId('purchase-table');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Export purchases (CSV)' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The export could not be created.');
+    expect(error).toHaveBeenCalledWith('Exporting purchases failed', expect.any(Error));
+    error.mockRestore();
+  });
+
   it('exports the purchases in view, named for the range', async () => {
     await db.batches.put(batch('b1', '2026-09-10'));
     renderScreen();

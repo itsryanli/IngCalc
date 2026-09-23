@@ -68,7 +68,10 @@ export function CostsScreen({ profiles, onDataReplaced, today = new Date() }: Pr
   const user = useAllUserIngredients();
   const [range, setRange] = useState<CostRange>('thisMonth');
   const [sort, setSort] = useState<Sort>(DEFAULT_SORT);
+  const [exportError, setExportError] = useState<string | null>(null);
   const todayStr = todayIso(today);
+
+  const onRangeChange = (r: CostRange) => { setExportError(null); setRange(r); };
 
   const lookup = useMemo(() => ingredientLookup(INGREDIENTS, user.list), [user.list]);
 
@@ -94,16 +97,30 @@ export function CostsScreen({ profiles, onDataReplaced, today = new Date() }: Pr
 
   const tag = rangeFileTag(range, todayStr);
 
+  const EXPORT_FAILED = 'The export could not be created.';
+
   const exportPurchases = sorted.length === 0 ? null : () => {
-    downloadText(`ingcalc-purchases-${tag}.csv`, CSV_MIME, toCsv(PURCHASE_CSV_HEADERS, purchaseCsvRows(sorted)));
+    try {
+      downloadText(`ingcalc-purchases-${tag}.csv`, CSV_MIME, toCsv(PURCHASE_CSV_HEADERS, purchaseCsvRows(sorted)));
+      setExportError(null);
+    } catch (err) {
+      console.error('Exporting purchases failed', err);
+      setExportError(EXPORT_FAILED);
+    }
   };
 
   const exportMeals = entries.length === 0 ? null : () => {
-    const rowsOut = mealCsvRows(entries, ctx, {
-      profileName: (id) => profiles.find((p) => p.id === id)?.name,
-      itemName: (e) => entryItemName(e, ctx),
-    });
-    downloadText(`ingcalc-meals-${tag}.csv`, CSV_MIME, toCsv(MEAL_CSV_HEADERS, rowsOut));
+    try {
+      const rowsOut = mealCsvRows(entries, ctx, {
+        profileName: (id) => profiles.find((p) => p.id === id)?.name,
+        itemName: (e) => entryItemName(e, ctx),
+      });
+      downloadText(`ingcalc-meals-${tag}.csv`, CSV_MIME, toCsv(MEAL_CSV_HEADERS, rowsOut));
+      setExportError(null);
+    } catch (err) {
+      console.error('Exporting meals failed', err);
+      setExportError(EXPORT_FAILED);
+    }
   };
 
   const onRestored = () => {
@@ -121,7 +138,7 @@ export function CostsScreen({ profiles, onDataReplaced, today = new Date() }: Pr
 
       {storageError !== null && <p role="alert" className="banner banner--warn">{storageError}</p>}
 
-      <RangePicker value={range} onChange={setRange} />
+      <RangePicker value={range} onChange={onRangeChange} />
 
       {!loading && storageError === null && kitchen.batches.length === 0 && (
         <p className="screen__hint" data-testid="costs-empty">
@@ -155,6 +172,8 @@ export function CostsScreen({ profiles, onDataReplaced, today = new Date() }: Pr
           <TotalsList title="By month" keyHeading="Month" rows={totalsByMonth(rows)} testId="totals-month" />
         </>
       )}
+
+      {exportError !== null && <p role="alert" className="banner banner--warn">{exportError}</p>}
 
       <DataPanel
         onExportPurchases={exportPurchases}
