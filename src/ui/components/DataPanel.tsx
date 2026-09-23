@@ -159,7 +159,12 @@ export function DataPanel({ onExportPurchases, onExportMeals, onRestored, today 
               type="file"
               accept=".json,application/json"
               className="visually-hidden"
-              onChange={(e) => { void pickFile(e.target.files?.[0]); }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                // Reset so picking the same file again (e.g. after fixing it) fires onChange again.
+                e.target.value = '';
+                void pickFile(file);
+              }}
             />
           </label>
         )}
@@ -212,19 +217,19 @@ export function DataPanel({ onExportPurchases, onExportMeals, onRestored, today 
               <>
                 <button
                   type="button"
-                  className="btn btn--danger"
-                  disabled={busy}
-                  onClick={() => { void confirm('replace', stage.tables); }}
-                >
-                  Erase and restore
-                </button>
-                <button
-                  type="button"
                   className="btn btn--secondary"
                   disabled={busy}
                   onClick={() => { void downloadBackup(); }}
                 >
                   Download a backup of this device first
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  disabled={busy}
+                  onClick={() => { void confirm('replace', stage.tables); }}
+                >
+                  Erase and restore
                 </button>
               </>
             )}
@@ -239,7 +244,7 @@ export function DataPanel({ onExportPurchases, onExportMeals, onRestored, today 
 
       {errors.length > 0 && (
         <div role="alert">
-          {errors.map((line) => <p key={line}>{line}</p>)}
+          {errors.map((line, i) => <p key={i}>{line}</p>)}
         </div>
       )}
     </div>
