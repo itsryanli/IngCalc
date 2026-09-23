@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
-  CURRENT_SCHEMA_VERSION, emptyTables, isIsoDate, makeBackup, MAX_MESSAGE_LINES,
-  NOT_OURS, NOT_READABLE, parseBackup, TOO_NEW,
+  checkIntegrity, CURRENT_SCHEMA_VERSION, emptyTables, isIsoDate, makeBackup, MAX_MESSAGE_LINES,
+  NOT_OURS, NOT_READABLE, parseBackup, planRestore, planSummary, restoredSummary, TOO_NEW,
+  type BackupTables,
 } from './backup';
 import { zeroNutrients } from './nutrients';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { INGREDIENTS } from '../data/ingredients';
+import { g } from './units';
 
 const envelope = (tables: Record<string, unknown>, over: Record<string, unknown> = {}): string =>
   JSON.stringify({ app: 'ingcalc', schemaVersion: 3, exportedAt: '2026-09-23T00:00:00.000Z', tables, ...over });
@@ -207,5 +212,180 @@ describe('makeBackup', () => {
       app: 'ingcalc', schemaVersion: CURRENT_SCHEMA_VERSION,
       exportedAt: '2026-09-23T01:02:03.000Z', tables: emptyTables(),
     });
+  });
+});
+
+const FIXTURE = readFileSync(join(process.cwd(), 'src/storage/__fixtures__/backup-v3.json'), 'utf8');
+
+/** A fresh, mutable copy every call. */
+const fixture = (): BackupTables => {
+  const r = parseBackup(FIXTURE);
+  if (!r.ok) throw new Error(r.errors.join('\n'));
+  return r.value;
+};
+
+const replaceErrors = (t: BackupTables) => {
+  const r = planRestore('replace', t, emptyTables(), INGREDIENTS);
+  return r.ok ? [] : r.errors;
+};
+
+describe('the v3 fixture', () => {
+  it('restores in both modes onto an empty device, forever', () => {
+    expect(planRestore('replace', fixture(), emptyTables(), INGREDIENTS).ok).toBe(true);
+    expect(planRestore('merge', fixture(), emptyTables(), INGREDIENTS).ok).toBe(true);
+  });
+});
+
+describe('checkIntegrity: references', () => {
+  it('finds a cook whose purchase is missing', () => {
+    const t = fixture();
+    t.batches = t.batches.filter((b) => b.id !== 'b-chicken');
+    expect(replaceErrors(t)).toContain("1 cook refers to a purchase that isn't in the backup.");
+  });
+
+  it('finds meal entries whose cook is missing', () => {
+    const t = fixture();
+    t.cookSessions = [];
+    expect(replaceErrors(t)).toContain("2 meal entries refer to cooks that aren't in the backup.");
+  });
+
+  it('finds entries and day records whose profile is missing', () => {
+    const t = fixture();
+    t.profiles = [];
+    const errors = replaceErrors(t);
+    expect(errors).toContain("4 meal entries refer to profiles that aren't in the backup.");
+    expect(errors).toContain("1 day record refers to a profile that isn't in the backup.");
+  });
+
+  it('finds a purchase and an ingredient entry whose ingredient is missing', () => {
+    const t = fixture();
+    t.userIngredients = [];
+    t.mealEntries = t.mealEntries.map((e) => (e.kind === 'ingredient' ? { ...e, ingredientId: 'nope' } : e));
+    const errors = replaceErrors(t);
+    expect(errors).toContain("1 purchase refers to an ingredient that isn't in the backup.");
+    expect(errors).toContain("1 meal entry refers to an ingredient that isn't in the backup.");
+  });
+
+  it('resolves built-in ingredients without the backup carrying them', () => {
+    expect(checkIntegrity(fixture(), INGREDIENTS, 'the backup')).toEqual([]);
+  });
+});
+
+describe('checkIntegrity: lifecycle', () => {
+  it('finds a purchase with more cooked from it than was bought', () => {
+    const t = fixture();
+    t.cookSessions = [{ ...t.cookSessions[0]!, rawUsedG: g(1200) }];
+    expect(replaceErrors(t)).toContain(
+      'The Chicken breast, skinless bought on 2026-09-19 has more cooked from it than was bought.',
+    );
+  });
+
+  it('finds a cook with more eaten from it than it produced', () => {
+    const t = fixture();
+    // 71g + 100g already eaten from 284g; another 150g is 37g too many.
+    t.mealEntries.push({ ...t.mealEntries[1]!, id: 'e-extra', kind: 'weight', cookSessionId: 's-roast', grams: g(150) } as never);
+    expect(replaceErrors(t)).toContain(
+      'More was eaten from the Chicken breast, skinless cooked on 2026-09-19 than the cook produced.',
+    );
+  });
+
+  it('allows a cook eaten to the gram', () => {
+    const t = fixture();
+    t.mealEntries.push({ ...t.mealEntries[1]!, id: 'e-rest', kind: 'weight', cookSessionId: 's-roast', grams: g(113) } as never);
+    expect(replaceErrors(t)).toEqual([]);
+  });
+});
+
+describe('planRestore: replace', () => {
+  it('writes the backup and counts what it erases', () => {
+    const device = fixture();
+    const r = planRestore('replace', fixture(), device, INGREDIENTS);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.toWrite.batches.map((b) => b.id)).toEqual(['b-chicken', 'b-tempeh']);
+    expect(r.value.perTable.mealEntries).toEqual({ incoming: 4, added: 4, alreadyPresent: 0, erased: 4 });
+  });
+
+  it('nulls an active profile that the backup does not contain, rather than refusing', () => {
+    const t = fixture();
+    t.settings = [{ ...t.settings[0]!, activeProfileId: 'gone' }];
+    const r = planRestore('replace', t, emptyTables(), INGREDIENTS);
+    expect(r.ok && r.value.toWrite.settings[0]!.activeProfileId).toBeNull();
+  });
+});
+
+describe('planRestore: merge', () => {
+  it('adds only rows the device lacks, and the device wins on a shared id', () => {
+    const device = emptyTables();
+    const mine = fixture();
+    device.profiles = mine.profiles;
+    device.batches = [{ ...mine.batches[0]!, purchase: { ...mine.batches[0]!.purchase, location: 'Changed here' } }];
+    const r = planRestore('merge', fixture(), device, INGREDIENTS);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.toWrite.batches.map((b) => b.id)).toEqual(['b-tempeh']);
+    expect(r.value.toWrite.profiles).toEqual([]);
+    expect(r.value.perTable.batches).toEqual({ incoming: 2, added: 1, alreadyPresent: 1, erased: 0 });
+  });
+
+  it('never writes settings', () => {
+    const r = planRestore('merge', fixture(), emptyTables(), INGREDIENTS);
+    expect(r.ok && r.value.toWrite.settings).toEqual([]);
+  });
+
+  it('refuses a merge whose rows are each valid but together over-eat a cook', () => {
+    // The device ate 200g from the same cook; the backup's own 171g is fine
+    // alone. Together, 371g from 284g.
+    const device = fixture();
+    device.mealEntries = [{
+      id: 'e-device', profileId: 'p-ali', date: '2026-09-21', label: 'dinner', createdAt: 9,
+      kind: 'weight', cookSessionId: 's-roast', grams: g(200),
+    }];
+    const r = planRestore('merge', fixture(), device, INGREDIENTS);
+    expect(r).toEqual({
+      ok: false,
+      errors: ['More was eaten from the Chicken breast, skinless cooked on 2026-09-19 than the cook produced.'],
+    });
+  });
+
+  it('says "or on this device" when a reference is missing from both', () => {
+    const t = fixture();
+    t.batches = [];
+    const r = planRestore('merge', t, emptyTables(), INGREDIENTS);
+    expect(r.ok ? [] : r.errors).toContain("1 cook refers to a purchase that isn't in the backup or on this device.");
+  });
+});
+
+describe('planSummary and restoredSummary', () => {
+  const plan = (mode: 'replace' | 'merge', device: BackupTables) => {
+    const r = planRestore(mode, fixture(), device, INGREDIENTS);
+    if (!r.ok) throw new Error(r.errors.join('\n'));
+    return r.value;
+  };
+  const LIST = '2 purchases, 1 cook, 4 meals, 1 profile and 1 added ingredient';
+
+  it('describes a merge onto an empty device', () => {
+    expect(planSummary(plan('merge', emptyTables()))).toBe(`Adds ${LIST}.`);
+    expect(restoredSummary(plan('merge', emptyTables()))).toBe(`Merged. Added ${LIST}.`);
+  });
+
+  it('describes a merge that adds nothing', () => {
+    expect(planSummary(plan('merge', fixture()))).toBe(
+      'Nothing in this backup is new to this device. 9 items are already on this device and will be kept as they are.',
+    );
+    expect(restoredSummary(plan('merge', fixture()))).toBe('Merged. Nothing was new.');
+  });
+
+  it('describes a replace over existing data by what it erases', () => {
+    expect(planSummary(plan('replace', fixture()))).toBe(
+      `This erases everything on this device — ${LIST} — and replaces it with the backup's ${LIST}.`,
+    );
+    expect(restoredSummary(plan('replace', fixture()))).toBe(`Restored ${LIST}.`);
+  });
+
+  it('describes a replace onto an empty device without talking about erasing', () => {
+    expect(planSummary(plan('replace', emptyTables()))).toBe(
+      `This device has nothing on it yet. The backup's ${LIST} will be restored.`,
+    );
   });
 });

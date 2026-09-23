@@ -4,6 +4,8 @@ import {
   type Batch, type CookSession, type DayLog, type Ingredient, type MealEntry, type Profile,
   type Settings,
 } from './types';
+import { consumedFromSession, EPSILON, isSessionEntry, sessionsOf } from './batch';
+import { ingredientLookup, UNKNOWN_INGREDIENT } from './costs';
 
 export const BACKUP_APP = 'ingcalc';
 /** Must equal the highest `this.version(n)` in `storage/db.ts`; a test asserts it. */
@@ -296,4 +298,205 @@ export function parseBackup(text: string): Result<BackupTables> {
   }
 
   return found.empty() ? { ok: true, value: out } : { ok: false, errors: found.lines() };
+}
+
+// ---------------------------------------------------------------------------
+// Integrity: run over the dataset a restore WOULD produce (spec §5.3 step 5).
+
+/**
+ * Every row can be valid alone and the set still be broken: a cook whose
+ * purchase is missing, or backup meals landing on the device's copy of a cook
+ * and eating more than it held. The second is the one a merge creates, and
+ * no row-level check can see it.
+ *
+ * The lifecycle checks use `core/batch.ts`'s own helpers and `EPSILON`, so
+ * "over-eaten" means exactly what it means everywhere else in the app.
+ */
+export function checkIntegrity(t: BackupTables, bundled: readonly Ingredient[], where: string): string[] {
+  const found = problems();
+  const ingredientById = ingredientLookup(bundled, t.userIngredients);
+  const profileIds = new Set(t.profiles.map((p) => p.id));
+  const batchById = new Map(t.batches.map((b) => [b.id, b]));
+  const sessionIds = new Set(t.cookSessions.map((s) => s.id));
+
+  const missing = (one: string, many: string): Phrase =>
+    [`${one} that isn't in ${where}`, `${many} that aren't in ${where}`];
+
+  for (const s of t.cookSessions) {
+    if (!batchById.has(s.batchId)) found.add(missing('cook refers to a purchase', 'cooks refer to purchases'));
+  }
+  for (const b of t.batches) {
+    if (ingredientById(b.ingredientId) === undefined) {
+      found.add(missing('purchase refers to an ingredient', 'purchases refer to ingredients'));
+    }
+  }
+  const bySession = new Map<string, MealEntry[]>();
+  for (const e of t.mealEntries) {
+    if (!profileIds.has(e.profileId)) found.add(missing('meal entry refers to a profile', 'meal entries refer to profiles'));
+    if (isSessionEntry(e)) {
+      if (!sessionIds.has(e.cookSessionId)) found.add(missing('meal entry refers to a cook', 'meal entries refer to cooks'));
+      bySession.set(e.cookSessionId, [...(bySession.get(e.cookSessionId) ?? []), e]);
+    }
+    if (e.kind === 'ingredient' && ingredientById(e.ingredientId) === undefined) {
+      found.add(missing('meal entry refers to an ingredient', 'meal entries refer to ingredients'));
+    }
+  }
+  for (const d of t.dayLogs) {
+    if (!profileIds.has(d.profileId)) found.add(missing('day record refers to a profile', 'day records refer to profiles'));
+  }
+
+  const nameOf = (b: Batch | undefined): string =>
+    (b === undefined ? undefined : ingredientById(b.ingredientId)?.name) ?? UNKNOWN_INGREDIENT;
+
+  for (const b of t.batches) {
+    const used = sessionsOf(b.id, t.cookSessions).reduce((sum, s) => sum + s.rawUsedG, 0);
+    if (used > b.rawWeightG + EPSILON) {
+      found.line(`The ${nameOf(b)} bought on ${b.purchase.date} has more cooked from it than was bought.`);
+    }
+  }
+  for (const s of t.cookSessions) {
+    if (consumedFromSession(s, bySession.get(s.id) ?? []) > s.cookedWeightG + EPSILON) {
+      found.line(`More was eaten from the ${nameOf(batchById.get(s.batchId))} cooked on ${s.cookedAt} than the cook produced.`);
+    }
+  }
+
+  return found.lines();
+}
+
+// ---------------------------------------------------------------------------
+// Planning.
+
+export type RestoreMode = 'replace' | 'merge';
+
+export interface TableCounts {
+  incoming: number;
+  added: number;
+  alreadyPresent: number;
+  erased: number;
+}
+
+export interface RestorePlan {
+  mode: RestoreMode;
+  perTable: Record<TableName, TableCounts>;
+  /** Exactly the rows to write; for replace, after clearing every table. */
+  toWrite: BackupTables;
+}
+
+/**
+ * A dangling active profile is harmless (`useProfiles` falls back to the
+ * first profile), so it is repaired rather than failing the whole restore.
+ */
+function withResolvableActiveProfile(t: BackupTables): BackupTables {
+  const ids = new Set(t.profiles.map((p) => p.id));
+  return {
+    ...t,
+    settings: t.settings.map((s) =>
+      (s.activeProfileId !== null && !ids.has(s.activeProfileId) ? { ...s, activeProfileId: null } : s)),
+  };
+}
+
+const onlyNew = <T extends { id: string }>(device: readonly T[], incoming: readonly T[]): T[] => {
+  const have = new Set(device.map((r) => r.id));
+  return incoming.filter((r) => !have.has(r.id));
+};
+
+/**
+ * Merge is add-only: a row whose id the device already has is skipped, so a
+ * merge can never modify or delete anything. Rows carry no `updatedAt`, so
+ * "the newer one" is unknowable; replace is the tool for rolling back. The
+ * device's settings, and its frozen day-log targets, are always kept.
+ */
+export function planRestore(
+  mode: RestoreMode,
+  backup: BackupTables,
+  device: BackupTables,
+  bundled: readonly Ingredient[],
+): Result<RestorePlan> {
+  let toWrite: BackupTables;
+  let resulting: BackupTables;
+
+  if (mode === 'replace') {
+    toWrite = withResolvableActiveProfile(backup);
+    resulting = toWrite;
+  } else {
+    toWrite = {
+      profiles: onlyNew(device.profiles, backup.profiles),
+      userIngredients: onlyNew(device.userIngredients, backup.userIngredients),
+      settings: [],
+      batches: onlyNew(device.batches, backup.batches),
+      cookSessions: onlyNew(device.cookSessions, backup.cookSessions),
+      mealEntries: onlyNew(device.mealEntries, backup.mealEntries),
+      dayLogs: onlyNew(device.dayLogs, backup.dayLogs),
+    };
+    resulting = {
+      profiles: [...device.profiles, ...toWrite.profiles],
+      userIngredients: [...device.userIngredients, ...toWrite.userIngredients],
+      settings: device.settings,
+      batches: [...device.batches, ...toWrite.batches],
+      cookSessions: [...device.cookSessions, ...toWrite.cookSessions],
+      mealEntries: [...device.mealEntries, ...toWrite.mealEntries],
+      dayLogs: [...device.dayLogs, ...toWrite.dayLogs],
+    };
+  }
+
+  const errors = checkIntegrity(
+    resulting, bundled, mode === 'replace' ? 'the backup' : 'the backup or on this device',
+  );
+  if (errors.length > 0) return { ok: false, errors };
+
+  const perTable = Object.fromEntries(TABLE_NAMES.map((t) => [t, {
+    incoming: backup[t].length,
+    added: toWrite[t].length,
+    alreadyPresent: mode === 'merge' ? backup[t].length - toWrite[t].length : 0,
+    erased: mode === 'replace' ? device[t].length : 0,
+  }])) as Record<TableName, TableCounts>;
+
+  return { ok: true, value: { mode, perTable, toWrite } };
+}
+
+// ---------------------------------------------------------------------------
+// Copy for the preview and the result. Only the tables a person recognises are
+// listed; day records and settings are counted but not named.
+
+const SHOWN: readonly (readonly [TableName, string, string])[] = [
+  ['batches', 'purchase', 'purchases'],
+  ['cookSessions', 'cook', 'cooks'],
+  ['mealEntries', 'meal', 'meals'],
+  ['profiles', 'profile', 'profiles'],
+  ['userIngredients', 'added ingredient', 'added ingredients'],
+];
+
+/** "2 purchases, 1 cook and 4 meals", or null when every count is zero. */
+function listCounts(plan: RestorePlan, pick: (c: TableCounts) => number): string | null {
+  const parts = SHOWN.flatMap(([t, one, many]) => {
+    const n = pick(plan.perTable[t]);
+    return n === 0 ? [] : [`${n} ${n === 1 ? one : many}`];
+  });
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return parts[0]!;
+  return `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)!}`;
+}
+
+export function planSummary(plan: RestorePlan): string {
+  if (plan.mode === 'merge') {
+    const added = listCounts(plan, (c) => c.added);
+    const kept = SHOWN.reduce((sum, [t]) => sum + plan.perTable[t].alreadyPresent, 0);
+    const head = added === null ? 'Nothing in this backup is new to this device.' : `Adds ${added}.`;
+    if (kept === 0) return head;
+    return `${head} ${kept} ${kept === 1 ? 'item is' : 'items are'} already on this device and will be kept as they are.`;
+  }
+  const incoming = listCounts(plan, (c) => c.incoming) ?? 'nothing';
+  const erased = listCounts(plan, (c) => c.erased);
+  return erased === null
+    ? `This device has nothing on it yet. The backup's ${incoming} will be restored.`
+    : `This erases everything on this device — ${erased} — and replaces it with the backup's ${incoming}.`;
+}
+
+export function restoredSummary(plan: RestorePlan): string {
+  if (plan.mode === 'merge') {
+    const added = listCounts(plan, (c) => c.added);
+    return added === null ? 'Merged. Nothing was new.' : `Merged. Added ${added}.`;
+  }
+  const incoming = listCounts(plan, (c) => c.incoming);
+  return incoming === null ? 'Restored. The backup was empty.' : `Restored ${incoming}.`;
 }
