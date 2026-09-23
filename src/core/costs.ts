@@ -1,9 +1,9 @@
-import { sessionsOf } from './batch';
-import {
-  costPerKgCooked, costPerKgRaw, proteinPerMYRRaw, proteinPerMYRRetained,
-} from './cost';
+import { isSessionEntry, portionsToGrams, sessionsOf } from './batch';
+import { costPerKgCooked, costPerKgRaw, entryCostMYR, proteinPerMYRRaw, proteinPerMYRRetained } from './cost';
+import type { CsvCell } from './csv';
+import { entryNutrients, type MealContext } from './meals';
+import { MEAL_LABEL_KEYS, type Batch, type CookSession, type Ingredient, type IsoDate, type MealEntry } from './types';
 import type { RetentionLookup } from './retention';
-import type { Batch, CookSession, Ingredient, IsoDate } from './types';
 import { g, myr, type Grams, type MYR } from './units';
 
 export type CostRange = 'thisMonth' | 'last3Months' | 'thisYear' | 'all';
@@ -268,4 +268,96 @@ export function totalsByMonth(rows: readonly PurchaseRow[]): TotalRow[] {
     (_, key) => `${MONTHS[Number(key.slice(5, 7)) - 1]} ${key.slice(0, 4)}`,
   );
   return toTotals(groups).sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
+}
+
+/**
+ * Rounding happens here, once, rather than in `toCsv` or the spreadsheet:
+ * grams to 0.1, money and ratios to 0.01, kcal whole, protein to 0.1.
+ */
+const round = (n: number, dp: number): number => {
+  const f = 10 ** dp;
+  return Math.round(n * f) / f;
+};
+const roundOrNull = (n: number | null, dp: number): number | null =>
+  n === null ? null : round(n, dp);
+
+export const PURCHASE_CSV_HEADERS: readonly string[] = [
+  'date', 'ingredient', 'location', 'raw_weight_g', 'price_myr', 'myr_per_kg_raw',
+  'protein_g_per_myr_raw', 'cooked_g', 'myr_per_kg_cooked', 'protein_g_per_myr_cooked',
+  'batch_id',
+];
+
+/** In the order given, which is the table's current sort. */
+export function purchaseCsvRows(rows: readonly PurchaseRow[]): CsvCell[][] {
+  return rows.map((r) => [
+    r.date, r.ingredient, r.location,
+    round(r.rawWeightG, 1), round(r.priceMYR, 2),
+    roundOrNull(r.myrPerKgRaw, 2), roundOrNull(r.proteinPerMYRRaw, 2),
+    roundOrNull(r.cookedG, 1), roundOrNull(r.myrPerKgCooked, 2),
+    roundOrNull(r.proteinPerMYRCooked, 2),
+    r.batchId,
+  ]);
+}
+
+export const MEAL_CSV_HEADERS: readonly string[] = [
+  'date', 'profile', 'meal', 'kind', 'item', 'cooked_g', 'portions', 'kcal', 'protein_g',
+  'cost_myr', 'batch_id',
+];
+
+export const UNKNOWN_PROFILE = 'Unknown profile';
+
+/**
+ * Names come from outside `core/`: profile names are stored data, and item
+ * names use the UI's method labels. Passed in, as `MealContext` passes in
+ * ingredients.
+ */
+export interface MealCsvNames {
+  profileName: (profileId: string) => string | undefined;
+  itemName: (entry: MealEntry) => string;
+}
+
+const LABEL_ORDER = new Map(MEAL_LABEL_KEYS.map((label, i) => [label, i]));
+
+function eatenG(entry: MealEntry, session: CookSession | undefined): number | null {
+  switch (entry.kind) {
+    case 'portion': return session === undefined ? null : portionsToGrams(session, entry.portions);
+    case 'weight': return entry.grams;
+    case 'ingredient': return entry.cookedG;
+    case 'quick': return null;
+  }
+}
+
+/**
+ * Nutrients come from `entryNutrients`, the Log's own arithmetic, so the file
+ * and the screen cannot disagree. A quick entry with no protein figure writes
+ * an empty cell: "unknown" and "zero" are different answers.
+ */
+export function mealCsvRows(
+  entries: readonly MealEntry[],
+  ctx: MealContext,
+  names: MealCsvNames,
+): CsvCell[][] {
+  const profile = (e: MealEntry) => names.profileName(e.profileId) ?? UNKNOWN_PROFILE;
+  const ordered = [...entries].sort((a, b) =>
+    a.date.localeCompare(b.date)
+    || profile(a).localeCompare(profile(b))
+    || LABEL_ORDER.get(a.label)! - LABEL_ORDER.get(b.label)!
+    || a.createdAt - b.createdAt);
+
+  return ordered.map((e) => {
+    const session = isSessionEntry(e) ? ctx.sessions.find((s) => s.id === e.cookSessionId) : undefined;
+    const batch: Batch | undefined = session === undefined
+      ? undefined
+      : ctx.batches.find((b) => b.id === session.batchId);
+    const nutrients = entryNutrients(e, ctx);
+    return [
+      e.date, profile(e), e.label, e.kind, names.itemName(e),
+      roundOrNull(eatenG(e, session), 1),
+      e.kind === 'portion' ? e.portions : null,
+      round(nutrients.kcal, 0),
+      e.kind === 'quick' && e.proteinG === undefined ? null : round(nutrients.protein, 1),
+      session !== undefined && batch !== undefined ? roundOrNull(entryCostMYR(e, session, batch), 2) : null,
+      batch?.id ?? null,
+    ];
+  });
 }

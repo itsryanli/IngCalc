@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { describeEntry } from './labels';
+import { describeEntry, entryItemName } from './labels';
 import type { Batch, CookSession, Ingredient, MealEntry } from '../core/types';
 import type { MealContext } from '../core/meals';
 import { g } from '../core/units';
@@ -55,6 +55,32 @@ const entry = (over: Partial<MealEntry> = {}): MealEntry => ({
   id: 'm1', profileId: 'p1', date: '2026-09-19', label: 'lunch', createdAt: 1,
   kind: 'portion', cookSessionId: 's1', portions: 1, ...over,
 } as MealEntry);
+
+describe('entryItemName', () => {
+  it.each<[string, Partial<MealEntry>, string]>([
+    ['quick', { kind: 'quick', name: 'Teh tarik', kcal: 180 }, 'Teh tarik'],
+    ['ingredient', { kind: 'ingredient', ingredientId: 'chicken', method: 'roasted', cookedG: g(142) }, 'Chicken breast, roasted'],
+    ['weight', { kind: 'weight', cookSessionId: 's1', grams: g(142) }, 'Chicken breast, roasted'],
+    ['portion', { kind: 'portion', cookSessionId: 's1', portions: 2 }, 'Chicken breast, roasted'],
+    ['missing cook', { kind: 'portion', cookSessionId: 'gone', portions: 1 }, 'A cook that is no longer in your kitchen'],
+    ['unknown ingredient', { kind: 'weight', cookSessionId: 's2', grams: g(50) }, 'Unknown ingredient, boiled'],
+  ])('names a %s entry without its amount', (_, over, expected) => {
+    expect(entryItemName(entry(over), ctx)).toBe(expected);
+  });
+
+  it('is always the start of the Log description, so the two cannot disagree', () => {
+    const kinds: Partial<MealEntry>[] = [
+      { kind: 'quick', name: 'Teh tarik', kcal: 180 },
+      { kind: 'ingredient', ingredientId: 'chicken', method: 'roasted', cookedG: g(142) },
+      { kind: 'weight', cookSessionId: 's1', grams: g(142) },
+      { kind: 'portion', cookSessionId: 's1', portions: 1 },
+    ];
+    for (const over of kinds) {
+      const e = entry(over);
+      expect(describeEntry(e, ctx).startsWith(entryItemName(e, ctx))).toBe(true);
+    }
+  });
+});
 
 describe('describeEntry', () => {
   it('describes a quick entry by its name, marked as quick', () => {

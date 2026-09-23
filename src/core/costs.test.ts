@@ -1,14 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_SORT,
-  ingredientLookup, inRange, NO_LOCATION, nextSort, purchaseRows, rangeFileTag, sortRows, summarise,
-  totalsByLocation, totalsByMonth, UNKNOWN_INGREDIENT,
+  ingredientLookup, inRange, MEAL_CSV_HEADERS, mealCsvRows, NO_LOCATION, nextSort, purchaseRows, PURCHASE_CSV_HEADERS, purchaseCsvRows, rangeFileTag, sortRows, summarise,
+  totalsByLocation, totalsByMonth, UNKNOWN_INGREDIENT, UNKNOWN_PROFILE,
   type CostRange, type PurchaseRow, type SortKey,
 } from './costs';
 import { zeroNutrients } from './nutrients';
 import type { RetentionLookup } from './retention';
 import type { Batch, CookSession, Ingredient } from './types';
 import { g, myr } from './units';
+import { CATEGORY_YIELD } from '../data/categoryYield';
+import type { MealContext } from './meals';
+import type { MealEntry } from './types';
 
 export const ingredient = (id: string, name: string, protein: number, over: Partial<Ingredient> = {}): Ingredient => ({
   id, name, category: 'meat', per100gRaw: { ...zeroNutrients(), protein },
@@ -249,5 +252,108 @@ describe('totalsByMonth', () => {
       { key: '2026-09', label: 'Sep 2026', count: 2, spentMYR: 16 },
       { key: '2026-08', label: 'Aug 2026', count: 1, spentMYR: 4 },
     ]);
+  });
+});
+
+describe('purchaseCsvRows', () => {
+  it('has the documented header', () => {
+    expect(PURCHASE_CSV_HEADERS).toEqual([
+      'date', 'ingredient', 'location', 'raw_weight_g', 'price_myr', 'myr_per_kg_raw',
+      'protein_g_per_myr_raw', 'cooked_g', 'myr_per_kg_cooked', 'protein_g_per_myr_cooked',
+      'batch_id',
+    ]);
+  });
+
+  it('rounds each figure and writes missing ones as null', () => {
+    const [r] = purchaseCsvRows([row('b1', {
+      rawWeightG: g(1000.04), priceMYR: myr(18.499), myrPerKgRaw: myr(18.499),
+      proteinPerMYRRaw: 12.1666, cookedG: g(284.06), myrPerKgCooked: myr(28.1690),
+      proteinPerMYRCooked: null,
+    })]);
+    expect(r).toEqual([
+      '2026-09-19', 'Chicken', 'Pasar', 1000, 18.5, 18.5, 12.17, 284.1, 28.17, null, 'b1',
+    ]);
+  });
+
+  it('keeps the order it is given', () => {
+    const rows = purchaseCsvRows([row('z'), row('a')]);
+    expect(rows.map((r) => r.at(-1))).toEqual(['z', 'a']);
+  });
+});
+
+describe('mealCsvRows', () => {
+  // 400g chicken (22.5g protein, 120 kcal /100g) roasted to 284g in 4 portions.
+  // No retention, so one portion (71g) is exactly a quarter: 22.5g protein, 120 kcal.
+  const chicken = ingredient('chicken', 'Chicken', 22.5, {
+    per100gRaw: { ...zeroNutrients(), protein: 22.5, kcal: 120 },
+  });
+  const b = batch('b1');
+  const s = session('s1', 'b1');
+  const ctx: MealContext = {
+    sessions: [s], batches: [b], ingredientById: ingredientLookup([chicken], []),
+    samples: [], categoryYield: CATEGORY_YIELD, retention: {},
+  };
+  const base = { profileId: 'p1', date: '2026-09-19', label: 'lunch' as const, createdAt: 0 };
+  const names = {
+    profileName: (id: string) => ({ p1: 'Ali', p2: 'Bee' } as Record<string, string>)[id],
+    itemName: (e: MealEntry) => `item:${e.id}`,
+  };
+
+  it('has the documented header', () => {
+    expect(MEAL_CSV_HEADERS).toEqual([
+      'date', 'profile', 'meal', 'kind', 'item', 'cooked_g', 'portions', 'kcal', 'protein_g',
+      'cost_myr', 'batch_id',
+    ]);
+  });
+
+  it('writes a portion entry with grams, nutrients, cost and its batch', () => {
+    const [r] = mealCsvRows(
+      [{ ...base, id: 'e1', kind: 'portion', cookSessionId: 's1', portions: 1 }], ctx, names,
+    );
+    expect(r).toEqual(['2026-09-19', 'Ali', 'lunch', 'portion', 'item:e1', 71, 1, 120, 22.5, 2, 'b1']);
+  });
+
+  it('writes a weighed entry with no portion count', () => {
+    const [r] = mealCsvRows(
+      [{ ...base, id: 'e1', kind: 'weight', cookSessionId: 's1', grams: g(142) }], ctx, names,
+    );
+    expect(r).toEqual(['2026-09-19', 'Ali', 'lunch', 'weight', 'item:e1', 142, null, 240, 45, 4, 'b1']);
+  });
+
+  it('leaves cost and batch empty for entries with no purchase behind them', () => {
+    const [r] = mealCsvRows(
+      [{ ...base, id: 'i1', kind: 'ingredient', ingredientId: 'chicken', method: 'roasted', cookedG: g(100) }],
+      ctx, names,
+    );
+    expect(r!.slice(5, 7)).toEqual([100, null]);
+    expect(r!.slice(9)).toEqual([null, null]);
+  });
+
+  it('leaves protein empty, not zero, for a quick entry with no protein figure', () => {
+    const [withP, without] = mealCsvRows([
+      { ...base, id: 'q1', kind: 'quick', name: 'Teh', kcal: 90, proteinG: 3 },
+      { ...base, id: 'q2', kind: 'quick', name: 'Kuih', kcal: 150, createdAt: 1 },
+    ], ctx, names);
+    expect(withP!.slice(5)).toEqual([null, null, 90, 3, null, null]);
+    expect(without!.slice(5)).toEqual([null, null, 150, null, null, null]);
+  });
+
+  it('orders by date, then profile name, then meal slot, then creation', () => {
+    const rows = mealCsvRows([
+      { ...base, id: 'late', date: '2026-09-20', kind: 'quick', name: 'x', kcal: 1 },
+      { ...base, id: 'bee', profileId: 'p2', kind: 'quick', name: 'x', kcal: 1 },
+      { ...base, id: 'dinner', label: 'dinner', kind: 'quick', name: 'x', kcal: 1 },
+      { ...base, id: 'lunch2', createdAt: 2, kind: 'quick', name: 'x', kcal: 1 },
+      { ...base, id: 'breakfast', label: 'breakfast', kind: 'quick', name: 'x', kcal: 1 },
+      { ...base, id: 'lunch1', createdAt: 1, kind: 'quick', name: 'x', kcal: 1 },
+    ], ctx, names);
+    expect(rows.map((r) => r[4])).toEqual([
+      'item:breakfast', 'item:lunch1', 'item:lunch2', 'item:dinner', 'item:bee', 'item:late',
+    ]);
+  });
+
+  it('names an unresolvable profile rather than dropping the row', () => {
+    const [r] = mealCsvRows([{ ...base, id: 'q', profileId: 'gone', kind: 'quick', name: 'x', kcal: 1 }], ctx, names);
+    expect(r![1]).toBe(UNKNOWN_PROFILE);
   });
 });

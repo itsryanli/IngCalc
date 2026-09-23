@@ -28,15 +28,16 @@ export const MEAL_LABELS: Record<MealLabel, string> = {
 };
 
 /**
- * What an entry says on the Log. Lives beside METHOD_LABELS rather than in the
- * component so the four kinds are described in one place and read consistently.
+ * What an entry is, without how much of it: "Chicken breast, skinless, roasted".
+ * Split out of `describeEntry` so the meals CSV, which has its own amount
+ * columns, names items exactly as the Log does.
  */
-export function describeEntry(entry: MealEntry, ctx: MealContext): string {
-  if (entry.kind === 'quick') return `${entry.name} (quick)`;
+export function entryItemName(entry: MealEntry, ctx: MealContext): string {
+  if (entry.kind === 'quick') return entry.name;
 
   if (entry.kind === 'ingredient') {
     const name = ctx.ingredientById(entry.ingredientId)?.name ?? 'Unknown ingredient';
-    return `${name}, ${METHOD_LABELS[entry.method].toLowerCase()} — ${formatG(entry.cookedG)}`;
+    return `${name}, ${METHOD_LABELS[entry.method].toLowerCase()}`;
   }
 
   const session = ctx.sessions.find((s) => s.id === entry.cookSessionId);
@@ -45,12 +46,24 @@ export function describeEntry(entry: MealEntry, ctx: MealContext): string {
   const batch = ctx.batches.find((b) => b.id === session.batchId);
   const name = (batch === undefined ? undefined : ctx.ingredientById(batch.ingredientId)?.name)
     ?? 'Unknown ingredient';
-  const method = METHOD_LABELS[session.method].toLowerCase();
+  return `${name}, ${METHOD_LABELS[session.method].toLowerCase()}`;
+}
+
+/**
+ * What an entry says on the Log. Lives beside METHOD_LABELS rather than in the
+ * component so the four kinds are described in one place and read consistently.
+ */
+export function describeEntry(entry: MealEntry, ctx: MealContext): string {
+  const name = entryItemName(entry, ctx);
+  if (entry.kind === 'quick') return `${name} (quick)`;
+  if (entry.kind === 'ingredient') return `${name} — ${formatG(entry.cookedG)}`;
+
+  if (!ctx.sessions.some((s) => s.id === entry.cookSessionId)) return name;
+
   const amount = entry.kind === 'portion'
     ? `${entry.portions} portion${entry.portions === 1 ? '' : 's'}`
     : formatG(entry.grams);
-
-  return `${name}, ${method} — ${amount}`;
+  return `${name} — ${amount}`;
 }
 
 /**
