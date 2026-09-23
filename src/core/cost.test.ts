@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import type { Batch, CookSession, Ingredient } from './types';
+import type { Batch, CookSession, Ingredient, MealEntry } from './types';
 import { g, myr } from './units';
 import { zeroNutrients } from './nutrients';
 import { RETENTION } from '../data/retentionTable';
 import {
   attributablePriceMYR, costPerKgCooked, costPerKgRaw, costPerPortion,
-  proteinPerMYRRaw, proteinPerMYRRetained,
+  entryCostMYR, proteinPerMYRRaw, proteinPerMYRRetained,
 } from './cost';
+import { EPSILON } from './batch';
 
 const chicken: Ingredient = {
   id: 'chicken-breast', name: 'Chicken breast', category: 'meat',
@@ -115,5 +116,54 @@ describe('proteinPerMYRRetained', () => {
   it('is null for a gift', () => {
     const free = batch({ purchase: { ...batch().purchase, pricePaidMYR: myr(0) } });
     expect(proteinPerMYRRetained(free, chicken, [session()], RETENTION)).toBeNull();
+  });
+});
+
+describe('entryCostMYR', () => {
+  // RM20 for 1kg; 400g of it roasted into 284g, cut into 4 portions of 71g.
+  // The cook's share of the price is 20 × 400/1000 = RM8.
+  const b: Batch = {
+    id: 'b1', ingredientId: 'chicken-breast', rawWeightG: g(1000),
+    purchase: { pricePaidMYR: myr(20), location: 'Pasar', date: '2026-09-19' }, createdAt: 0,
+  };
+  const s: CookSession = {
+    id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(400), cookedWeightG: g(284),
+    cookedAt: '2026-09-19', portionCount: 4, excludeFromCalibration: false,
+  };
+  const base = { profileId: 'p1', date: '2026-09-19', label: 'lunch' as const, createdAt: 0 };
+  const portion = (id: string, portions: number): MealEntry =>
+    ({ ...base, id, kind: 'portion', cookSessionId: 's1', portions });
+  const weight = (id: string, grams: number): MealEntry =>
+    ({ ...base, id, kind: 'weight', cookSessionId: 's1', grams: g(grams) });
+
+  it('prices a portion as its share of the cook', () => {
+    expect(entryCostMYR(portion('e1', 1), s, b)).toBeCloseTo(2, 10);
+  });
+
+  it('prices a weighed entry by grams over the cooked weight', () => {
+    expect(entryCostMYR(weight('e1', 142), s, b)).toBeCloseTo(4, 10);
+  });
+
+  it('is null for entries with no purchase behind them', () => {
+    expect(entryCostMYR({ ...base, id: 'q', kind: 'quick', name: 'Teh', kcal: 90 }, s, b)).toBeNull();
+    expect(entryCostMYR(
+      { ...base, id: 'i', kind: 'ingredient', ingredientId: 'rice', method: 'boiled', cookedG: g(100) },
+      s, b,
+    )).toBeNull();
+  });
+
+  it('is null for an entry against a different cook', () => {
+    expect(entryCostMYR({ ...portion('e1', 1), cookSessionId: 'other' } as MealEntry, s, b)).toBeNull();
+  });
+
+  it('is null when the cook does not belong to the batch', () => {
+    expect(entryCostMYR(portion('e1', 1), { ...s, batchId: 'elsewhere' }, b)).toBeNull();
+  });
+
+  it('adds up to the cook\'s share of the price once the cook is fully eaten', () => {
+    // 2 portions (142g) + 100g + 42g = 284g, the whole cook.
+    const entries = [portion('e1', 2), weight('e2', 100), weight('e3', 42)];
+    const total = entries.reduce((sum, e) => sum + (entryCostMYR(e, s, b) ?? 0), 0);
+    expect(Math.abs(total - 8)).toBeLessThan(EPSILON);
   });
 });

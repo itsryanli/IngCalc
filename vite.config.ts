@@ -27,5 +27,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
+    // The forks pool spawns a process per test file, which fails intermittently
+    // under load ("Failed to start forks worker") and reports it as a failing
+    // suite. Phase 3 execution record §5.
+    pool: 'threads',
   },
 });

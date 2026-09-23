@@ -1,0 +1,36 @@
+{
+  "app": "ingcalc",
+  "schemaVersion": 3,
+  "exportedAt": "2026-09-23T01:00:00.000Z",
+  "tables": {
+    "profiles": [
+      { "id": "p-ali", "name": "Ali", "sex": "male", "birthYear": 1995, "heightCm": 175, "weightKg": 72, "sessionsPerWeek": 4, "goal": "maintain" }
+    ],
+    "userIngredients": [
+      {
+        "id": "u-tempeh", "name": "Tempeh (Pasar)", "category": "legume",
+        "per100gRaw": { "kcal": 192, "protein": 20.3, "carbs": 7.6, "fibre": 0, "fat": 10.8, "potassium": 412, "iron": 2.7, "magnesium": 81, "zinc": 1.14, "calcium": 111, "sodium": 9 },
+        "publishedYield": {}, "absorbsWater": false, "source": "user", "archived": true
+      }
+    ],
+    "settings": [
+      { "id": "singleton", "activeProfileId": "p-ali", "landingTab": "log", "defaultWeightUnit": "g" }
+    ],
+    "batches": [
+      { "id": "b-chicken", "ingredientId": "chicken-breast", "rawWeightG": 1000, "purchase": { "pricePaidMYR": 18.5, "location": "Pasar Chow Kit", "date": "2026-09-19" }, "createdAt": 1758240000000 },
+      { "id": "b-tempeh", "ingredientId": "u-tempeh", "rawWeightG": 300, "purchase": { "pricePaidMYR": 4.5, "location": "Tesco, Setapak", "date": "2026-09-20" }, "createdAt": 1758326400000 }
+    ],
+    "cookSessions": [
+      { "id": "s-roast", "batchId": "b-chicken", "method": "roasted", "rawUsedG": 400, "cookedWeightG": 284, "cookedAt": "2026-09-19", "portionCount": 4, "excludeFromCalibration": false }
+    ],
+    "mealEntries": [
+      { "id": "e-dinner", "profileId": "p-ali", "date": "2026-09-19", "label": "dinner", "createdAt": 1758290000000, "kind": "portion", "cookSessionId": "s-roast", "portions": 1 },
+      { "id": "e-lunch", "profileId": "p-ali", "date": "2026-09-20", "label": "lunch", "createdAt": 1758340000000, "kind": "weight", "cookSessionId": "s-roast", "grams": 100 },
+      { "id": "e-veg", "profileId": "p-ali", "date": "2026-09-20", "label": "lunch", "createdAt": 1758340000001, "kind": "ingredient", "ingredientId": "kangkung", "method": "boiled", "cookedG": 150 },
+      { "id": "e-teh", "profileId": "p-ali", "date": "2026-09-20", "label": "snack", "createdAt": 1758350000000, "kind": "quick", "name": "Teh tarik", "kcal": 120 }
+    ],
+    "dayLogs": [
+      { "id": "p-ali:2026-09-19", "profileId": "p-ali", "date": "2026-09-19", "targets": { "kcal": 2450, "proteinG": 130, "micros": { "potassium": { "rni": 4700, "dv": 4700 } } } }
+    ]
+  }
+}

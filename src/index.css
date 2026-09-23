@@ -197,20 +197,8 @@ body {
   background: var(--accent);
 }
 
-.tab:disabled {
-  color: var(--text-dim);
-  opacity: 0.38;
-  cursor: not-allowed;
-}
-
-.tab:not(:disabled):active {
+.tab:active {
   background: var(--surface-sunken);
-}
-
-.tab__phase {
-  font-size: var(--fs-xs);
-  font-weight: 400;
-  opacity: 0.85;
 }
 
 /* ==========================================================================
@@ -728,6 +716,11 @@ body {
   padding-inline: var(--sp-4);
 }
 
+/* The scrollport's clipping edge and the sticky column's edge must coincide,
+   or scrolled cells show in the padding strip to its left. The bleed margin
+   stays; the inset moves onto the edge cells. */
+.table-scroll--pinned { padding-inline: 0; }
+
 .app table {
   width: 100%;
   border-collapse: collapse;
@@ -989,3 +982,105 @@ body {
   color: var(--text-dim);
   font-size: var(--fs-xs);
 }
+
+/* ==========================================================================
+   Costs
+   ========================================================================== */
+
+/* The segmented control, as a 2×2 grid on a phone and one row from 30rem. */
+.range-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: var(--sp-4);
+}
+
+@media (min-width: 30rem) {
+  .range-picker { grid-template-columns: repeat(4, 1fr); }
+}
+
+.range-picker .seg__btn { min-width: 0; font-size: var(--fs-sm); }
+
+.costs__summary {
+  margin: 0 0 var(--sp-4);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Header cells are buttons, styled as the header text they replace. */
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: var(--tap-min);
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.purchase-table th[aria-sort] .sort-btn { color: var(--accent); }
+.sort-btn__arrow { min-width: 0.75em; }
+
+/* Pinned ingredient column: opaque, so scrolled cells pass under it. */
+.purchase-table thead th:first-child,
+.purchase-table tbody th[scope='row'] {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+/* Separate borders belong to their cell, so the header rule moves with the
+   sticky cell instead of being painted over by it. */
+.purchase-table { border-collapse: separate; border-spacing: 0; }
+.app .purchase-table thead th:first-child,
+.app .purchase-table tbody th[scope='row'] { padding-left: var(--sp-4); }
+.app .purchase-table thead th:last-child,
+.app .purchase-table tbody td:last-child { padding-right: var(--sp-4); }
+
+.purchase-table tbody th[scope='row'] {
+  max-width: calc(10rem + var(--sp-4));
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.data-panel__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.data-panel__note {
+  margin: 0 0 var(--sp-2);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+.data-panel__restore:focus-within {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.data-panel__step { margin-top: var(--sp-4); }
+.data-panel__step .btn-row { margin-top: var(--sp-3); }
+
+.app [role='alert'] p { margin: 0; }
+.app [role='alert'] p + p { margin-top: var(--sp-2); }
+
+/* Destructive: only "Erase and restore" uses it. */
+.btn--danger {
+  background: var(--danger);
+  color: var(--surface);
+  border: 1px solid var(--danger);
+  width: 100%;
+}
+
+.btn--danger:hover { filter: brightness(0.92); }
+
+/* The export buttons are the first ordinary buttons that can be disabled;
+   no rule for that existed. */
+.app .btn:disabled { cursor: not-allowed; opacity: 0.55; }
