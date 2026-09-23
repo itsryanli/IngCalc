@@ -8,6 +8,7 @@ import { DataPanel } from './DataPanel';
 import { MAX_BACKUP_BYTES, NOT_READABLE, TOO_LARGE } from '../../core/backup';
 import { db } from '../../storage/db';
 import { g, myr } from '../../core/units';
+import * as backupStorage from '../../storage/backup';
 
 vi.mock('../download', () => ({ downloadText: vi.fn() }));
 import { downloadText } from '../download';
@@ -96,6 +97,26 @@ describe('DataPanel: restore', () => {
     await user.click(screen.getByRole('button', { name: 'Erase and restore' }));
     await waitFor(() => expect(onRestored).toHaveBeenCalledOnce());
     expect((await db.batches.toArray()).map((b) => b.id).sort()).toEqual(['b-chicken', 'b-tempeh']);
+  });
+
+  it('blocks the mode buttons while the preview is loading, so a race with Cancel is impossible', async () => {
+    const original = backupStorage.previewRestore;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    vi.spyOn(backupStorage, 'previewRestore').mockImplementationOnce(async (mode, tables) => {
+      await gate;
+      return original(mode, tables);
+    });
+    const { user } = setup();
+    await user.upload(restoreInput(), fileOf(FIXTURE));
+    await user.click(await screen.findByRole('button', { name: 'Merge' }));
+
+    expect(screen.getByRole('button', { name: 'Merge' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Replace' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+
+    release();
+    expect(await screen.findByTestId('restore-preview')).toHaveTextContent(`Adds ${LIST}.`);
   });
 
   it('cancels back to the start without writing', async () => {

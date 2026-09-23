@@ -84,6 +84,7 @@ export function DataPanel({ onExportPurchases, onExportMeals, onRestored, today 
   };
 
   const choose = async (mode: RestoreMode, tables: BackupTables) => {
+    setBusy(true);
     try {
       const plan = await previewRestore(mode, tables);
       if (!plan.ok) {
@@ -91,6 +92,7 @@ export function DataPanel({ onExportPurchases, onExportMeals, onRestored, today 
         return;
       }
       setStage({ kind: 'preview', tables, plan: plan.value });
+      setBusy(false);
     } catch (err) {
       console.error('Reading this device before a restore failed', err);
       reset(["This device's data could not be read, so nothing was changed."]);
@@ -170,13 +172,23 @@ export function DataPanel({ onExportPurchases, onExportMeals, onRestored, today 
             device and restores the backup exactly.
           </p>
           <div className="btn-row">
-            <button type="button" className="btn btn--primary" onClick={() => { void choose('merge', stage.tables); }}>
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={busy}
+              onClick={() => { void choose('merge', stage.tables); }}
+            >
               Merge
             </button>
-            <button type="button" className="btn btn--secondary" onClick={() => { void choose('replace', stage.tables); }}>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              disabled={busy}
+              onClick={() => { void choose('replace', stage.tables); }}
+            >
               Replace
             </button>
-            <button type="button" className="btn btn--secondary" onClick={() => reset()}>
+            <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => reset()}>
               Cancel
             </button>
           </div>
