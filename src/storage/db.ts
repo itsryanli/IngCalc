@@ -1,12 +1,7 @@
 import Dexie, { type Table } from 'dexie';
-import type { Batch, CookSession, DayLog, Ingredient, MealEntry, Profile } from '../core/types';
+import type { Batch, CookSession, DayLog, Ingredient, MealEntry, Profile, Settings } from '../core/types';
 
-export interface Settings {
-  id: 'singleton';
-  activeProfileId: string | null;
-  landingTab: 'log' | 'kitchen' | 'calc';
-  defaultWeightUnit: 'g' | 'kg';
-}
+export type { Settings };
 
 /**
  * Exported so `migration.test.ts` can build throwaway databases from the same

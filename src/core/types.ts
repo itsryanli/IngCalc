@@ -36,8 +36,10 @@ export interface Ingredient {
   archived: boolean;
 }
 
-export type Sex = 'male' | 'female';
-export type Goal = 'cut' | 'maintain' | 'bulk';
+export const SEXES = ['male', 'female'] as const;
+export type Sex = (typeof SEXES)[number];
+export const GOALS = ['cut', 'maintain', 'bulk'] as const;
+export type Goal = (typeof GOALS)[number];
 
 export interface Profile {
   id: string;
@@ -179,4 +181,18 @@ export interface CalcStep {
   value: string;
   /** Where the number came from, shown to the user verbatim. */
   sourceNote?: string;
+}
+
+export const LANDING_TABS = ['log', 'kitchen', 'calc'] as const;
+export const WEIGHT_UNITS = ['g', 'kg'] as const;
+
+/**
+ * Lives in `core/` (not beside the Dexie table) because a backup file carries
+ * the settings row, and the backup validator is pure.
+ */
+export interface Settings {
+  id: 'singleton';
+  activeProfileId: string | null;
+  landingTab: (typeof LANDING_TABS)[number];
+  defaultWeightUnit: (typeof WEIGHT_UNITS)[number];
 }
