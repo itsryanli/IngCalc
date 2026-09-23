@@ -126,6 +126,30 @@ const isOptional = (check: (v: unknown) => boolean) => (v: unknown): boolean =>
 const isOneOf = (list: readonly string[]) => (v: unknown): boolean =>
   typeof v === 'string' && list.includes(v);
 
+/**
+ * Composes onto a passing check to add an upper bound, so a hand-edited
+ * backup carrying an absurd-but-finite number (1e308) is rejected too, rather
+ * than surviving every guard and blowing up `summarise` after restore. `v`
+ * may be `undefined` here (an optional field the inner check already let
+ * through), which is left alone rather than failing the `<= max` compare.
+ */
+const bounded = (check: (v: unknown) => boolean, max: number) => (v: unknown): boolean =>
+  check(v) && (typeof v !== 'number' || v <= max);
+
+/** The one weight bound every gram field in a backup shares. */
+export const MAX_BACKUP_GRAMS = 1_000_000;
+const MAX_PRICE_MYR = 1_000_000;
+const MAX_PORTIONS = 1000;
+const MAX_KCAL = 100_000;
+const MAX_PROTEIN_G = 10_000;
+const MAX_NUTRIENT = 100_000;
+const MAX_YIELD_FACTOR = 10;
+const MAX_HEIGHT_CM = 300;
+const MAX_WEIGHT_KG = 1000;
+const MAX_SESSIONS_PER_WEEK = 100;
+const MAX_PROTEIN_G_PER_KG = 10;
+const MAX_TARGET = 1_000_000;
+
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 /** Shape AND calendar: '2026-02-30' has the shape and is not a day. */
@@ -153,20 +177,21 @@ const SPECS: Record<Exclude<TableName, 'mealEntries'>, readonly Spec[]> = {
     ['name', (r) => isName(r.name)],
     ['sex', (r) => isOneOf(SEXES)(r.sex)],
     ['birth year', (r) => Number.isInteger(r.birthYear)],
-    ['height', (r) => isPositive(r.heightCm)],
-    ['weight', (r) => isPositive(r.weightKg)],
-    ['sessions per week', (r) => isNonNegative(r.sessionsPerWeek)],
+    ['height', (r) => bounded(isPositive, MAX_HEIGHT_CM)(r.heightCm)],
+    ['weight', (r) => bounded(isPositive, MAX_WEIGHT_KG)(r.weightKg)],
+    ['sessions per week', (r) => bounded(isNonNegative, MAX_SESSIONS_PER_WEEK)(r.sessionsPerWeek)],
     ['goal', (r) => isOneOf(GOALS)(r.goal)],
-    ['protein target', (r) => isOptional(isPositive)(r.proteinGPerKg)],
+    ['protein target', (r) => bounded(isOptional(isPositive), MAX_PROTEIN_G_PER_KG)(r.proteinGPerKg)],
   ],
   userIngredients: [
     ID,
     ['name', (r) => isName(r.name)],
     ['category', (r) => isOneOf(CATEGORIES)(r.category)],
     ['nutrients', (r) => isRecord(r.per100gRaw)
-      && NUTRIENT_KEYS.every((k) => isNonNegative(sub(r.per100gRaw)[k]))],
+      && NUTRIENT_KEYS.every((k) => bounded(isNonNegative, MAX_NUTRIENT)(sub(r.per100gRaw)[k]))],
     ['published yields', (r) => isRecord(r.publishedYield)
-      && Object.entries(r.publishedYield).every(([k, f]) => isOneOf(COOK_METHODS)(k) && isPositive(f))],
+      && Object.entries(r.publishedYield)
+        .every(([k, f]) => isOneOf(COOK_METHODS)(k) && bounded(isPositive, MAX_YIELD_FACTOR)(f))],
     ['water absorption', (r) => typeof r.absorbsWater === 'boolean'],
     // Built-in ingredients are code, not data: a backup can only carry the user's own.
     ['source', (r) => r.source === 'user'],
@@ -182,8 +207,8 @@ const SPECS: Record<Exclude<TableName, 'mealEntries'>, readonly Spec[]> = {
   batches: [
     ID,
     ['ingredient', (r) => isId(r.ingredientId)],
-    ['weight', (r) => isPositive(r.rawWeightG)],
-    ['price', (r) => isNonNegative(sub(r.purchase).pricePaidMYR)],
+    ['weight', (r) => bounded(isPositive, MAX_BACKUP_GRAMS)(r.rawWeightG)],
+    ['price', (r) => bounded(isNonNegative, MAX_PRICE_MYR)(sub(r.purchase).pricePaidMYR)],
     ['location', (r) => typeof sub(r.purchase).location === 'string'],
     ['date', (r) => isIsoDate(sub(r.purchase).date)],
     CREATED,
@@ -192,10 +217,11 @@ const SPECS: Record<Exclude<TableName, 'mealEntries'>, readonly Spec[]> = {
     ID,
     ['purchase', (r) => isId(r.batchId)],
     ['cooking method', (r) => isOneOf(COOK_METHODS)(r.method)],
-    ['raw weight', (r) => isPositive(r.rawUsedG)],
-    ['cooked weight', (r) => isPositive(r.cookedWeightG)],
+    ['raw weight', (r) => bounded(isPositive, MAX_BACKUP_GRAMS)(r.rawUsedG)],
+    ['cooked weight', (r) => bounded(isPositive, MAX_BACKUP_GRAMS)(r.cookedWeightG)],
     ['date', (r) => isIsoDate(r.cookedAt)],
-    ['portion count', (r) => Number.isInteger(r.portionCount) && (r.portionCount as number) >= 1],
+    ['portion count', (r) => Number.isInteger(r.portionCount)
+      && (r.portionCount as number) >= 1 && (r.portionCount as number) <= MAX_PORTIONS],
     ['calibration flag', (r) => typeof r.excludeFromCalibration === 'boolean'],
   ],
   dayLogs: [
@@ -203,11 +229,12 @@ const SPECS: Record<Exclude<TableName, 'mealEntries'>, readonly Spec[]> = {
     ['profile', (r) => isId(r.profileId)],
     ['date', (r) => isIsoDate(r.date)],
     ['profile-and-date id', (r) => r.id === `${String(r.profileId)}:${String(r.date)}`],
-    ['calorie target', (r) => isNonNegative(sub(r.targets).kcal)],
-    ['protein target', (r) => isNonNegative(sub(r.targets).proteinG)],
+    ['calorie target', (r) => bounded(isNonNegative, MAX_TARGET)(sub(r.targets).kcal)],
+    ['protein target', (r) => bounded(isNonNegative, MAX_TARGET)(sub(r.targets).proteinG)],
     ['nutrient targets', (r) => isRecord(sub(r.targets).micros)
       && Object.values(sub(sub(r.targets).micros)).every((m) => isRecord(m)
-        && isOptional(isNonNegative)(m.rni) && isOptional(isNonNegative)(m.dv))],
+        && bounded(isOptional(isNonNegative), MAX_TARGET)(m.rni)
+        && bounded(isOptional(isNonNegative), MAX_TARGET)(m.dv))],
   ],
 };
 
@@ -220,17 +247,23 @@ const ENTRY_BASE: readonly Spec[] = [
 ];
 
 const ENTRY_KINDS: Record<MealEntry['kind'], readonly Spec[]> = {
-  portion: [['cook', (r) => isId(r.cookSessionId)], ['portion count', (r) => isPositive(r.portions)]],
-  weight: [['cook', (r) => isId(r.cookSessionId)], ['weight', (r) => isPositive(r.grams)]],
+  portion: [
+    ['cook', (r) => isId(r.cookSessionId)],
+    ['portion count', (r) => bounded(isPositive, MAX_PORTIONS)(r.portions)],
+  ],
+  weight: [
+    ['cook', (r) => isId(r.cookSessionId)],
+    ['weight', (r) => bounded(isPositive, MAX_BACKUP_GRAMS)(r.grams)],
+  ],
   ingredient: [
     ['ingredient', (r) => isId(r.ingredientId)],
     ['cooking method', (r) => isOneOf(COOK_METHODS)(r.method)],
-    ['weight', (r) => isPositive(r.cookedG)],
+    ['weight', (r) => bounded(isPositive, MAX_BACKUP_GRAMS)(r.cookedG)],
   ],
   quick: [
     ['name', (r) => isName(r.name)],
-    ['calorie figure', (r) => isPositive(r.kcal)],
-    ['protein figure', (r) => isOptional(isNonNegative)(r.proteinG)],
+    ['calorie figure', (r) => bounded(isPositive, MAX_KCAL)(r.kcal)],
+    ['protein figure', (r) => bounded(isOptional(isNonNegative), MAX_PROTEIN_G)(r.proteinG)],
   ],
 };
 

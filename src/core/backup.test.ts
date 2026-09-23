@@ -167,6 +167,71 @@ describe('parseBackup: each guard rejects each field it checks', () => {
   });
 });
 
+describe('parseBackup: bounds reject absurd-but-finite numbers', () => {
+  // [table, noun, label, patch]. Each pushes exactly one bounded field just past its limit.
+  const cases: [string, string, string, Record<string, unknown>][] = [
+    ['profiles', 'profile', 'height', { heightCm: 301 }],
+    ['profiles', 'profile', 'weight', { weightKg: 1001 }],
+    ['profiles', 'profile', 'sessions per week', { sessionsPerWeek: 101 }],
+    ['profiles', 'profile', 'protein target', { proteinGPerKg: 11 }],
+    ['userIngredients', 'added ingredient', 'nutrients', { per100gRaw: { ...zeroNutrients(), protein: 100_001 } }],
+    ['userIngredients', 'added ingredient', 'published yields', { publishedYield: { steamed: 11 } }],
+    ['batches', 'purchase', 'weight', { rawWeightG: 1_000_001 }],
+    ['batches', 'purchase', 'price', { purchase: { ...purchase, pricePaidMYR: 1e308 } }],
+    ['cookSessions', 'cook', 'raw weight', { rawUsedG: 1_000_001 }],
+    ['cookSessions', 'cook', 'cooked weight', { cookedWeightG: 1_000_001 }],
+    ['cookSessions', 'cook', 'portion count', { portionCount: 1001 }],
+    ['dayLogs', 'day record', 'calorie target', { targets: { ...targets, kcal: 1_000_001 } }],
+    ['dayLogs', 'day record', 'protein target', { targets: { ...targets, proteinG: 1_000_001 } }],
+    ['dayLogs', 'day record', 'nutrient targets', { targets: { ...targets, micros: { iron: { rni: 1_000_001, dv: 18 } } } }],
+  ];
+  it.each(cases)('%s: %s has an invalid %s', (table, noun, label, patch) => {
+    const row = { ...VALID[table as keyof typeof VALID], ...patch };
+    expect(errorsFor(table, row)).toContain(`1 ${noun} has an invalid ${label}.`);
+  });
+
+  const entryCases: [keyof typeof ENTRIES, string, Record<string, unknown>][] = [
+    ['portion', 'portion count', { portions: 1001 }],
+    ['weight', 'weight', { grams: 1_000_001 }],
+    ['ingredient', 'weight', { cookedG: 1_000_001 }],
+    ['quick', 'calorie figure', { kcal: 100_001 }],
+    ['quick', 'protein figure', { proteinG: 10_001 }],
+  ];
+  it.each(entryCases)('a %s meal entry has an invalid %s', (kind, label, patch) => {
+    expect(errorsFor('mealEntries', { ...ENTRIES[kind], ...patch }))
+      .toContain(`1 meal entry has an invalid ${label}.`);
+  });
+
+  it('accepts the exact upper bound of every bounded field', () => {
+    const boundary = {
+      profiles: { ...VALID.profiles, heightCm: 300, weightKg: 1000, sessionsPerWeek: 100, proteinGPerKg: 10 },
+      userIngredients: {
+        ...VALID.userIngredients,
+        per100gRaw: { ...zeroNutrients(), protein: 100_000 },
+        publishedYield: { steamed: 10 },
+      },
+      settings: VALID.settings,
+      batches: { ...VALID.batches, rawWeightG: 1_000_000, purchase: { ...purchase, pricePaidMYR: 1_000_000 } },
+      cookSessions: { ...VALID.cookSessions, rawUsedG: 1_000_000, cookedWeightG: 1_000_000, portionCount: 1000 },
+      dayLogs: {
+        ...VALID.dayLogs,
+        targets: { kcal: 1_000_000, proteinG: 1_000_000, micros: { iron: { rni: 1_000_000, dv: 1_000_000 } } },
+      },
+    };
+    const boundaryEntries = {
+      portion: { ...ENTRIES.portion, portions: 1000 },
+      weight: { ...ENTRIES.weight, grams: 1_000_000 },
+      ingredient: { ...ENTRIES.ingredient, cookedG: 1_000_000 },
+      quick: { ...ENTRIES.quick, kcal: 100_000, proteinG: 10_000 },
+    };
+    const r = parseBackup(envelope({
+      ...Object.fromEntries(Object.entries(boundary).map(([t, row]) => [t, [row]])),
+      mealEntries: Object.values(boundaryEntries).map((e, i) => ({ ...e, id: `e${i}` })),
+    }));
+    expect(r.ok).toBe(true);
+  });
+});
+
 describe('parseBackup: whole-table checks and reporting', () => {
   it('rejects duplicate ids within a table', () => {
     const r = parseBackup(envelope({ profiles: [VALID.profiles, VALID.profiles] }));
