@@ -30,7 +30,7 @@ const existing: Batch = {
 
 const session = (over: Partial<CookSession> = {}): CookSession => ({
   id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(400),
-  cookedWeightG: g(284), cookedRemainingG: g(284), cookedAt: '2026-09-01',
+  cookedWeightG: g(284), cookedAt: '2026-09-01',
   portionCount: 2, excludeFromCalibration: false, ...over,
 });
 

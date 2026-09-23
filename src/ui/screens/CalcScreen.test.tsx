@@ -205,7 +205,7 @@ describe('CalcScreen calibration', () => {
     });
     await db.cookSessions.put({
       id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(1000),
-      cookedWeightG: g(600), cookedRemainingG: g(600), cookedAt: '2026-09-19',
+      cookedWeightG: g(600), cookedAt: '2026-09-19',
       portionCount: 4, excludeFromCalibration: false,
     });
 
@@ -226,7 +226,7 @@ describe('CalcScreen calibration', () => {
     });
     await db.cookSessions.put({
       id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(1000),
-      cookedWeightG: g(600), cookedRemainingG: g(600), cookedAt: '2026-09-19',
+      cookedWeightG: g(600), cookedAt: '2026-09-19',
       portionCount: 4, excludeFromCalibration: true,
     });
 
@@ -238,17 +238,12 @@ describe('CalcScreen calibration', () => {
     });
   });
 
-  it('offers to log the calculated weight as a batch', async () => {
+  it('offers no way to write anything from the calculator', async () => {
     render(<CalcScreen profile={null} today={today} />);
     await selectChicken();
 
-    fireEvent.click(await screen.findByRole('button', { name: /log this as a batch/i }));
-
-    // Prefilled from the calculator, so the user does not retype it.
-    expect(screen.getByLabelText(/^raw weight/i)).toHaveValue(1000);
-    // CalcScreen's own injected `today` must reach the batch form, not the form's
-    // own `new Date()` fallback, so the purchase date stays testable/pinnable.
-    expect(screen.getByLabelText(/^date/i)).toHaveValue('2026-06-15');
+    expect(screen.queryByRole('button', { name: /log this as a batch/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /i bought this/i })).toBeNull();
   });
 
   it('warns when the kitchen could not be read, and falls back to the published factor', async () => {
@@ -261,7 +256,7 @@ describe('CalcScreen calibration', () => {
     });
     await db.cookSessions.put({
       id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(1000),
-      cookedWeightG: g(600), cookedRemainingG: g(600), cookedAt: '2026-09-19',
+      cookedWeightG: g(600), cookedAt: '2026-09-19',
       portionCount: 4, excludeFromCalibration: false,
     });
 
@@ -279,19 +274,6 @@ describe('CalcScreen calibration', () => {
     }
   });
 
-  it('still reaches the add-ingredient form when "add new" is opened from inside the batch form', async () => {
-    render(<CalcScreen profile={null} />);
-    await selectChicken();
-
-    fireEvent.click(await screen.findByRole('button', { name: /log this as a batch/i }));
-    // AddBatchForm renders its own IngredientPicker wired to the same onAddNew handler
-    // as the calculator's — that's the composition this test exercises, not just reads.
-    await openAddIngredient();
-
-    // Without clearing loggingBatch, the batch-form branch keeps winning the ternary
-    // and this never appears: the picker just closes with no visible effect.
-    expect(await screen.findByLabelText(/^name/i)).toBeInTheDocument();
-  });
 });
 
 /* ==========================================================================

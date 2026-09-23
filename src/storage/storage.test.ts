@@ -4,8 +4,11 @@ import { db, isStorageAvailable } from './db';
 import { listProfiles, saveProfile, deleteProfile } from './profiles';
 import { getSettings, saveSettings, setActiveProfile } from './settings';
 import { listUserIngredients, saveUserIngredient, archiveUserIngredient } from './userIngredients';
+import { addEntry, dayLogId } from './meals';
+import { cookedRemainingG } from '../core/batch';
 import { zeroNutrients } from '../core/nutrients';
-import type { Profile, Ingredient } from '../core/types';
+import { g, myr } from '../core/units';
+import type { Batch, CookSession, Profile, Ingredient } from '../core/types';
 
 const profile: Profile = {
   id: 'p1', name: 'Ryan', sex: 'male', birthYear: 1996,
@@ -22,6 +25,10 @@ beforeEach(async () => {
   await db.profiles.clear();
   await db.settings.clear();
   await db.userIngredients.clear();
+  await db.batches.clear();
+  await db.cookSessions.clear();
+  await db.mealEntries.clear();
+  await db.dayLogs.clear();
 });
 
 describe('storage', () => {
@@ -61,8 +68,12 @@ describe('storage', () => {
 
   it('returns default settings when none are stored', async () => {
     expect(await getSettings()).toEqual({
-      id: 'singleton', activeProfileId: null, landingTab: 'today', defaultWeightUnit: 'g',
+      id: 'singleton', activeProfileId: null, landingTab: 'log', defaultWeightUnit: 'g',
     });
+  });
+
+  it('defaults to the Log tab when nothing is stored', async () => {
+    expect((await getSettings()).landingTab).toBe('log');
   });
 
   it('persists settings', async () => {
@@ -108,5 +119,72 @@ describe('storage', () => {
     } finally {
       openSpy.mockRestore();
     }
+  });
+});
+
+describe('deleting a profile', () => {
+  const batch: Batch = {
+    id: 'b1', ingredientId: 'chicken-breast', rawWeightG: g(1000),
+    purchase: { pricePaidMYR: myr(20), location: 'Pasar Chow Kit', date: '2026-09-19' },
+    createdAt: 1_758_240_000_000,
+  };
+  const session: CookSession = {
+    id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(400), cookedWeightG: g(284),
+    cookedAt: '2026-09-19', portionCount: 4, excludeFromCalibration: false,
+  };
+
+  const eatTwoPortions = async (): Promise<void> => {
+    await db.batches.put(batch);
+    await db.cookSessions.put(session);
+    await saveProfile(profile);
+    for (const id of ['m1', 'm2']) {
+      await addEntry(
+        { id, profileId: 'p1', date: '2026-09-19', label: 'lunch', createdAt: 1,
+          kind: 'portion', cookSessionId: 's1', portions: 1 },
+        { id: dayLogId('p1', '2026-09-19'), profileId: 'p1', date: '2026-09-19',
+          targets: { kcal: 2000, proteinG: 150, micros: {} } },
+      );
+    }
+  };
+
+  it('gives the cook its grams back, because a surviving entry would eat them forever', async () => {
+    // An entry outliving its profile is unreachable: loadDay only queries
+    // [profileId+date] for a profile that is gone, so no Log day lists it and
+    // no delete path can reach it — while loadKitchen still feeds it to
+    // cookedRemainingG, which filters on cookSessionId alone.
+    await eatTwoPortions();
+    expect(cookedRemainingG(session, await db.mealEntries.toArray())).toBe(142);
+
+    await deleteProfile('p1');
+
+    expect(cookedRemainingG(session, await db.mealEntries.toArray())).toBe(284);
+  });
+
+  it('takes its entries and day logs, and leaves the kitchen alone', async () => {
+    await eatTwoPortions();
+
+    await deleteProfile('p1');
+
+    expect(await db.mealEntries.toArray()).toEqual([]);
+    expect(await db.dayLogs.toArray()).toEqual([]);
+    // Purchases and cooks belong to the kitchen, not to whoever ate from them.
+    expect(await db.batches.count()).toBe(1);
+    expect(await db.cookSessions.count()).toBe(1);
+  });
+
+  it('leaves another profile\'s entries and day logs untouched', async () => {
+    await eatTwoPortions();
+    await saveProfile({ ...profile, id: 'p2', name: 'Other' });
+    await addEntry(
+      { id: 'm3', profileId: 'p2', date: '2026-09-19', label: 'dinner', createdAt: 2,
+        kind: 'portion', cookSessionId: 's1', portions: 1 },
+      { id: dayLogId('p2', '2026-09-19'), profileId: 'p2', date: '2026-09-19',
+        targets: { kcal: 2000, proteinG: 150, micros: {} } },
+    );
+
+    await deleteProfile('p1');
+
+    expect((await db.mealEntries.toArray()).map((e) => e.id)).toEqual(['m3']);
+    expect((await db.dayLogs.toArray()).map((l) => l.profileId)).toEqual(['p2']);
   });
 });

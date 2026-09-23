@@ -1,10 +1,10 @@
 import Dexie, { type Table } from 'dexie';
-import type { Batch, CookSession, Ingredient, Profile } from '../core/types';
+import type { Batch, CookSession, DayLog, Ingredient, MealEntry, Profile } from '../core/types';
 
 export interface Settings {
   id: 'singleton';
   activeProfileId: string | null;
-  landingTab: 'today' | 'calc';
+  landingTab: 'log' | 'kitchen' | 'calc';
   defaultWeightUnit: 'g' | 'kg';
 }
 
@@ -33,17 +33,36 @@ export const SCHEMA_V2: Record<string, string> = {
   cookSessions: 'id, batchId, cookedAt',
 };
 
+/**
+ * `[profileId+date]` serves the day view, which is the only query the Log screen
+ * makes on load. `cookSessionId` serves the remainder derivation in `core/batch.ts`.
+ *
+ * `quick` and `ingredient` entries carry no `cookSessionId`. Dexie omits rows
+ * whose indexed key is undefined, so they are absent from session queries by
+ * construction rather than by a filter a caller could forget.
+ *
+ * `dayLogs` needs no secondary index: its primary key `${profileId}:${date}` is
+ * the lookup, and being a natural key makes a duplicate row impossible.
+ */
+export const SCHEMA_V3: Record<string, string> = {
+  mealEntries: 'id, [profileId+date], cookSessionId',
+  dayLogs: 'id',
+};
+
 export class IngCalcDB extends Dexie {
   profiles!: Table<Profile, string>;
   userIngredients!: Table<Ingredient, string>;
   settings!: Table<Settings, string>;
   batches!: Table<Batch, string>;
   cookSessions!: Table<CookSession, string>;
+  mealEntries!: Table<MealEntry, string>;
+  dayLogs!: Table<DayLog, string>;
 
   constructor() {
     super('ingcalc');
     this.version(1).stores(SCHEMA_V1);
     this.version(2).stores(SCHEMA_V2);
+    this.version(3).stores(SCHEMA_V3);
   }
 }
 

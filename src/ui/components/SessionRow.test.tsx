@@ -6,7 +6,7 @@ import { db } from '../../storage/db';
 import * as kitchenModule from '../../storage/kitchen';
 import { g, myr } from '../../core/units';
 import { INGREDIENTS } from '../../data/ingredients';
-import type { Batch, CookSession, Ingredient } from '../../core/types';
+import type { Batch, CookSession, Ingredient, MealEntry } from '../../core/types';
 
 const bundled = (id: string): Ingredient => {
   const found = INGREDIENTS.find((i) => i.id === id);
@@ -22,12 +22,24 @@ const batch: Batch = {
 
 const session = (over: Partial<CookSession> = {}): CookSession => ({
   id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(400),
-  cookedWeightG: g(284), cookedRemainingG: g(284), cookedAt: '2026-09-19',
+  cookedWeightG: g(284), cookedAt: '2026-09-19',
   portionCount: 2, excludeFromCalibration: false, ...over,
 });
 
+/** A weighed entry against `s1`: how a partly eaten cook is set up now. */
+const eaten = (grams: number, over: Partial<MealEntry> = {}): MealEntry => ({
+  id: 'm1', profileId: 'p1', date: '2026-09-19', label: 'lunch', createdAt: 1,
+  kind: 'weight', cookSessionId: 's1', grams: g(grams), ...over,
+} as MealEntry);
+
+/** A portion entry against `s1`, for the float-residue case. */
+const atePortions = (portions: number): MealEntry => ({
+  id: 'm1', profileId: 'p1', date: '2026-09-19', label: 'lunch', createdAt: 1,
+  kind: 'portion', cookSessionId: 's1', portions,
+});
+
 const props = {
-  batch, ingredient: bundled('chicken-breast'),
+  batch, ingredient: bundled('chicken-breast'), entries: [] as readonly MealEntry[],
   onChanged: vi.fn(), onEdit: vi.fn(),
 };
 
@@ -58,13 +70,13 @@ describe('SessionRow', () => {
 
   it('flags an unusual cook with its reason', () => {
     // 0.45 against chicken-breast's published 0.71: 37% off, past the 35% band.
-    render(<SessionRow {...props} session={session({ cookedWeightG: g(180), cookedRemainingG: g(180) })} />);
+    render(<SessionRow {...props} session={session({ cookedWeightG: g(180) })} />);
     expect(screen.getByTestId('outlier-flag')).toHaveTextContent('45%');
     expect(screen.getByTestId('outlier-flag')).toHaveTextContent('71%');
   });
 
   it('renders with no throw when the ingredient is unresolvable (archived)', () => {
-    render(<SessionRow {...props} ingredient={null} session={session({ cookedWeightG: g(180), cookedRemainingG: g(180) })} />);
+    render(<SessionRow {...props} ingredient={null} session={session({ cookedWeightG: g(180) })} />);
     expect(screen.queryByTestId('outlier-flag')).toBeNull();
   });
 
@@ -92,12 +104,46 @@ describe('SessionRow', () => {
     });
   });
 
+  // The remaining line moved here from EatControl, which is gone: consumption is
+  // logged in Log now, and Kitchen only reports what the entries leave.
+  it('shows what is left in both grams and portions, derived from the entries', () => {
+    // 284g in 2 portions of 142g; a weighed 136g eaten leaves 148g, about 1.0 portions.
+    render(<SessionRow {...props} entries={[eaten(136)]} session={session()} />);
+    expect(screen.getByTestId('remaining')).toHaveTextContent('148g');
+    expect(screen.getByTestId('remaining')).toHaveTextContent('1.0');
+  });
+
+  it('says a cook is all eaten once the entries account for the whole of it', () => {
+    render(<SessionRow {...props} entries={[eaten(284)]} session={session()} />);
+    expect(screen.getByTestId('remaining')).toHaveTextContent(/all eaten/i);
+  });
+
+  it('says all eaten over the float residue a portion split leaves behind', () => {
+    // 460g over 7 portions: (460/7)*7 overshoots by ~5.7e-14, so a bare `> 0`
+    // rendered "0g left · 0.0 portions" under a card header already reading
+    // "Finished", which uses EPSILON. Same tolerance on both now.
+    render(
+      <SessionRow
+        {...props}
+        entries={[atePortions(7)]}
+        session={session({ cookedWeightG: g(460), portionCount: 7 })}
+      />,
+    );
+    expect(screen.getByTestId('remaining')).toHaveTextContent(/all eaten/i);
+  });
+
   it('asks before deleting a cook, naming what is left of it', () => {
     render(<SessionRow {...props} session={session()} />);
     fireEvent.click(screen.getByRole('button', { name: /^delete/i }));
     // A confirmation question paired with its own buttons, not an assertive
     // announcement — found by its text, leaving role="alert" free for write errors.
     expect(screen.getByText(/delete this cook/i)).toHaveTextContent('284g');
+  });
+
+  it('names the derived remainder, not the cooked weight, when confirming a delete', () => {
+    render(<SessionRow {...props} entries={[eaten(136)]} session={session()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^delete/i }));
+    expect(screen.getByText(/delete this cook/i)).toHaveTextContent('148g');
   });
 
   it('deletes the cook on confirmation', async () => {

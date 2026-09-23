@@ -863,7 +863,7 @@ body {
   color: var(--danger);
 }
 
-.eat__remaining {
+.session__remaining {
   font-weight: 600;
 }
 
@@ -877,4 +877,115 @@ body {
 .yield-badge--categoryDefault {
   font-style: italic;
   color: var(--estimate);
+}
+
+/* ==========================================================================
+   Log
+   ========================================================================== */
+
+/* Day navigation, one row, arrows either side of the day's name. */
+.daynav {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-3);
+}
+
+/* .btn--secondary is width: 100% by default (mobile-first, one button per
+   row); without this override each arrow would claim the full row width and
+   wrap onto its own line, which defeats "one row" above. */
+.daynav__step { flex: none; width: auto; min-width: 3rem; }
+
+.daynav__name {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+}
+
+.daynav__jump { flex-basis: 100%; }
+.daynav__jump label { display: block; font-size: var(--fs-xs); color: var(--text-dim); }
+.daynav__jump input { width: 100%; }
+
+/* Day progress: a figure that tells the truth over a bar that is capped. */
+.day-progress { margin-bottom: var(--sp-4); }
+.progress + .progress { margin-top: var(--sp-3); }
+.progress__line { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); }
+.progress__line--estimate { color: var(--estimate); }
+.progress__pct { color: var(--text-dim); }
+
+.progress__track {
+  height: 0.5rem;
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.progress__bar { height: 100%; background: var(--accent); }
+
+/* One meal, its subtotal and its entries. */
+.meal-group { margin-bottom: var(--sp-4); }
+
+.meal-group__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.meal-group__head h3 { margin: 0; }
+
+.meal-group__subtotal {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+.entry {
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.entry__description { margin: 0 0 var(--sp-2); }
+
+.entry__nutrients {
+  margin: 0 0 var(--sp-2);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+/* The add-entry form's list of cooks with something left. */
+.entry-form__preview {
+  margin: var(--sp-3) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+.available { list-style: none; margin: 0 0 var(--sp-3); padding: 0; }
+.available li + li { margin-top: var(--sp-2); }
+
+.available__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  font: inherit;
+  color: inherit;
+}
+
+.available__item--on { border-color: var(--accent); }
+
+/* `width: auto` overrides the `width: 100%` that .btn--secondary sets; without
+   it "+ Add" stretched to 68% of a 390px viewport beside its heading. It does
+   not disturb button rows: `.btn-row .btn` at >=30rem is more specific.
+   min-height stays — that is the 48px tap target. */
+.btn--small { width: auto; padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); }
+
+.field__hint {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
 }

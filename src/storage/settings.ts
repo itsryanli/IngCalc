@@ -3,7 +3,7 @@ import { db, type Settings } from './db';
 const DEFAULTS: Settings = {
   id: 'singleton',
   activeProfileId: null,
-  landingTab: 'today',
+  landingTab: 'log',
   defaultWeightUnit: 'g',
 };
 

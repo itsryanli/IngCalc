@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ageFrom, explainTargets, bmr, activityMultiplier, tdee, calorieTarget, proteinTargetG, proteinGPerLb, microTargets } from './targets';
+import { ageFrom, explainTargets, bmr, activityMultiplier, tdee, calorieTarget, proteinTargetG, proteinGPerLb, microTargets, snapshotTargets } from './targets';
 import type { Profile } from './types';
 import { rniFor } from '../data/rniMY';
 import { DV_US } from '../data/dvUS';
@@ -85,6 +85,15 @@ describe('targets', () => {
     const t = microTargets(male, TODAY, () => ({ iron: 9 }), {});
     expect(t.iron?.rni).toBe(9);
     expect(t.iron?.dv).toBeUndefined();
+  });
+});
+
+describe('snapshotTargets', () => {
+  it('gathers the three figures a day is measured against', () => {
+    const snap = snapshotTargets(male, TODAY, rniFor, DV_US);
+    expect(snap.kcal).toBeCloseTo(calorieTarget(male, TODAY), 10);
+    expect(snap.proteinG).toBeCloseTo(proteinTargetG(male), 10);
+    expect(snap.micros.iron).toBeDefined();
   });
 });
 

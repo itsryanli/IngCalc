@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { KitchenScreen } from './KitchenScreen';
 import { db } from '../../storage/db';
 import { g, myr } from '../../core/units';
-import type { Batch, CookSession } from '../../core/types';
+import type { Batch, CookSession, MealEntry } from '../../core/types';
 
 const batch = (id: string, over: Partial<Batch> = {}): Batch => ({
   id, ingredientId: 'chicken-breast', rawWeightG: g(1000),
@@ -14,8 +14,18 @@ const batch = (id: string, over: Partial<Batch> = {}): Batch => ({
 
 const session = (id: string, batchId: string, over: Partial<CookSession> = {}): CookSession => ({
   id, batchId, method: 'roasted', rawUsedG: g(1000), cookedWeightG: g(710),
-  cookedRemainingG: g(710), cookedAt: '2026-09-19', portionCount: 4,
+  cookedAt: '2026-09-19', portionCount: 4,
   excludeFromCalibration: false, ...over,
+});
+
+/**
+ * A weighed entry against one cook. A fully eaten cook used to be set up by
+ * storing `cookedRemainingG: g(0)`; the remainder is derived from entries now,
+ * so eating the whole of it is what the setup has to say.
+ */
+const eaten = (id: string, cookSessionId: string, grams: number): MealEntry => ({
+  id, profileId: 'p1', date: '2026-09-19', label: 'lunch', createdAt: 1,
+  kind: 'weight', cookSessionId, grams: g(grams),
 });
 
 // The ingredient control is a typeahead combobox, not a <select>: options activate on
@@ -25,6 +35,7 @@ const press = (el: HTMLElement) => fireEvent.mouseDown(el);
 beforeEach(async () => {
   await db.batches.clear();
   await db.cookSessions.clear();
+  await db.mealEntries.clear();
 });
 
 describe('KitchenScreen', () => {
@@ -41,9 +52,10 @@ describe('KitchenScreen', () => {
     // b4 only partly used, so raw weight remains alongside the cook.
     await db.cookSessions.bulkPut([
       session('s2', 'b2'),
-      session('s3', 'b3', { cookedRemainingG: g(0) }),
-      session('s4', 'b4', { rawUsedG: g(400), cookedWeightG: g(284), cookedRemainingG: g(284) }),
+      session('s3', 'b3'),
+      session('s4', 'b4', { rawUsedG: g(400), cookedWeightG: g(284) }),
     ]);
+    await db.mealEntries.put(eaten('m1', 's3', 710));
 
     render(<KitchenScreen />);
 
@@ -62,7 +74,8 @@ describe('KitchenScreen', () => {
 
   it('reveals finished batches on request', async () => {
     await db.batches.put(batch('b3'));
-    await db.cookSessions.put(session('s3', 'b3', { cookedRemainingG: g(0) }));
+    await db.cookSessions.put(session('s3', 'b3'));
+    await db.mealEntries.put(eaten('m1', 's3', 710));
 
     render(<KitchenScreen />);
     await waitFor(() => {

@@ -4,9 +4,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CookSessionForm } from './CookSessionForm';
 import { db } from '../../storage/db';
 import * as kitchenModule from '../../storage/kitchen';
+import { cookedRemainingG } from '../../core/batch';
 import { g, myr } from '../../core/units';
 import { INGREDIENTS } from '../../data/ingredients';
-import type { Batch, CookSession, Ingredient } from '../../core/types';
+import type { Batch, CookSession, Ingredient, MealEntry } from '../../core/types';
 
 const bundled = (id: string): Ingredient => {
   const found = INGREDIENTS.find((i) => i.id === id);
@@ -22,8 +23,14 @@ const batch: Batch = {
 
 const session = (over: Partial<CookSession> = {}): CookSession => ({
   id: 's1', batchId: 'b1', method: 'roasted', rawUsedG: g(400),
-  cookedWeightG: g(284), cookedRemainingG: g(284), cookedAt: '2026-09-19',
+  cookedWeightG: g(284), cookedAt: '2026-09-19',
   portionCount: 2, excludeFromCalibration: false, ...over,
+});
+
+/** A weighed entry against `s1`: how a partly eaten cook is set up now. */
+const eaten = (grams: number): MealEntry => ({
+  id: `m-${grams}`, profileId: 'p1', date: '2026-09-19', label: 'lunch',
+  createdAt: 1, kind: 'weight', cookSessionId: 's1', grams: g(grams),
 });
 
 const props = {
@@ -31,6 +38,7 @@ const props = {
   ingredient: bundled('chicken-breast'),
   sessions: [] as CookSession[],
   samples: [],
+  entries: [] as readonly MealEntry[],
   today: new Date(2026, 8, 19),
   onSaved: vi.fn(),
   onCancel: vi.fn(),
@@ -65,7 +73,7 @@ describe('CookSessionForm', () => {
     expect(screen.getByTestId('yield-badge')).toHaveTextContent(/your average across 1 cook/i);
   });
 
-  it('saves a session with the cooked weight as the starting remainder', async () => {
+  it('saves a session whose whole cooked weight is still remaining', async () => {
     const onSaved = vi.fn();
     render(<CookSessionForm {...props} onSaved={onSaved} />);
 
@@ -79,7 +87,9 @@ describe('CookSessionForm', () => {
     expect(saved).toHaveLength(1);
     expect(saved[0]!.batchId).toBe('b1');
     expect(saved[0]!.cookedWeightG).toBe(284);
-    expect(saved[0]!.cookedRemainingG).toBe(284);
+    // The remainder is no longer a field: a cook nothing has been eaten out of
+    // derives to its whole cooked weight.
+    expect(cookedRemainingG(saved[0]!, [])).toBe(284);
     expect(saved[0]!.excludeFromCalibration).toBe(false);
   });
 
@@ -120,12 +130,22 @@ describe('CookSessionForm', () => {
     expect(screen.getByLabelText(/portions/i)).toHaveValue(2);
   });
 
-  it('rescales the remainder when an edited cooked weight is corrected', async () => {
-    // 80g logged for what was really 800g, half eaten: the correction must
-    // leave it half remaining, not 40g out of 800g.
-    const wrong = session({ cookedWeightG: g(80), cookedRemainingG: g(40) });
+  it('corrects an under-recorded cooked weight, leaving the eaten grams standing', async () => {
+    // 80g logged for what was really 800g, with a weighed 40g already eaten.
+    // Under the stored remainder this rescaled to preserve the fraction eaten;
+    // entries are fixed events, so what survives the correction is the 40g, and
+    // 760g is left rather than half of 800g.
+    const wrong = session({ cookedWeightG: g(80) });
     const onSaved = vi.fn();
-    render(<CookSessionForm {...props} sessions={[wrong]} session={wrong} onSaved={onSaved} />);
+    render(
+      <CookSessionForm
+        {...props}
+        sessions={[wrong]}
+        session={wrong}
+        entries={[eaten(40)]}
+        onSaved={onSaved}
+      />,
+    );
 
     fireEvent.change(screen.getByLabelText(/cooked weight/i), { target: { value: '800' } });
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
@@ -133,7 +153,28 @@ describe('CookSessionForm', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     const saved = (await db.cookSessions.toArray())[0]!;
     expect(saved.cookedWeightG).toBe(800);
-    expect(saved.cookedRemainingG).toBe(400);
+    expect(cookedRemainingG(saved, [eaten(40)])).toBe(760);
+  });
+
+  it('refuses a corrected cooked weight below what has already been eaten', async () => {
+    // 284g cook, 200g logged as eaten; correcting it to 150g must be refused.
+    const existing = session();
+    const onSaved = vi.fn();
+    render(
+      <CookSessionForm
+        {...props}
+        sessions={[existing]}
+        session={existing}
+        entries={[eaten(200)]}
+        onSaved={onSaved}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/cooked weight/i), { target: { value: '150' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('200g');
+    expect(onSaved).not.toHaveBeenCalled();
   });
 
   it('keeps the same id when editing, so calibration does not double-count', async () => {
@@ -166,10 +207,10 @@ describe('CookSessionForm', () => {
   });
 
   it('keeps a deliberately excluded cook excluded through an edit', async () => {
-    // excludeFromCalibration sits in the same object literal as rescaleCookedRemaining's
-    // call (line 96-98) — exactly where Phase 3's meal work lands. If a refactor there
-    // dropped this flag, a deliberately-excluded bad reading would silently rejoin the
-    // yield average and corrupt every later calculation for this ingredient.
+    // excludeFromCalibration sat in the same object literal as the line Task 6
+    // deleted (rescaleCookedRemaining's call). If that edit had taken one line too
+    // many, a deliberately-excluded bad reading would silently rejoin the yield
+    // average and corrupt every later calculation for this ingredient.
     const excluded = session({ excludeFromCalibration: true });
     const onSaved = vi.fn();
     render(<CookSessionForm {...props} sessions={[excluded]} session={excluded} onSaved={onSaved} />);

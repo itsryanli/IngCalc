@@ -82,6 +82,12 @@ export interface Batch {
  * One cooking event, and simultaneously one yield observation: it records the
  * ingredient (through its batch), the method, the raw weight in and the cooked
  * weight out. That is why Phase 2 needs no separate calibration table.
+ *
+ * There is deliberately no `cookedRemainingG` field. Meal entries are an event
+ * log of consumption, so the remainder is always recoverable from them —
+ * storing it too would be a second source of truth that editing could put out
+ * of step. Phase 2 did store it, correctly, because eating wrote no record
+ * then. See `cookedRemainingG()` in `./batch`.
  */
 export interface CookSession {
   id: string;
@@ -90,15 +96,67 @@ export interface CookSession {
   rawUsedG: Grams;
   /** Measured by the user on a scale, never derived from a yield factor. */
   cookedWeightG: Grams;
-  /**
-   * Authoritative remaining quantity. Stored rather than derived because
-   * eating writes no record until Phase 3 introduces meals.
-   */
-  cookedRemainingG: Grams;
   cookedAt: IsoDate;
   portionCount: number;
   /** The day you forgot to drain it: kept, but excluded from the yield mean. */
   excludeFromCalibration: boolean;
+}
+
+/**
+ * A population-table target for one micronutrient. Lives here rather than in
+ * `targets.ts` because `DayLog` embeds it, and `targets.ts` already imports
+ * from this module — the other direction would be a cycle.
+ */
+export interface MicroTarget {
+  rni?: number;
+  dv?: number;
+}
+
+export const MEAL_LABEL_KEYS = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
+export type MealLabel = (typeof MEAL_LABEL_KEYS)[number];
+
+interface MealEntryBase {
+  id: string;
+  profileId: string;
+  /** Local calendar date. Built with `todayIso`, never `toISOString()`. */
+  date: IsoDate;
+  label: MealLabel;
+  /** Orders entries within a label. */
+  createdAt: number;
+}
+
+/**
+ * The part of an entry a form produces, before it is given an id and a day.
+ * Split out so `EntryDraft` and `MealEntry` cannot drift: `Omit` does not
+ * distribute over a discriminated union, so composing is the only safe way.
+ */
+export type MealEntryFields =
+  | { kind: 'portion'; cookSessionId: string; portions: number }
+  | { kind: 'weight'; cookSessionId: string; grams: Grams }
+  | { kind: 'ingredient'; ingredientId: string; method: CookMethod; cookedG: Grams }
+  /** `name`, not `label` — `label` is already the meal slot on the base. */
+  | { kind: 'quick'; name: string; kcal: number; proteinG?: number };
+
+export type MealEntry = MealEntryBase & MealEntryFields;
+
+export interface DayLogTargets {
+  kcal: number;
+  proteinG: number;
+  micros: Partial<Record<NutrientKey, MicroTarget>>;
+}
+
+/**
+ * The targets frozen at the moment a day's first entry was written.
+ *
+ * Without this, editing a profile's weight silently re-reads the entire
+ * history: last Tuesday's "78% of target" would start meaning something else.
+ */
+export interface DayLog {
+  /** `${profileId}:${date}` — a natural key, so a duplicate row is impossible. */
+  id: string;
+  profileId: string;
+  date: IsoDate;
+  targets: DayLogTargets;
 }
 
 export interface YieldSample {

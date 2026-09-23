@@ -25,3 +25,24 @@ export function formatIsoDate(iso: IsoDate): string {
     day: 'numeric', month: 'short', year: 'numeric',
   });
 }
+
+/**
+ * Day arithmetic through a local `Date`, which handles month, year and leap-day
+ * rollover for free. Building the result with `todayIso` rather than string
+ * surgery keeps it on the same local-calendar footing as every other date in
+ * the app — `toISOString()` here would reintroduce the UTC bug the whole module
+ * exists to avoid.
+ */
+export function shiftIso(iso: IsoDate, days: number): IsoDate {
+  // Asserted rather than checked like formatIsoDate's parse: every caller in
+  // this app only ever feeds shiftIso a value that already round-tripped
+  // through todayIso, so there is no "not a date" case to fall back on here.
+  const [year, month, day] = iso.split('-').map(Number) as [number, number, number];
+  return todayIso(new Date(year, month - 1, day + days));
+}
+
+export const dayName = (iso: IsoDate, today: IsoDate): string => {
+  if (iso === today) return 'Today';
+  if (iso === shiftIso(today, -1)) return 'Yesterday';
+  return formatIsoDate(iso);
+};

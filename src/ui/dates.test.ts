@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatIsoDate, todayIso } from './dates';
+import { dayName, formatIsoDate, shiftIso, todayIso } from './dates';
 
 describe('todayIso', () => {
   it('uses the local calendar date, not UTC', () => {
@@ -28,5 +28,37 @@ describe('formatIsoDate', () => {
 
   it('passes through anything that is not a date', () => {
     expect(formatIsoDate('')).toBe('');
+  });
+});
+
+describe('shiftIso', () => {
+  it('steps back a day', () => {
+    expect(shiftIso('2026-09-19', -1)).toBe('2026-09-18');
+  });
+
+  it('rolls over a month boundary', () => {
+    expect(shiftIso('2026-09-01', -1)).toBe('2026-08-31');
+  });
+
+  it('rolls over a year boundary', () => {
+    expect(shiftIso('2027-01-01', -1)).toBe('2026-12-31');
+  });
+
+  it('handles a leap day', () => {
+    expect(shiftIso('2028-02-28', 1)).toBe('2028-02-29');
+  });
+});
+
+describe('dayName', () => {
+  it('names today', () => {
+    expect(dayName('2026-09-19', '2026-09-19')).toBe('Today');
+  });
+
+  it('names yesterday', () => {
+    expect(dayName('2026-09-18', '2026-09-19')).toBe('Yesterday');
+  });
+
+  it('gives any other day its date', () => {
+    expect(dayName('2026-09-01', '2026-09-19')).toBe(formatIsoDate('2026-09-01'));
   });
 });

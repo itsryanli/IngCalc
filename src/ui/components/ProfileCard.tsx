@@ -56,8 +56,9 @@ export function ProfileCard({ profile, active, today, onSetActive, onEdit, onDel
               plain text, so role="alert" stays free to mean "a write just
               failed" (execution record §3.5). */}
           <p>
-            Delete "{profile.name}"? Nothing else refers to a profile, so this removes
-            only the targets other screens measure food against.
+            Delete "{profile.name}"? Every meal logged for {profile.name} goes with it,
+            along with that day's targets. The kitchen keeps its batches and cooks, and
+            the food those meals used counts as uneaten again.
           </p>
           <div className="btn-row">
             <button type="button" className="btn btn--primary" onClick={() => { void remove(); }}>

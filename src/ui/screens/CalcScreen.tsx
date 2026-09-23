@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { COOK_METHODS, type CookMethod, type Ingredient, type NutrientKey, type Profile } from '../../core/types';
-import { formatG, g, type Grams } from '../../core/units';
+import { g, type Grams } from '../../core/units';
 import { computeCooked, rawFromCooked } from '../../core/nutrition';
 import { perPortion } from '../../core/batch';
 import { compareMethods } from '../../core/methodCompare';
@@ -17,7 +17,6 @@ import { CalcTrace } from '../components/CalcTrace';
 import { NutrientTable } from '../components/NutrientTable';
 import { MethodCompare } from '../components/MethodCompare';
 import { IngredientPicker } from '../components/IngredientPicker';
-import { AddBatchForm } from '../components/AddBatchForm';
 import { PortionSplit } from '../components/PortionSplit';
 import { AddIngredientScreen } from './AddIngredientScreen';
 import { METHOD_LABELS } from '../labels';
@@ -28,9 +27,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
   const { catalogue, refresh } = useCatalogue();
   // The point of Phase 2: resolveYield's `measured` branch has been
   // unreachable since Phase 1 because nothing produced samples.
-  const { sessions, samples, storageError: kitchenError, refresh: refreshKitchen } = useKitchen();
-  const [loggingBatch, setLoggingBatch] = useState(false);
-  const [loggedMessage, setLoggedMessage] = useState<string | null>(null);
+  const { samples, storageError: kitchenError } = useKitchen();
   const [ingredientId, setIngredientId] = useState('');
   /** Whole containers, at least one. `PortionSplit` guarantees both, so dividing by it is safe. */
   const [portionCount, setPortionCount] = useState(1);
@@ -46,10 +43,6 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
   const ingredient = catalogue.find((i) => i.id === ingredientId) ?? null;
 
   const handleAddNew = (typedName: string) => {
-    // The batch form renders its own picker wired to this same handler. Without
-    // clearing loggingBatch, its branch keeps winning the ternary below and the
-    // add-ingredient screen never renders — the affordance silently does nothing.
-    setLoggingBatch(false);
     setAddIngredientError(null);
     setAddInitialName(typedName);
     setAddingIngredient(true);
@@ -126,26 +119,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
     <section className="screen">
       <h2>Calculator</h2>
 
-      {loggingBatch && ingredient !== null ? (
-        <AddBatchForm
-          catalogue={catalogue}
-          sessions={sessions}
-          initialIngredientId={ingredient.id}
-          initialRawWeightG={result?.cooked.rawWeightG}
-          today={today}
-          onSaved={(batch) => {
-            void (async () => {
-              await refreshKitchen();
-              setLoggingBatch(false);
-              setLoggedMessage(
-                `Logged ${formatG(batch.rawWeightG)} of ${ingredient.name.toLowerCase()} to your kitchen.`,
-              );
-            })();
-          }}
-          onCancel={() => setLoggingBatch(false)}
-          onAddNew={handleAddNew}
-        />
-      ) : addingIngredient ? (
+      {addingIngredient ? (
         <AddIngredientScreen
           initialName={addInitialName}
           onSaved={(added) => { void handleIngredientAdded(added); }}
@@ -204,20 +178,6 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
                 cookedWeightG={result.cooked.cookedWeightG}
                 onChange={setPortionCount}
               />
-
-              <div className="btn-row">
-                <button
-                  type="button"
-                  className="btn btn--secondary"
-                  onClick={() => { setLoggedMessage(null); setLoggingBatch(true); }}
-                >
-                  Log this as a batch
-                </button>
-              </div>
-
-              {loggedMessage !== null && (
-                <p className="banner banner--info" role="status">{loggedMessage}</p>
-              )}
 
               <div className="card">
                 <h3 className="card__title">

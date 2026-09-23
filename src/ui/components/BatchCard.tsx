@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { batchState, rawRemainingG, sessionsOf } from '../../core/batch';
+import {
+  batchState, cookedRemainingTotalG, EPSILON, rawRemainingG, sessionsOf,
+} from '../../core/batch';
 import {
   costPerKgCooked, costPerKgRaw, proteinPerMYRRaw, proteinPerMYRRetained,
 } from '../../core/cost';
-import type { Batch, CookSession, Ingredient } from '../../core/types';
-import { formatG, formatMYR, g } from '../../core/units';
+import type { Batch, CookSession, Ingredient, MealEntry } from '../../core/types';
+import { formatG, formatMYR } from '../../core/units';
 import { RETENTION } from '../../data/retentionTable';
 import { deleteBatchCascade } from '../../storage/kitchen';
 import { formatIsoDate } from '../dates';
@@ -21,6 +23,8 @@ interface Props {
   ingredient: Ingredient | null;
   /** Every session in the kitchen; the card filters to its own. */
   sessions: readonly CookSession[];
+  /** Every meal entry in the kitchen; the cooked remainder is derived from them. */
+  entries: readonly MealEntry[];
   onChanged: () => void;
   onCook: (batch: Batch) => void;
   onEditBatch: (batch: Batch) => void;
@@ -28,15 +32,15 @@ interface Props {
 }
 
 export function BatchCard({
-  batch, ingredient, sessions, onChanged, onCook, onEditBatch, onEditSession,
+  batch, ingredient, sessions, entries, onChanged, onCook, onEditBatch, onEditSession,
 }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const mine = sessionsOf(batch.id, sessions);
-  const state = batchState(batch, sessions);
+  const state = batchState(batch, sessions, entries);
   const remaining = rawRemainingG(batch, sessions);
-  const cookedLeft = g(mine.reduce((sum, s) => sum + s.cookedRemainingG, 0));
+  const cookedLeft = cookedRemainingTotalG(batch, sessions, entries);
 
   const perKgRaw = costPerKgRaw(batch);
   const perKgCooked = costPerKgCooked(batch, sessions);
@@ -73,7 +77,10 @@ export function BatchCard({
 
       <p className="batch__remaining" data-testid="batch-remaining">
         {formatG(remaining)} raw left
-        {cookedLeft > 0 && ` · ${formatG(cookedLeft)} cooked left`}
+        {/* EPSILON, not 0: `batchState` calls this batch 'finished' at the same
+            threshold, and a float residue of 1e-14g left over from a portion
+            split used to make the header read 'Finished · 0g cooked left'. */}
+        {cookedLeft > EPSILON && ` · ${formatG(cookedLeft)} cooked left`}
       </p>
 
       <p className="batch__purchase" data-testid="batch-purchase">
@@ -100,6 +107,7 @@ export function BatchCard({
           batch={batch}
           ingredient={ingredient}
           session={mine[0]!}
+          entries={entries}
           onChanged={onChanged}
           onEdit={(s) => onEditSession(batch, s)}
         />
@@ -113,6 +121,7 @@ export function BatchCard({
                 batch={batch}
                 ingredient={ingredient}
                 session={s}
+                entries={entries}
                 onChanged={onChanged}
                 onEdit={(edited) => onEditSession(batch, edited)}
               />

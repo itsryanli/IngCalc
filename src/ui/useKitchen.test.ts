@@ -5,6 +5,7 @@ import { useKitchen } from './useKitchen';
 import { db } from '../storage/db';
 import { saveBatch, saveCookSession } from '../storage/kitchen';
 import * as kitchenModule from '../storage/kitchen';
+import { addEntry, dayLogId } from '../storage/meals';
 import { g, myr } from '../core/units';
 import type { Batch, CookSession } from '../core/types';
 
@@ -16,13 +17,15 @@ const batch = (id: string): Batch => ({
 
 const session = (id: string, batchId: string): CookSession => ({
   id, batchId, method: 'roasted', rawUsedG: g(400), cookedWeightG: g(284),
-  cookedRemainingG: g(284), cookedAt: '2026-09-19', portionCount: 2,
+  cookedAt: '2026-09-19', portionCount: 2,
   excludeFromCalibration: false,
 });
 
 beforeEach(async () => {
   await db.batches.clear();
   await db.cookSessions.clear();
+  await db.mealEntries.clear();
+  await db.dayLogs.clear();
 });
 
 describe('useKitchen', () => {
@@ -36,6 +39,22 @@ describe('useKitchen', () => {
 
     expect(result.current.batches.map((b) => b.id)).toEqual(['b1']);
     expect(result.current.sessions.map((s) => s.id)).toEqual(['s1']);
+  });
+
+  it('loads meal entries on mount', async () => {
+    await saveBatch(batch('b1'));
+    await saveCookSession(session('s1', 'b1'));
+    await addEntry(
+      { id: 'm1', profileId: 'p1', date: '2026-09-19', label: 'lunch', createdAt: 1,
+        kind: 'portion', cookSessionId: 's1', portions: 1 },
+      { id: dayLogId('p1', '2026-09-19'), profileId: 'p1', date: '2026-09-19',
+        targets: { kcal: 2000, proteinG: 150, micros: {} } },
+    );
+
+    const { result } = renderHook(() => useKitchen());
+    await waitFor(() => { expect(result.current.loading).toBe(false); });
+
+    expect(result.current.entries.map((e) => e.id)).toEqual(['m1']);
   });
 
   it('derives yield samples with the ingredient joined on', async () => {
