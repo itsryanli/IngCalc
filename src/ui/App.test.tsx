@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
@@ -10,13 +12,10 @@ import { g, myr } from '../core/units';
 import type { Batch, Profile } from '../core/types';
 
 beforeEach(async () => {
-  await db.profiles.clear();
-  await db.settings.clear();
-  // KitchenScreen (mounted by the tests below) reads these tables, so they
-  // must be cleared too — otherwise a pass or fail here could depend on
-  // whatever some other test file left behind.
-  await db.batches.clear();
-  await db.cookSessions.clear();
+  // Every screen the tests below mount reads its own tables, so they must all
+  // be cleared — otherwise a pass or fail here could depend on whatever some
+  // other test file left behind.
+  await Promise.all(db.tables.map((t) => t.clear()));
   vi.resetModules();
   vi.restoreAllMocks();
 });
@@ -29,10 +28,31 @@ describe('App', () => {
     }
   });
 
-  it('disables the tabs that arrive in later phases', async () => {
+  it('enables every tab now that Costs has arrived', async () => {
     render(<App />);
-    expect(await screen.findByRole('tab', { name: 'Costs' })).toBeDisabled();
-    expect(await screen.findByRole('tab', { name: 'Calc' })).toBeEnabled();
+    for (const name of ['Log', 'Kitchen', 'Calc', 'Costs', 'Profile']) {
+      expect(await screen.findByRole('tab', { name })).toBeEnabled();
+    }
+  });
+
+  it('opens the Costs screen', async () => {
+    render(<App />);
+    await userEvent.setup().click(await screen.findByRole('tab', { name: 'Costs' }));
+    expect(await screen.findByRole('heading', { name: 'Costs' })).toBeInTheDocument();
+  });
+
+  it('shows the restored profile in the header after a replace', async () => {
+    const fixture = readFileSync(join(process.cwd(), 'src/storage/__fixtures__/backup-v3.json'), 'utf8');
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Costs' }));
+    await user.upload(
+      await screen.findByLabelText(/restore from backup/i),
+      new File([fixture], 'backup.json', { type: 'application/json' }),
+    );
+    await user.click(await screen.findByRole('button', { name: 'Replace' }));
+    await user.click(await screen.findByRole('button', { name: 'Erase and restore' }));
+    expect(await screen.findByText('Ali', { selector: '.app__profile' })).toBeInTheDocument();
   });
 
   it('lands on the Log', async () => {
@@ -75,7 +95,7 @@ describe('App', () => {
   it('falls back to the Log when the stored tab is one that does not exist', async () => {
     await saveSettings({
       id: 'singleton', activeProfileId: null,
-      landingTab: 'costs' as never, defaultWeightUnit: 'g',
+      landingTab: 'unknown' as never, defaultWeightUnit: 'g',
     });
     render(<App />);
     expect(await screen.findByRole('tab', { name: /log/i })).toHaveAttribute('aria-selected', 'true');
@@ -94,11 +114,6 @@ describe('App Kitchen tab', () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('tab', { name: /kitchen/i }));
     expect(await screen.findByRole('heading', { name: /^kitchen$/i })).toBeInTheDocument();
-  });
-
-  it('still marks Costs as a future phase', async () => {
-    render(<App />);
-    expect(await screen.findByRole('tab', { name: /costs/i })).toBeDisabled();
   });
 });
 
