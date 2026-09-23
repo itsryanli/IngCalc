@@ -716,6 +716,11 @@ body {
   padding-inline: var(--sp-4);
 }
 
+/* The scrollport's clipping edge and the sticky column's edge must coincide,
+   or scrolled cells show in the padding strip to its left. The bleed margin
+   stays; the inset moves onto the edge cells. */
+.table-scroll--pinned { padding-inline: 0; }
+
 .app table {
   width: 100%;
   border-collapse: collapse;
@@ -1029,8 +1034,16 @@ body {
   background: var(--surface);
 }
 
+/* Separate borders belong to their cell, so the header rule moves with the
+   sticky cell instead of being painted over by it. */
+.purchase-table { border-collapse: separate; border-spacing: 0; }
+.app .purchase-table thead th:first-child,
+.app .purchase-table tbody th[scope='row'] { padding-left: var(--sp-4); }
+.app .purchase-table thead th:last-child,
+.app .purchase-table tbody td:last-child { padding-right: var(--sp-4); }
+
 .purchase-table tbody th[scope='row'] {
-  max-width: 10rem;
+  max-width: calc(10rem + var(--sp-4));
   overflow: hidden;
   text-overflow: ellipsis;
 }

@@ -37,7 +37,7 @@ interface Props {
  */
 export function PurchaseTable({ rows, sort, onSort }: Props) {
   return (
-    <div className="table-scroll">
+    <div className="table-scroll table-scroll--pinned">
       <table className="purchase-table" data-testid="purchase-table">
         <thead>
           <tr>
