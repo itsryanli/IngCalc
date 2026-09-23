@@ -1,6 +1,6 @@
-import { sessionsOf } from './batch';
+import { entrySessionGrams, isSessionEntry, sessionsOf } from './batch';
 import { retentionFor, type RetentionLookup } from './retention';
-import type { Batch, CookSession, Ingredient } from './types';
+import type { Batch, CookSession, Ingredient, MealEntry } from './types';
 import { myr, type MYR } from './units';
 
 /**
@@ -79,4 +79,20 @@ export function proteinPerMYRRetained(
   }, 0);
 
   return proteinG / price;
+}
+
+/**
+ * What one meal cost: the cook's share of the purchase price, times the share
+ * of the cook this entry ate.
+ *
+ * `entrySessionGrams` is the same helper the remainder derivation uses, so a
+ * portion is priced at exactly the grams it removes from the pan. That is what
+ * makes a fully eaten cook's entries sum to the cook's price (tested).
+ */
+export function entryCostMYR(entry: MealEntry, session: CookSession, batch: Batch): MYR | null {
+  if (!isSessionEntry(entry) || entry.cookSessionId !== session.id) return null;
+  if (session.batchId !== batch.id) return null;
+  if (batch.rawWeightG <= 0 || session.cookedWeightG <= 0) return null;
+  const sessionPrice = batch.purchase.pricePaidMYR * (session.rawUsedG / batch.rawWeightG);
+  return myr(sessionPrice * (entrySessionGrams(entry, session) / session.cookedWeightG));
 }
