@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ingredientLookup, inRange, purchaseRows, rangeFileTag, summarise, UNKNOWN_INGREDIENT,
-  type CostRange,
+  DEFAULT_SORT,
+  ingredientLookup, inRange, NO_LOCATION, nextSort, purchaseRows, rangeFileTag, sortRows, summarise,
+  totalsByLocation, totalsByMonth, UNKNOWN_INGREDIENT,
+  type CostRange, type PurchaseRow, type SortKey,
 } from './costs';
 import { zeroNutrients } from './nutrients';
 import type { RetentionLookup } from './retention';
@@ -136,5 +138,116 @@ describe('summarise', () => {
   it('has no protein ratio when nothing was spent', () => {
     expect(summarise([]).proteinPerMYR).toBeNull();
     expect(summarise(purchaseRows([batch('c', { price: 0 })], [], lookup, RETENTION)).proteinPerMYR).toBeNull();
+  });
+});
+
+const row = (id: string, over: Partial<PurchaseRow> = {}): PurchaseRow => ({
+  batchId: id, date: '2026-09-19', ingredient: 'Chicken', location: 'Pasar',
+  rawWeightG: g(1000), priceMYR: myr(20), myrPerKgRaw: myr(20), proteinRawG: 225,
+  proteinPerMYRRaw: 11.25, cookedG: null, myrPerKgCooked: null, proteinPerMYRCooked: null,
+  ...over,
+});
+const ids = (rows: readonly PurchaseRow[]) => rows.map((r) => r.batchId);
+
+describe('nextSort', () => {
+  it('reverses the active column', () => {
+    expect(nextSort({ key: 'priceMYR', dir: 'desc' }, 'priceMYR')).toEqual({ key: 'priceMYR', dir: 'asc' });
+  });
+  it('starts a new number or date column descending and a text column ascending', () => {
+    expect(nextSort(DEFAULT_SORT, 'priceMYR')).toEqual({ key: 'priceMYR', dir: 'desc' });
+    expect(nextSort(DEFAULT_SORT, 'ingredient')).toEqual({ key: 'ingredient', dir: 'asc' });
+    expect(nextSort(DEFAULT_SORT, 'location')).toEqual({ key: 'location', dir: 'asc' });
+  });
+  it('defaults to newest first', () => {
+    expect(DEFAULT_SORT).toEqual({ key: 'date', dir: 'desc' });
+  });
+});
+
+describe('sortRows', () => {
+  const rows = [
+    row('a', { date: '2026-09-02', ingredient: 'banana', location: 'Tesco', priceMYR: myr(5), proteinPerMYRCooked: 3 }),
+    row('b', { date: '2026-09-01', ingredient: 'Apple', location: '', priceMYR: myr(9), proteinPerMYRCooked: null }),
+    row('c', { date: '2026-09-03', ingredient: 'cherry', location: 'aeon', priceMYR: myr(1), proteinPerMYRCooked: 7 }),
+  ];
+
+  const cases: [SortKey, string[], string[]][] = [
+    ['date', ['b', 'a', 'c'], ['c', 'a', 'b']],
+    ['ingredient', ['b', 'a', 'c'], ['c', 'a', 'b']],
+    ['priceMYR', ['c', 'a', 'b'], ['b', 'a', 'c']],
+    // Nulls last in BOTH directions.
+    ['proteinPerMYRCooked', ['a', 'c', 'b'], ['c', 'a', 'b']],
+    // A blank location renders as — and sorts like a null.
+    ['location', ['c', 'a', 'b'], ['a', 'c', 'b']],
+  ];
+  it.each(cases)('sorts by %s both ways', (key, asc, desc) => {
+    expect(ids(sortRows(rows, { key, dir: 'asc' }))).toEqual(asc);
+    expect(ids(sortRows(rows, { key, dir: 'desc' }))).toEqual(desc);
+  });
+
+  it('compares text ignoring case', () => {
+    expect(ids(sortRows([row('x', { ingredient: 'b' }), row('y', { ingredient: 'A' })], { key: 'ingredient', dir: 'asc' })))
+      .toEqual(['y', 'x']);
+  });
+
+  it('keeps ties in their incoming order, in either direction', () => {
+    const tied = [row('1'), row('2'), row('3')];
+    expect(ids(sortRows(tied, { key: 'date', dir: 'asc' }))).toEqual(['1', '2', '3']);
+    expect(ids(sortRows(tied, { key: 'date', dir: 'desc' }))).toEqual(['1', '2', '3']);
+  });
+
+  it('does not mutate its input', () => {
+    const input = [row('a', { priceMYR: myr(1) }), row('b', { priceMYR: myr(2) })];
+    sortRows(input, { key: 'priceMYR', dir: 'desc' });
+    expect(ids(input)).toEqual(['a', 'b']);
+  });
+});
+
+describe('totalsByLocation', () => {
+  it('folds case and whitespace, labels with the most recent spelling, and ranks by spend', () => {
+    const totals = totalsByLocation([
+      row('1', { location: 'tesco ', date: '2026-09-01', priceMYR: myr(10) }),
+      row('2', { location: 'Tesco', date: '2026-09-05', priceMYR: myr(5) }),
+      row('3', { location: 'Pasar', date: '2026-09-02', priceMYR: myr(30) }),
+    ]);
+    expect(totals).toEqual([
+      { key: 'pasar', label: 'Pasar', count: 1, spentMYR: 30, share: 30 / 45 },
+      { key: 'tesco', label: 'Tesco', count: 2, spentMYR: 15, share: 15 / 45 },
+    ]);
+  });
+
+  it('breaks a same-date spelling tie in favour of the row seen first', () => {
+    const [t] = totalsByLocation([
+      row('1', { location: 'AEON', date: '2026-09-05' }),
+      row('2', { location: 'aeon', date: '2026-09-05' }),
+    ]);
+    expect(t!.label).toBe('AEON');
+  });
+
+  it('groups blank locations under No location', () => {
+    const [t] = totalsByLocation([row('1', { location: '' }), row('2', { location: '   ' })]);
+    expect(t).toMatchObject({ label: NO_LOCATION, count: 2 });
+  });
+
+  it('gives every share as zero when nothing was spent', () => {
+    expect(totalsByLocation([row('1', { priceMYR: myr(0) })])[0]!.share).toBe(0);
+  });
+
+  it('orders equal spends by label', () => {
+    const totals = totalsByLocation([row('1', { location: 'Zed' }), row('2', { location: 'Abe' })]);
+    expect(totals.map((t) => t.label)).toEqual(['Abe', 'Zed']);
+  });
+});
+
+describe('totalsByMonth', () => {
+  it('groups by month, newest first, with readable labels', () => {
+    const totals = totalsByMonth([
+      row('1', { date: '2026-08-30', priceMYR: myr(4) }),
+      row('2', { date: '2026-09-01', priceMYR: myr(6) }),
+      row('3', { date: '2026-09-20', priceMYR: myr(10) }),
+    ]);
+    expect(totals.map(({ key, label, count, spentMYR }) => ({ key, label, count, spentMYR }))).toEqual([
+      { key: '2026-09', label: 'Sep 2026', count: 2, spentMYR: 16 },
+      { key: '2026-08', label: 'Aug 2026', count: 1, spentMYR: 4 },
+    ]);
   });
 });
