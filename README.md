@@ -31,7 +31,9 @@ the app says so.
 
 ## Getting started
 
-You need [Node.js](https://nodejs.org/) **22.12 or newer** (see `.nvmrc`).
+You need [Node.js](https://nodejs.org/) **22.12 or newer** (see `.nvmrc`; with nvm,
+run `nvm install && nvm use`). On older Node versions the build tools fail with
+"Cannot find native binding".
 
 ```bash
 git clone https://github.com/itsryanli/IngCalc.git
