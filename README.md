@@ -67,9 +67,56 @@ npm install
 npm run dev
 ```
 
-Then open the URL Vite prints (usually http://localhost:5173). To try it on your
-phone, run `npm run dev -- --host` and open the network URL from a phone on the
-same Wi-Fi.
+Then open the URL Vite prints (usually http://localhost:5173).
+
+## Using it on your phone
+
+IngCalc is meant for your phone. There are two ways to get it there.
+
+### Quick test over Wi-Fi
+
+```bash
+npm run dev -- --host
+```
+
+Open the "Network" address Vite prints (like `http://192.168.x.x:5173`) in your
+phone's browser while the phone is on the same Wi-Fi as your computer.
+
+This only works while your computer is running that command. Phones only allow
+installing a web app and using it offline over HTTPS, and this address is plain
+HTTP. It's good for a quick look, not for use at the market.
+
+### Host it and install it (recommended)
+
+The app is a static site with no server, so you can host it for free. Your data
+still stays on your phone, because the app only saves to the phone's browser storage.
+
+1. **Deploy it.** Fork or clone this repo, then connect it to a free static host
+   such as [Netlify](https://www.netlify.com/), [Vercel](https://vercel.com/) or
+   [Cloudflare Pages](https://pages.cloudflare.com/). Use these settings:
+   - Build command: `npm run build`
+   - Output directory: `dist`
+   - Node version: 22.12 or newer (most hosts pick this up from `.nvmrc` or `package.json`)
+
+   You get an HTTPS link, and the site rebuilds whenever you push to the connected
+   branch.
+2. **Open that link on your phone and install it:**
+   - **iPhone (Safari):** Share button → **Add to Home Screen**
+   - **Android (Chrome):** ⋮ menu → **Install app** (or **Add to Home screen**)
+3. **Open it from the home-screen icon.** After the first load it works offline.
+
+> **GitHub Pages** also works, but serves the site from `/IngCalc/` rather than
+> the root. Set `base: '/IngCalc/'` in `vite.config.ts` and the manifest's
+> `start_url` to `/IngCalc/` before deploying there.
+
+### Keeping your data safe
+
+- Data is saved per site address. If you move to a different link, the app starts
+  empty there. In the **Costs** tab, tap **Download backup (JSON)** on the old
+  link, then **Restore from backup…** on the new one.
+- On iPhone, Safari can clear stored data for sites you haven't opened in a few
+  weeks. Installing the app to the home screen avoids this, and a JSON backup now
+  and then is a good safety net.
 
 ## Scripts
 
@@ -82,8 +129,8 @@ same Wi-Fi.
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run lint` | Lint with oxlint |
 
-`dist/` is a plain static site, so you can host it anywhere that serves files
-(GitHub Pages, Netlify, Vercel, etc.).
+`dist/` is a plain static site, so you can host it anywhere that serves files.
+See [Using it on your phone](#using-it-on-your-phone).
 
 ## Tech stack, and why
 
