@@ -6,7 +6,7 @@ protein targets, and what it cost per gram of protein.
 
 ## Why I built this
 
-I was tired of searching for every single ingredient, one at a time, whenever I
+IngCalc is actually short form for "Ingredients Calculator" (I know its kinda lame, I just couldn't come up with a better name). I was tired of searching for every single ingredient, one at a time, whenever I
 wanted to know its nutritional value. Whether I was standing at the market deciding
 what to buy or back home with a bag of groceries, it was the same routine: look up
 chicken breast, then bayam, then tofu, and so on, piecing together numbers from
