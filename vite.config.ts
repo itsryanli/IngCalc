@@ -3,7 +3,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// GitHub Pages serves the site from /<repo>/ rather than the root, so the deploy
+// workflow sets BASE_PATH. Other hosts serve from the root and leave it unset.
+const base = process.env.BASE_PATH ?? '/';
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     VitePWA({
@@ -15,7 +20,8 @@ export default defineConfig({
         theme_color: '#1f2933',
         background_color: '#ffffff',
         display: 'standalone',
-        start_url: '/',
+        start_url: base,
+        scope: base,
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },

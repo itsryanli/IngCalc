@@ -105,9 +105,11 @@ still stays on your phone, because the app only saves to the phone's browser sto
    - **Android (Chrome):** ⋮ menu → **Install app** (or **Add to Home screen**)
 3. **Open it from the home-screen icon.** After the first load it works offline.
 
-> **GitHub Pages** also works, but serves the site from `/IngCalc/` rather than
-> the root. Set `base: '/IngCalc/'` in `vite.config.ts` and the manifest's
-> `start_url` to `/IngCalc/` before deploying there.
+> **GitHub Pages** also works. The included workflow
+> (`.github/workflows/deploy.yml`) builds the app and publishes it on every push
+> to `main`. In the repo's **Settings → Pages**, set **Source** to
+> **GitHub Actions**. Don't use "Deploy from a branch": that publishes the
+> unbuilt source code, which shows as a blank white page.
 
 ### Keeping your data safe
 
