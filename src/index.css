@@ -292,6 +292,18 @@ body {
   font-size: var(--fs-base);
 }
 
+/* iOS Safari gives a native date input an intrinsic width that ignores
+   width: 100%, so every date field (Jump to a date, Date cooked, the purchase
+   date) ran past the right edge of the screen. Dropping the native appearance
+   lets it size like every other input; tapping it still opens the picker. */
+.app input[type='date'] {
+  display: block;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.app input[type='date']::-webkit-date-and-time-value { text-align: left; }
+
 .app select {
   /* Room for the native chevron. */
   padding-right: var(--sp-6);
@@ -924,17 +936,6 @@ body {
 .daynav__jump { flex-basis: 100%; min-width: 0; }
 .daynav__jump label { display: block; font-size: var(--fs-xs); color: var(--text-dim); }
 
-/* iOS Safari gives a native date input an intrinsic width that ignores
-   width: 100%, so it ran past the right edge of the screen. Dropping the
-   native appearance lets it size like every other input. */
-.daynav__jump input {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  -webkit-appearance: none;
-  appearance: none;
-}
-.daynav__jump input::-webkit-date-and-time-value { text-align: left; }
 
 /* Day progress: a figure that tells the truth over a bar that is capped. */
 .day-progress { margin-bottom: var(--sp-4); }
