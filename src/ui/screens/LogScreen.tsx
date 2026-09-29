@@ -115,7 +115,7 @@ export function LogScreen({ profile, today = new Date() }: { profile: Profile | 
         proteinExact={totals.unknownProteinEntries === 0}
       />
 
-      <div className="btn-row">
+      <div className="btn-row log__add">
         <button
           type="button"
           className="btn btn--primary"

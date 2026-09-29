@@ -3,6 +3,11 @@ import type { MealEntry, MealLabel } from '../../core/types';
 import { MEAL_LABELS } from '../labels';
 import { EntryRow } from './EntryRow';
 
+/** A glanceable marker per meal, so the four sections are told apart by shape, not just by reading. */
+const MEAL_ICONS: Record<MealLabel, string> = {
+  breakfast: '🌅', lunch: '☀️', dinner: '🌙', snack: '🍎',
+};
+
 interface Props {
   label: MealLabel;
   entries: readonly MealEntry[];
@@ -18,9 +23,18 @@ export function MealGroup({ label, entries, ctx, onAdd, onEdit, onChanged }: Pro
   const subtotal = entries.length === 0 ? null : dayTotals(entries, ctx).totals;
 
   return (
-    <section className="meal-group">
+    <section className="card meal-group" aria-labelledby={`meal-${label}`}>
       <div className="meal-group__head">
-        <h3>{MEAL_LABELS[label]}</h3>
+        <span className="meal-group__icon" aria-hidden="true">{MEAL_ICONS[label]}</span>
+        <div className="meal-group__title">
+          <h3 id={`meal-${label}`}>{MEAL_LABELS[label]}</h3>
+          {subtotal !== null && (
+            <p className="meal-group__subtotal" data-testid={`group-subtotal-${label}`}>
+              {Math.round(subtotal.kcal).toLocaleString('en-MY')} kcal ·{' '}
+              {Math.round(subtotal.protein)}g protein
+            </p>
+          )}
+        </div>
         {/* "+ Add" visibly, per spec section 6's mockup: the full phrase is what
             forced this button to 264px beside its own heading, and LogScreen
             already offers a full-width "Add something". The aria-label keeps
@@ -36,12 +50,7 @@ export function MealGroup({ label, entries, ctx, onAdd, onEdit, onChanged }: Pro
         </button>
       </div>
 
-      {subtotal !== null && (
-        <p className="meal-group__subtotal" data-testid={`group-subtotal-${label}`}>
-          {Math.round(subtotal.kcal).toLocaleString('en-MY')} kcal ·{' '}
-          {Math.round(subtotal.protein)}g protein
-        </p>
-      )}
+      {entries.length === 0 && <p className="meal-group__empty">Nothing logged yet</p>}
 
       {entries.map((entry) => (
         <EntryRow key={entry.id} entry={entry} ctx={ctx} onEdit={onEdit} onDeleted={onChanged} />

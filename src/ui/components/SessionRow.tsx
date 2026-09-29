@@ -60,6 +60,7 @@ export function SessionRow({ batch, ingredient, session, entries, onChanged, onE
 
   return (
     <div className="session">
+      <p className="session__heading">Cook</p>
       <p className="session__summary" data-testid="session-summary">
         {METHOD_LABELS[session.method]} · {formatG(session.rawUsedG)} raw →{' '}
         {formatG(session.cookedWeightG)} cooked · {session.portionCount} portions ·{' '}
@@ -122,14 +123,14 @@ export function SessionRow({ batch, ingredient, session, entries, onChanged, onE
       ) : (
         <div className="btn-row">
           <button type="button" className="btn btn--secondary" onClick={() => onEdit(session)}>
-            Edit
+            Edit cook
           </button>
           <button
             type="button"
             className="btn btn--secondary"
             onClick={() => { setError(null); setConfirming(true); }}
           >
-            Delete
+            Delete cook
           </button>
         </div>
       )}

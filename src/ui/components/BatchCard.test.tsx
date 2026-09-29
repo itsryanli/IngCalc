@@ -90,13 +90,13 @@ describe('BatchCard', () => {
   it('offers to cook while raw weight is left', () => {
     const onCook = vi.fn();
     render(<BatchCard {...props} batch={batch()} sessions={[]} onCook={onCook} />);
-    fireEvent.click(screen.getByRole('button', { name: /cook/i }));
+    fireEvent.click(screen.getByRole('button', { name: /cook some/i }));
     expect(onCook).toHaveBeenCalledWith(expect.objectContaining({ id: 'b1' }));
   });
 
   it('stops offering to cook once the batch is used up', () => {
     render(<BatchCard {...props} batch={batch()} sessions={[session('s1', { rawUsedG: g(1000) })]} />);
-    expect(screen.queryByRole('button', { name: /cook/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /cook some/i })).toBeNull();
   });
 
   it('derives the cooked-left figure from the meal entries', () => {

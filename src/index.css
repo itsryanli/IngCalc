@@ -243,14 +243,21 @@ body {
 
 .btn-row {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: var(--sp-3);
   margin-top: var(--sp-5);
 }
 
+/* On a phone the primary action takes its own full-width row, and the
+   secondary actions below it split one row evenly instead of stacking —
+   "Edit" and "Delete" each at full width made every card twice as tall. */
+.btn-row .btn { flex: 1 1 0; min-width: 0; padding-inline: var(--sp-3); }
+.btn-row .btn--primary { flex-basis: 100%; }
+
 @media (min-width: 30rem) {
-  .btn-row { flex-direction: row-reverse; }
-  .btn-row .btn { width: auto; flex: 1; }
+  .btn-row { flex-direction: row-reverse; flex-wrap: nowrap; }
+  .btn-row .btn,
+  .btn-row .btn--primary { width: auto; flex: 1 1 0; }
 }
 
 /* ==========================================================================
@@ -651,7 +658,8 @@ body {
 .result__unit { font-size: 0.45em; font-weight: 550; color: var(--text-dim); margin-left: 0.2em; }
 
 .share {
-  margin: var(--sp-3) 0 0;
+  /* Sits between two cards, so it takes the cards' own bottom margin. */
+  margin: 0 0 var(--sp-4);
   padding: var(--sp-3);
   background: var(--accent-soft);
   color: var(--accent);
@@ -835,10 +843,27 @@ body {
   margin: 0;
 }
 
+/* A cook sits inset inside its batch card, so its own Edit/Delete read as
+   belonging to the cook and not to the purchase around it. */
 .session {
-  padding-block: var(--sp-3);
-  border-top: 1px solid var(--border);
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--surface-sunken);
+  border-radius: var(--radius);
 }
+
+.session__heading {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.session .btn-row { margin-top: var(--sp-3); }
+
+.batch__sessions li + li { margin-top: var(--sp-3); }
 
 /* Advisory, not an error: a deviation flag must read as "worth a look", never
    as a failure, because the cook it describes is kept either way. */
@@ -896,9 +921,20 @@ body {
   font-weight: 600;
 }
 
-.daynav__jump { flex-basis: 100%; }
+.daynav__jump { flex-basis: 100%; min-width: 0; }
 .daynav__jump label { display: block; font-size: var(--fs-xs); color: var(--text-dim); }
-.daynav__jump input { width: 100%; }
+
+/* iOS Safari gives a native date input an intrinsic width that ignores
+   width: 100%, so it ran past the right edge of the screen. Dropping the
+   native appearance lets it size like every other input. */
+.daynav__jump input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.daynav__jump input::-webkit-date-and-time-value { text-align: left; }
 
 /* Day progress: a figure that tells the truth over a bar that is capped. */
 .day-progress { margin-bottom: var(--sp-4); }
@@ -916,28 +952,59 @@ body {
 
 .progress__bar { height: 100%; background: var(--accent); }
 
-/* One meal, its subtotal and its entries. */
-.meal-group { margin-bottom: var(--sp-4); }
+/* The "Add something" row, spaced from Breakfast the same as each meal
+   card is spaced from the next. */
+.log__add { margin-bottom: var(--sp-4); }
 
+/* One meal, its subtotal and its entries — a card each, with an icon, so the
+   four meals read as separate sections at a glance. */
 .meal-group__head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-2);
+  align-items: center;
+  gap: var(--sp-3);
 }
 
-.meal-group__head h3 { margin: 0; }
+.meal-group__icon {
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.meal-group__title { flex: 1; min-width: 0; }
+
+.meal-group__title h3 {
+  margin: 0;
+  font-size: var(--fs-btn);
+  font-weight: 650;
+  line-height: 1.25;
+}
 
 .meal-group__subtotal {
-  margin: var(--sp-2) 0 0;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+.meal-group__empty {
+  margin: var(--sp-3) 0 0;
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
 
 .entry {
   padding: var(--sp-3) 0;
-  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
 }
+
+.entry:first-of-type { margin-top: var(--sp-3); }
+
+.entry .btn-row { margin-top: var(--sp-3); }
 
 .entry__description { margin: 0 0 var(--sp-2); }
 
