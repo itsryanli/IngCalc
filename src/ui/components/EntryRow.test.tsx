@@ -52,8 +52,8 @@ describe('EntryRow', () => {
 
   it('describes the entry and what it was worth', () => {
     render(<EntryRow entry={portionEntry} ctx={ctx} onEdit={() => {}} onDeleted={() => {}} />);
-    expect(screen.getByTestId('entry-description'))
-      .toHaveTextContent('Chicken breast, roasted — 1 portion');
+    expect(screen.getByTestId('entry-description')).toHaveTextContent('Chicken breast');
+    expect(screen.getByTestId('entry-detail')).toHaveTextContent('Roasted · 1 portion');
     expect(screen.getByTestId('entry-nutrients')).toHaveTextContent('22g');
   });
 

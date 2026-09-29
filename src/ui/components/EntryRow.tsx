@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { MealEntry } from '../../core/types';
 import { entryNutrients, type MealContext } from '../../core/meals';
 import { deleteEntry } from '../../storage/meals';
-import { describeEntry } from '../labels';
+import { entryLabel } from '../labels';
 
 interface Props {
   entry: MealEntry;
@@ -16,6 +16,7 @@ export function EntryRow({ entry, ctx, onEdit, onDeleted }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const n = entryNutrients(entry, ctx);
+  const item = entryLabel(entry, ctx);
 
   const remove = async () => {
     try {
@@ -33,9 +34,8 @@ export function EntryRow({ entry, ctx, onEdit, onDeleted }: Props) {
 
   return (
     <div className="entry">
-      <p className="entry__description" data-testid="entry-description">
-        {describeEntry(entry, ctx)}
-      </p>
+      <p className="item-name" data-testid="entry-description">{item.name}</p>
+      <p className="item-detail" data-testid="entry-detail">{item.detail}</p>
       <p className="entry__nutrients" data-testid="entry-nutrients">
         {Math.round(n.kcal).toLocaleString('en-MY')} kcal · {Math.round(n.protein)}g protein
       </p>

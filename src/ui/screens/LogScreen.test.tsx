@@ -95,7 +95,7 @@ describe('LogScreen', () => {
     await seedQuickEntry({ date: '2026-09-19', kcal: 500, proteinG: 30 });
     render(<LogScreen profile={profile} today={new Date(2026, 8, 19)} />);
 
-    expect(await screen.findByTestId('entry-description')).toHaveTextContent('(quick)');
+    expect(await screen.findByTestId('entry-detail')).toHaveTextContent('Quick add');
     expect(screen.getByTestId('kcal-progress')).toHaveTextContent('500');
   });
 

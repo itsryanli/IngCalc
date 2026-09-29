@@ -5,7 +5,7 @@ import { COOK_METHODS, type CookMethod, type DayLogTargets, type Ingredient,
   type IsoDate, type MealEntry, type MealEntryFields, type MealLabel } from '../../core/types';
 import { g, type Grams } from '../../core/units';
 import { addEntry, dayLogId, updateEntry } from '../../storage/meals';
-import { describeAvailable, METHOD_LABELS } from '../labels';
+import { availableLabel, METHOD_LABELS } from '../labels';
 import { newId } from '../newId';
 import { IngredientPicker } from './IngredientPicker';
 import { WeightInput, type WeightUnit } from './WeightInput';
@@ -196,19 +196,23 @@ export function AddEntryForm({
             </p>
           ) : (
             <ul className="available">
-              {available.map(({ session, left }) => (
-                <li key={session.id}>
-                  <button
-                    type="button"
-                    data-testid={`available-${session.id}`}
-                    className={`available__item${sessionId === session.id ? ' available__item--on' : ''}`}
-                    aria-pressed={sessionId === session.id}
-                    onClick={() => setSessionId(session.id)}
-                  >
-                    {describeAvailable(session, left, others, ctx)}
-                  </button>
-                </li>
-              ))}
+              {available.map(({ session, left }) => {
+                const item = availableLabel(session, left, others, ctx);
+                return (
+                  <li key={session.id}>
+                    <button
+                      type="button"
+                      data-testid={`available-${session.id}`}
+                      className={`available__item${sessionId === session.id ? ' available__item--on' : ''}`}
+                      aria-pressed={sessionId === session.id}
+                      onClick={() => setSessionId(session.id)}
+                    >
+                      <span className="item-name">{item.name}</span>
+                      <span className="item-detail">{item.detail}</span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
 

@@ -69,7 +69,7 @@ export function BatchCard({
 
   return (
     <article className="card batch">
-      <h3 className="card__title" data-testid="batch-name">
+      <h3 className="batch__name" data-testid="batch-name">
         {ingredient?.name ?? 'This ingredient is no longer in your list'}
       </h3>
 

@@ -820,11 +820,19 @@ body {
   margin-block: var(--sp-4);
 }
 
-.kitchen__group h3 {
+.kitchen__group > h3 {
   font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-dim);
+}
+
+.batch__name {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
 }
 
 .batch__state {
@@ -1007,7 +1015,24 @@ body {
 
 .entry .btn-row { margin-top: var(--sp-3); }
 
-.entry__description { margin: 0 0 var(--sp-2); }
+/* An item's name is what you scan for, so it reads as the strongest line;
+   how it was cooked and how much sit on a quieter line under it. */
+.item-name {
+  display: block;
+  margin: 0;
+  font-weight: 650;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.item-detail {
+  display: block;
+  margin: var(--sp-1) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+
+.entry .item-detail { margin-bottom: var(--sp-1); }
 
 .entry__nutrients {
   margin: 0 0 var(--sp-2);

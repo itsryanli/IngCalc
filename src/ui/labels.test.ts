@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { describeEntry, entryItemName } from './labels';
+import { entryItemName, entryLabel } from './labels';
 import type { Batch, CookSession, Ingredient, MealEntry } from '../core/types';
 import type { MealContext } from '../core/meals';
 import { g } from '../core/units';
@@ -68,7 +68,7 @@ describe('entryItemName', () => {
     expect(entryItemName(entry(over), ctx)).toBe(expected);
   });
 
-  it('is always the start of the Log description, so the two cannot disagree', () => {
+  it('names items as the Log does, so the CSV and the Log cannot disagree', () => {
     const kinds: Partial<MealEntry>[] = [
       { kind: 'quick', name: 'Teh tarik', kcal: 180 },
       { kind: 'ingredient', ingredientId: 'chicken', method: 'roasted', cookedG: g(142) },
@@ -77,39 +77,39 @@ describe('entryItemName', () => {
     ];
     for (const over of kinds) {
       const e = entry(over);
-      expect(describeEntry(e, ctx).startsWith(entryItemName(e, ctx))).toBe(true);
+      expect(entryItemName(e, ctx).startsWith(entryLabel(e, ctx).name)).toBe(true);
     }
   });
 });
 
-describe('describeEntry', () => {
+describe('entryLabel', () => {
   it('describes a quick entry by its name, marked as quick', () => {
     const e = entry({ kind: 'quick', name: 'Teh tarik', kcal: 180, proteinG: 4 });
-    expect(describeEntry(e, ctx)).toBe('Teh tarik (quick)');
+    expect(entryLabel(e, ctx)).toEqual({ name: 'Teh tarik', detail: 'Quick add' });
   });
 
-  it('describes an ingredient entry by name, lowercased method and cooked grams', () => {
+  it('puts an ingredient entry\'s method and cooked grams under its name', () => {
     const e = entry({ kind: 'ingredient', ingredientId: 'chicken', method: 'roasted', cookedG: g(142) });
-    expect(describeEntry(e, ctx)).toBe('Chicken breast, roasted — 142g');
+    expect(entryLabel(e, ctx)).toEqual({ name: 'Chicken breast', detail: 'Roasted · 142g' });
   });
 
   it('describes a weighed entry by the ingredient resolved through the session\'s batch', () => {
     const e = entry({ kind: 'weight', cookSessionId: 's1', grams: g(142) });
-    expect(describeEntry(e, ctx)).toBe('Chicken breast, roasted — 142g');
+    expect(entryLabel(e, ctx)).toEqual({ name: 'Chicken breast', detail: 'Roasted · 142g' });
   });
 
   it('pluralises a portion entry\'s amount', () => {
     const e = entry({ kind: 'portion', cookSessionId: 's1', portions: 2 });
-    expect(describeEntry(e, ctx)).toBe('Chicken breast, roasted — 2 portions');
+    expect(entryLabel(e, ctx).detail).toBe('Roasted · 2 portions');
   });
 
   it('falls back when the entry\'s cook session no longer exists', () => {
     const e = entry({ kind: 'portion', cookSessionId: 'gone', portions: 1 });
-    expect(describeEntry(e, ctx)).toBe('A cook that is no longer in your kitchen');
+    expect(entryLabel(e, ctx)).toEqual({ name: 'A cook that is no longer in your kitchen', detail: '1 portion' });
   });
 
   it('names an unresolvable ingredient when the batch resolves but the ingredient does not', () => {
     const e = entry({ kind: 'weight', cookSessionId: 's2', grams: g(50) });
-    expect(describeEntry(e, ctx)).toBe('Unknown ingredient, boiled — 50g');
+    expect(entryLabel(e, ctx)).toEqual({ name: 'Unknown ingredient', detail: 'Boiled · 50g' });
   });
 });
