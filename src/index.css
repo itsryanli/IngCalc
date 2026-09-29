@@ -1015,14 +1015,37 @@ body {
   font-size: var(--fs-sm);
 }
 
+/* The add-entry form: one even gap between every block, whichever source is
+   chosen. Before, the switchers had no margin at all and sat flush against
+   whatever followed, while fields carried their own bottom margin. */
+.entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.entry-form > *,
+.entry-form > .btn-row { margin-block: 0; }
+
+/* The two switchers split their width evenly, so no option looks more
+   important than the others just because its label is longer. */
+.entry-form > .seg .seg__btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-sm);
+  line-height: 1.25;
+}
+
 /* The add-entry form's list of cooks with something left. */
 .entry-form__preview {
-  margin: var(--sp-3) 0 0;
+  margin: 0;
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
 
 .available { list-style: none; margin: 0 0 var(--sp-3); padding: 0; }
+.entry-form > .available { margin: 0; }
 .available li + li { margin-top: var(--sp-2); }
 
 .available__item {
