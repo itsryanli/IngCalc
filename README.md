@@ -157,3 +157,7 @@ src/
   ui/        React screens, components and hooks
 public/      Icons
 ```
+
+## License
+
+[MIT](LICENSE): free to use, copy, change and share, including in other projects, as long as the license notice stays with it.
