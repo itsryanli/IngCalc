@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CATEGORIES, NUTRIENT_KEYS, type Category, type Ingredient, type NutrientKey, type NutrientProfile } from '../../core/types';
 import { zeroNutrients } from '../../core/nutrients';
+import { parseLabel, type LabelReading } from '../../core/labelParse';
 import { saveUserIngredient } from '../../storage/userIngredients';
 import { newId } from '../newId';
 
@@ -12,6 +13,13 @@ const LABELS: Record<NutrientKey, string> = {
 };
 
 type Entries = Record<NutrientKey, string>;
+
+const BASIS: Record<LabelReading['basis'], string> = {
+  per100g: 'from the per 100 g column',
+  per100ml: 'from the per 100 ml column',
+  perServing: 'converted from per serving to per 100 g',
+  assumedPer100g: 'as per 100 g',
+};
 
 const emptyEntries = (): Entries => {
   const out = {} as Entries;
@@ -27,6 +35,25 @@ export function AddIngredientScreen({
   const [absorbsWater, setAbsorbsWater] = useState(false);
   const [entries, setEntries] = useState<Entries>(emptyEntries);
   const [error, setError] = useState<string | null>(null);
+  const [labelText, setLabelText] = useState('');
+  const [reading, setReading] = useState<LabelReading | null>(null);
+
+  // Replaces every nutrient field, so pasting a second label never leaves values
+  // from the first behind. Nothing is saved: the person checks the form first.
+  const fillFromLabel = () => {
+    const r = parseLabel(labelText);
+    setReading(r);
+    if (Object.keys(r.values).length === 0) return;
+    const next = emptyEntries();
+    for (const k of NUTRIENT_KEYS) {
+      const v = r.values[k];
+      if (v !== undefined) next[k] = String(v);
+    }
+    setEntries(next);
+  };
+
+  const filled = reading === null ? [] : NUTRIENT_KEYS.filter((k) => reading.values[k] !== undefined);
+  const missing = reading === null ? [] : NUTRIENT_KEYS.filter((k) => reading.values[k] === undefined);
 
   const submit = async () => {
     if (name.trim() === '') { setError('Please enter a name'); return; }
@@ -50,6 +77,7 @@ export function AddIngredientScreen({
       publishedYield: {},
       absorbsWater,
       source: 'user',
+      ...(filled.length > 0 ? { sourceRef: 'Nutrition label' } : {}),
       archived: false,
     };
     try {
@@ -68,6 +96,41 @@ export function AddIngredientScreen({
     <section className="screen">
       <h2>Add an ingredient</h2>
       <p className="screen__hint">Values per 100g raw. Anything you leave blank is recorded as zero.</p>
+
+      <details className="label-paste">
+        <summary>Fill in from a nutrition label</summary>
+        <p className="screen__hint">
+          On iPhone, tap and hold in the box below and choose Scan Text, then point the
+          camera at the label. Or copy the label's text from the camera or a photo (Live
+          Text on iPhone, Google Lens on Android) and paste it here.
+        </p>
+        <div className="field">
+          <label htmlFor="label-text">Label text</label>
+          <textarea id="label-text" rows={6} value={labelText} onChange={(e) => setLabelText(e.target.value)} />
+        </div>
+        <button type="button" className="btn btn--secondary" disabled={labelText.trim() === ''} onClick={fillFromLabel}>
+          Fill in values
+        </button>
+        {reading !== null && (
+          <div role="status" className={`banner ${filled.length === 0 || reading.notes.length > 0 ? 'banner--warn' : 'banner--info'} label-paste__result`}>
+            {filled.length === 0 ? (
+              <p>No nutrition values were found in that text. Check it's the nutrition table, or type the values in below.</p>
+            ) : (
+              <>
+                <p>
+                  Filled in {filled.length} {filled.length === 1 ? 'value' : 'values'} {BASIS[reading.basis]}
+                  {reading.servingGrams !== undefined && ` (serving: ${reading.servingGrams} g)`}.
+                  Check each one against the label before saving.
+                </p>
+                {missing.length > 0 && (
+                  <p>Not on the label, so left blank (saved as zero): {missing.map((k) => LABELS[k].replace(/ \(.*\)$/, '')).join(', ')}.</p>
+                )}
+              </>
+            )}
+            {reading.notes.length > 0 && <ul>{reading.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+          </div>
+        )}
+      </details>
 
       <div className="field">
         <label htmlFor="ing-name">Name</label>
