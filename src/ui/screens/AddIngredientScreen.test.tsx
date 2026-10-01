@@ -109,4 +109,67 @@ describe('AddIngredientScreen', () => {
       spy.mockRestore();
     }
   });
+
+  describe('fill in from a nutrition label', () => {
+    const LABEL = 'Per 100 g   Per serving (30 g)\nEnergy 1580 kJ (378 kcal) 474 kJ (113 kcal)\nProtein 12.5 g 3.8 g\nFat 10 g 3 g\nCarbohydrate 60.1 g 18 g';
+
+    const paste = (text: string) => {
+      fireEvent.change(screen.getByLabelText(/label text/i), { target: { value: text } });
+      fireEvent.click(screen.getByRole('button', { name: /fill in values/i }));
+    };
+
+    it('fills the form from pasted label text and lists what the label did not give', () => {
+      render(<AddIngredientScreen initialName="Oat crackers" onSaved={vi.fn()} />);
+      paste(LABEL);
+      expect(screen.getByLabelText(/^energy/i)).toHaveValue('378');
+      expect(screen.getByLabelText(/^protein/i)).toHaveValue('12.5');
+      expect(screen.getByLabelText(/^fat/i)).toHaveValue('10');
+      expect(screen.getByLabelText(/^carbohydrate/i)).toHaveValue('60.1');
+      const status = screen.getByRole('status');
+      expect(status).toHaveTextContent(/filled in 4 values from the per 100 g column/i);
+      expect(status).toHaveTextContent(/not on the label.*fibre, potassium/i);
+    });
+
+    it('replaces earlier values rather than mixing two labels', () => {
+      render(<AddIngredientScreen initialName="x" onSaved={vi.fn()} />);
+      fireEvent.change(screen.getByLabelText(/^sodium/i), { target: { value: '999' } });
+      paste(LABEL);
+      expect(screen.getByLabelText(/^sodium/i)).toHaveValue('');
+    });
+
+    it('leaves the form alone and says so when nothing is found', () => {
+      render(<AddIngredientScreen initialName="x" onSaved={vi.fn()} />);
+      fireEvent.change(screen.getByLabelText(/^protein/i), { target: { value: '7' } });
+      paste('just some words');
+      expect(screen.getByRole('status')).toHaveTextContent(/no nutrition values were found/i);
+      expect(screen.getByLabelText(/^protein/i)).toHaveValue('7');
+    });
+
+    it('shows the parser notes, such as a per-serving conversion', () => {
+      render(<AddIngredientScreen initialName="x" onSaved={vi.fn()} />);
+      paste('Serving size 1 piece\nAmount per serving\nProtein 3 g');
+      expect(screen.getByRole('status')).toHaveTextContent(/no serving size in grams/i);
+    });
+
+    it('saves label values only when the person taps Save, recording the label as the source', async () => {
+      const onSaved = vi.fn();
+      render(<AddIngredientScreen initialName="Oat crackers" onSaved={onSaved} />);
+      paste(LABEL);
+      expect(await db.userIngredients.count()).toBe(0);
+      fireEvent.click(screen.getByRole('button', { name: /save/i }));
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      const saved = (await db.userIngredients.toArray())[0]!;
+      expect(saved.per100gRaw.protein).toBe(12.5);
+      expect(saved.per100gRaw.potassium).toBe(0);
+      expect(saved.sourceRef).toBe('Nutrition label');
+    });
+
+    it('records no source when the values were typed in', async () => {
+      const onSaved = vi.fn();
+      render(<AddIngredientScreen initialName="Petai" onSaved={onSaved} />);
+      fireEvent.click(screen.getByRole('button', { name: /save/i }));
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      expect((await db.userIngredients.toArray())[0]!.sourceRef).toBeUndefined();
+    });
+  });
 });

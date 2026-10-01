@@ -280,7 +280,8 @@ body {
 /* Matches bare <input> too — ProfileScreen's Name field has no type attribute,
    and an attribute-only selector would leave it with raw browser styling. */
 .app input:not([type='radio']):not([type='checkbox']),
-.app select {
+.app select,
+.app textarea {
   min-height: var(--tap-min);
   width: 100%;
   padding: var(--sp-2) var(--sp-3);
@@ -311,6 +312,8 @@ body {
 
 .app input:focus-visible,
 .app select:focus-visible,
+.app textarea:focus-visible,
+.app summary:focus-visible,
 .app button:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
@@ -635,6 +638,26 @@ body {
   letter-spacing: 0.06em;
   color: var(--text-dim);
 }
+
+/* Fill in from a nutrition label: folded away until wanted. */
+.app textarea { resize: vertical; line-height: 1.4; }
+.label-paste {
+  margin: 0 0 var(--sp-4);
+  padding: 0 var(--sp-3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+}
+.label-paste > summary {
+  /* Kept as a list item so the browser's open/closed marker still shows. */
+  padding: var(--sp-3) 0;
+  font-weight: 600;
+  cursor: pointer;
+}
+.label-paste[open] { padding-bottom: var(--sp-3); }
+.label-paste__result { margin: var(--sp-3) 0 0; }
+.label-paste__result p { margin: 0 0 var(--sp-2); }
+.label-paste__result p:last-child { margin-bottom: 0; }
+.label-paste__result ul { margin: 0; padding-left: var(--sp-5); }
 
 /* Banners */
 .banner {
