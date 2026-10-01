@@ -1,5 +1,7 @@
 import Dexie, { type Table } from 'dexie';
-import type { Batch, CookSession, DayLog, Ingredient, MealEntry, Profile, Settings } from '../core/types';
+import type {
+  Batch, CookSession, DayLog, Ingredient, MealEntry, Profile, ProfileGroup, Settings,
+} from '../core/types';
 
 export type { Settings };
 
@@ -44,6 +46,11 @@ export const SCHEMA_V3: Record<string, string> = {
   dayLogs: 'id',
 };
 
+/** Groups are read whole (a household has a handful), so they need no index. */
+export const SCHEMA_V4: Record<string, string> = {
+  groups: 'id',
+};
+
 export class IngCalcDB extends Dexie {
   profiles!: Table<Profile, string>;
   userIngredients!: Table<Ingredient, string>;
@@ -52,12 +59,14 @@ export class IngCalcDB extends Dexie {
   cookSessions!: Table<CookSession, string>;
   mealEntries!: Table<MealEntry, string>;
   dayLogs!: Table<DayLog, string>;
+  groups!: Table<ProfileGroup, string>;
 
   constructor() {
     super('ingcalc');
     this.version(1).stores(SCHEMA_V1);
     this.version(2).stores(SCHEMA_V2);
     this.version(3).stores(SCHEMA_V3);
+    this.version(4).stores(SCHEMA_V4);
   }
 }
 

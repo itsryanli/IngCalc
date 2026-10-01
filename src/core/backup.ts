@@ -2,14 +2,14 @@ import {
   CATEGORIES, COOK_METHODS, GOALS, LANDING_TABS, MEAL_LABEL_KEYS, NUTRIENT_KEYS, SEXES,
   WEIGHT_UNITS,
   type Batch, type CookSession, type DayLog, type Ingredient, type MealEntry, type Profile,
-  type Settings,
+  type ProfileGroup, type Settings,
 } from './types';
 import { consumedFromSession, EPSILON, isSessionEntry, sessionsOf } from './batch';
 import { ingredientLookup, UNKNOWN_INGREDIENT } from './costs';
 
 export const BACKUP_APP = 'ingcalc';
 /** Must equal the highest `this.version(n)` in `storage/db.ts`; a test asserts it. */
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 export const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
 export const MAX_MESSAGE_LINES = 5;
 
@@ -20,6 +20,7 @@ export const TOO_LARGE = 'That file is too large to be an IngCalc backup.';
 
 export const TABLE_NAMES = [
   'profiles', 'userIngredients', 'settings', 'batches', 'cookSessions', 'mealEntries', 'dayLogs',
+  'groups',
 ] as const;
 export type TableName = (typeof TABLE_NAMES)[number];
 
@@ -31,6 +32,7 @@ export interface BackupTables {
   cookSessions: CookSession[];
   mealEntries: MealEntry[];
   dayLogs: DayLog[];
+  groups: ProfileGroup[];
 }
 
 export interface BackupFile {
@@ -45,7 +47,7 @@ export type Result<T> = { ok: true; value: T } | { ok: false; errors: string[] }
 
 export const emptyTables = (): BackupTables => ({
   profiles: [], userIngredients: [], settings: [], batches: [], cookSessions: [],
-  mealEntries: [], dayLogs: [],
+  mealEntries: [], dayLogs: [], groups: [],
 });
 
 export function makeBackup(tables: BackupTables, now: Date): BackupFile {
@@ -103,6 +105,7 @@ export const NOUNS: Record<TableName, Phrase> = {
   cookSessions: ['cook', 'cooks'],
   mealEntries: ['meal entry', 'meal entries'],
   dayLogs: ['day record', 'day records'],
+  groups: ['group', 'groups'],
 };
 
 const invalid = (table: TableName, label: string): Phrase =>
@@ -238,6 +241,12 @@ const SPECS: Record<Exclude<TableName, 'mealEntries'>, readonly Spec[]> = {
         && bounded(isOptional(isNonNegative), MAX_TARGET)(m.rni)
         && bounded(isOptional(isNonNegative), MAX_TARGET)(m.dv))],
   ],
+  groups: [
+    ID,
+    ['name', (r) => isName(r.name)],
+    ['member list', (r) => Array.isArray(r.memberIds) && r.memberIds.length > 0
+      && r.memberIds.every(isId) && new Set(r.memberIds).size === r.memberIds.length],
+  ],
 };
 
 const ENTRY_BASE: readonly Spec[] = [
@@ -304,7 +313,7 @@ export function parseBackup(text: string): Result<BackupTables> {
 
   for (const table of TABLE_NAMES) {
     const rows = data.tables[table];
-    // Schema v1 → v3 only ever added tables, so an older file lacks some.
+    // Schema v1 → v4 only ever added tables, so an older file lacks some.
     if (rows === undefined) continue;
     if (!Array.isArray(rows)) {
       found.line(`The backup's ${NOUNS[table][1]} are not a list.`);
@@ -378,6 +387,11 @@ export function checkIntegrity(t: BackupTables, bundled: readonly Ingredient[], 
   }
   for (const d of t.dayLogs) {
     if (!profileIds.has(d.profileId)) found.add(missing('day record refers to a profile', 'day records refer to profiles'));
+  }
+  for (const gr of t.groups) {
+    if (gr.memberIds.some((id) => !profileIds.has(id))) {
+      found.add(missing('group includes a profile', 'groups include profiles'));
+    }
   }
 
   const nameOf = (b: Batch | undefined): string =>
@@ -462,6 +476,7 @@ export function planRestore(
       cookSessions: onlyNew(device.cookSessions, backup.cookSessions),
       mealEntries: onlyNew(device.mealEntries, backup.mealEntries),
       dayLogs: onlyNew(device.dayLogs, backup.dayLogs),
+      groups: onlyNew(device.groups, backup.groups),
     };
     resulting = {
       profiles: [...device.profiles, ...toWrite.profiles],
@@ -471,6 +486,7 @@ export function planRestore(
       cookSessions: [...device.cookSessions, ...toWrite.cookSessions],
       mealEntries: [...device.mealEntries, ...toWrite.mealEntries],
       dayLogs: [...device.dayLogs, ...toWrite.dayLogs],
+      groups: [...device.groups, ...toWrite.groups],
     };
   }
 
@@ -499,6 +515,7 @@ const SHOWN: readonly (readonly [TableName, string, string])[] = [
   ['mealEntries', 'meal', 'meals'],
   ['profiles', 'profile', 'profiles'],
   ['userIngredients', 'added ingredient', 'added ingredients'],
+  ['groups', 'group', 'groups'],
 ];
 
 /** "2 purchases, 1 cook and 4 meals", or null when every count is zero. */

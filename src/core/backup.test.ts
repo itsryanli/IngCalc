@@ -354,6 +354,33 @@ describe('checkIntegrity: references', () => {
   });
 });
 
+describe('groups in a backup', () => {
+  const group = { id: 'g1', name: 'Family', memberIds: ['p1', 'p2'] };
+
+  it('accepts a group', () => {
+    expect(errorsFor('groups', group)).toEqual([]);
+  });
+
+  it('rejects a group with nobody in it, or someone twice', () => {
+    expect(errorsFor('groups', { ...group, memberIds: [] })).not.toEqual([]);
+    expect(errorsFor('groups', { ...group, memberIds: ['p1', 'p1'] })).not.toEqual([]);
+  });
+
+  it('finds a group whose member is missing', () => {
+    const t = fixture();
+    t.groups = [{ id: 'g1', name: 'Family', memberIds: ['p-ali', 'gone'] }];
+    expect(replaceErrors(t)).toContain("1 group includes a profile that isn't in the backup.");
+  });
+
+  it('merges a new group in and counts it', () => {
+    const t = fixture();
+    t.groups = [{ id: 'g1', name: 'Family', memberIds: ['p-ali'] }];
+    const r = planRestore('merge', t, emptyTables(), INGREDIENTS);
+    expect(r.ok && r.value.toWrite.groups).toEqual(t.groups);
+    expect(r.ok && planSummary(r.value)).toMatch(/1 group/);
+  });
+});
+
 describe('checkIntegrity: lifecycle', () => {
   it('finds a purchase with more cooked from it than was bought', () => {
     const t = fixture();

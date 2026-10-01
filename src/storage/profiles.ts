@@ -6,7 +6,8 @@ export const listProfiles = (): Promise<Profile[]> => db.profiles.toArray();
 export const saveProfile = async (p: Profile): Promise<void> => { await db.profiles.put(p); };
 
 /**
- * Deleting a profile must take its meal entries and its day logs.
+ * Deleting a profile must take its meal entries and its day logs, and take it
+ * out of any group it belongs to.
  *
  * Before Phase 3 nothing referred to a profile and this was a one-liner. Now
  * an entry carries `profileId`, and a surviving one is worse than an orphaned
@@ -20,7 +21,7 @@ export const saveProfile = async (p: Profile): Promise<void> => { await db.profi
  * as `deleteBatchCascade`.
  */
 export const deleteProfile = async (id: string): Promise<void> => {
-  await db.transaction('rw', db.profiles, db.mealEntries, db.dayLogs, async () => {
+  await db.transaction('rw', [db.profiles, db.mealEntries, db.dayLogs, db.groups], async () => {
     // There is no `profileId`-alone index, but the compound `[profileId+date]`
     // one covers the whole profile as a key range: every date sorts between
     // the lowest and highest keys IndexedDB can hold.
@@ -34,6 +35,13 @@ export const deleteProfile = async (id: string): Promise<void> => {
     // field, and would over-match a profile id that itself contained the `:`
     // separator. The table holds one row per profile-day, so the scan is small.
     await db.dayLogs.filter((log) => log.profileId === id).delete();
+    // A group keeps its other members; one left with nobody goes with them.
+    for (const group of await db.groups.toArray()) {
+      if (!group.memberIds.includes(id)) continue;
+      const memberIds = group.memberIds.filter((m) => m !== id);
+      if (memberIds.length === 0) await db.groups.delete(group.id);
+      else await db.groups.put({ ...group, memberIds });
+    }
     await db.profiles.delete(id);
   });
 };

@@ -76,7 +76,7 @@ export function App() {
 
       <main className="app__main">
         <ErrorBoundary resetKey={tab} onReset={() => selectTab('log')}>
-          {tab === 'log' && <LogScreen profile={profile} />}
+          {tab === 'log' && <LogScreen profile={profile} profiles={profiles} />}
           {tab === 'kitchen' && <KitchenScreen />}
           {tab === 'calc' && <CalcScreen profile={profile} />}
           {tab === 'costs' && (

@@ -1,10 +1,10 @@
 import { useId, useMemo, useState } from 'react';
 import { cookedRemainingG, EPSILON } from '../../core/batch';
 import { entryNutrients, validateEntry, type MealContext } from '../../core/meals';
-import { COOK_METHODS, type CookMethod, type DayLogTargets, type Ingredient,
+import { COOK_METHODS, type CookMethod, type DayLog, type DayLogTargets, type Ingredient,
   type IsoDate, type MealEntry, type MealEntryFields, type MealLabel } from '../../core/types';
 import { g, type Grams } from '../../core/units';
-import { addEntry, dayLogId, updateEntry } from '../../storage/meals';
+import { addEntries, addEntry, dayLogId, updateEntry } from '../../storage/meals';
 import { availableLabel, METHOD_LABELS } from '../labels';
 import { newId } from '../newId';
 import { IngredientPicker } from './IngredientPicker';
@@ -15,6 +15,14 @@ type Source = 'kitchen' | 'ingredient' | 'quick';
 const SOURCE_LABELS: Record<Source, string> = {
   kitchen: 'From the kitchen', ingredient: 'Any ingredient', quick: 'Quick add',
 };
+
+/** A group this meal can be logged for, with what each member needs to log it. */
+export interface GroupOption {
+  id: string;
+  name: string;
+  /** Today's targets, frozen into a member's day if this is its first entry. */
+  members: { id: string; name: string; targets: DayLogTargets }[];
+}
 
 /** An entry being edited cannot change its source; the three are different things. */
 const sourceOf = (entry: MealEntry): Source =>
@@ -42,16 +50,25 @@ interface Props {
   allEntries: readonly MealEntry[];
   targets: DayLogTargets;
   editing?: MealEntry;
+  /** The active profile's name, for the "Just …" choice. */
+  profileName?: string;
+  /** Groups the active profile is in; empty hides the "who ate this" choice. */
+  groups?: readonly GroupOption[];
   onSaved: () => void;
   onCancel: () => void;
 }
 
 export function AddEntryForm({
-  profileId, date, label, ctx, catalogue, allEntries, targets, editing, onSaved, onCancel,
+  profileId, date, label, ctx, catalogue, allEntries, targets, editing,
+  profileName = 'me', groups = [], onSaved, onCancel,
 }: Props) {
   const ids = useId();
   const [source, setSource] = useState<Source>(editing === undefined ? 'kitchen' : sourceOf(editing));
   const [error, setError] = useState<string | null>(null);
+  // '' is just the active profile. An edit is always one person's entry.
+  const [forGroupId, setForGroupId] = useState('');
+  const group = editing === undefined ? groups.find((g) => g.id === forGroupId) ?? null : null;
+  const each = group !== null;
 
   // From-the-kitchen
   const [sessionId, setSessionId] = useState(
@@ -132,9 +149,43 @@ export function AddEntryForm({
   }, [source, sessionId, byWeight, portions, grams, ingredientId, method, cookedG,
       name, kcalText, proteinText, ctx]);
 
+  /**
+   * One entry per member, each checked against what the members before it
+   * have already taken, so a cook cannot be over-eaten by the group as a whole.
+   */
+  const saveForGroup = async (d: MealEntryFields, g: GroupOption) => {
+    const now = Date.now();
+    const items: { entry: MealEntry; snapshot: DayLog }[] = [];
+    for (const [i, m] of g.members.entries()) {
+      const check = validateEntry(d, ctx, [...others, ...items.map((it) => it.entry)], null);
+      if (!check.ok) {
+        setError(i === 0 ? check.message : `Not enough for all ${g.members.length} people. ${check.message}`);
+        return;
+      }
+      items.push({
+        entry: { id: newId(), profileId: m.id, date, label, createdAt: now + i, ...d },
+        snapshot: { id: dayLogId(m.id, date), profileId: m.id, date, targets: m.targets },
+      });
+    }
+    setError(null);
+    try {
+      await addEntries(items);
+    } catch (err) {
+      console.error('Saving a group meal failed', err);
+      setError('Could not save that — storage may be blocked or full. Please try again.');
+      return;
+    }
+    onSaved();
+  };
+
   const save = async () => {
     const d = draft();
     if (d === null) { setError('Choose something from the kitchen first.'); return; }
+
+    if (group !== null) {
+      await saveForGroup(d, group);
+      return;
+    }
 
     const check = validateEntry(d, ctx, others, editing?.id ?? null);
     if (!check.ok) { setError(check.message); return; }
@@ -170,6 +221,25 @@ export function AddEntryForm({
   return (
     <div className="card entry-form">
       <h3 className="card__title">{editing === undefined ? 'Add to' : 'Edit'} {label}</h3>
+
+      {editing === undefined && groups.length > 0 && (
+        <div className="field entry-form__who">
+          <label htmlFor={`${ids}-who`}>Who ate this?</label>
+          <select id={`${ids}-who`} value={forGroupId} onChange={(e) => setForGroupId(e.target.value)}>
+            <option value="">Just {profileName}</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name} — everyone ({g.members.length})
+              </option>
+            ))}
+          </select>
+          {group !== null && (
+            <p className="field__hint">
+              Enter what one person ate. It is logged for {group.members.map((m) => m.name).join(', ')}.
+            </p>
+          )}
+        </div>
+      )}
 
       {editing === undefined && (
         <div className="seg" role="group" aria-label="Where this came from">
@@ -228,11 +298,12 @@ export function AddEntryForm({
               </div>
 
               {byWeight ? (
-                <WeightInput value={grams} unit={kitchenUnit} label="How much did you eat?"
+                <WeightInput value={grams} unit={kitchenUnit}
+                             label={each ? 'How much did each person eat?' : 'How much did you eat?'}
                              onChange={setGrams} onUnitChange={setKitchenUnit} />
               ) : (
                 <div className="field">
-                  <label htmlFor={`${ids}-portions`}>How many portions?</label>
+                  <label htmlFor={`${ids}-portions`}>{each ? 'How many portions each?' : 'How many portions?'}</label>
                   <input id={`${ids}-portions`} type="number" inputMode="decimal"
                          min={0} step="0.5" value={portions}
                          onChange={(e) => setPortions(e.target.value)} />
@@ -260,7 +331,8 @@ export function AddEntryForm({
               {COOK_METHODS.map((m) => <option key={m} value={m}>{METHOD_LABELS[m]}</option>)}
             </select>
           </div>
-          <WeightInput value={cookedG} unit={unit} label="How much did you eat? (cooked)"
+          <WeightInput value={cookedG} unit={unit}
+                       label={each ? 'How much did each person eat? (cooked)' : 'How much did you eat? (cooked)'}
                        onChange={setCookedG} onUnitChange={setUnit} />
         </>
       )}
@@ -292,7 +364,7 @@ export function AddEntryForm({
       {preview !== null && (
         <p className="entry-form__preview" data-testid="entry-preview">
           {Math.round(preview.kcal).toLocaleString('en-MY')} kcal ·{' '}
-          {Math.round(preview.protein)}g protein
+          {Math.round(preview.protein)}g protein{each && ' each'}
         </p>
       )}
 

@@ -40,6 +40,22 @@ export const addEntry = async (entry: MealEntry, snapshot: DayLog): Promise<void
   });
 };
 
+/**
+ * A meal logged for a whole group: one entry per member, each with that
+ * member's frozen day targets, all or nothing so a group meal is never half
+ * logged.
+ */
+export const addEntries = async (
+  items: readonly { entry: MealEntry; snapshot: DayLog }[],
+): Promise<void> => {
+  await db.transaction('rw', db.mealEntries, db.dayLogs, async () => {
+    for (const { entry, snapshot } of items) {
+      if ((await db.dayLogs.get(snapshot.id)) === undefined) await db.dayLogs.add(snapshot);
+      await db.mealEntries.add(entry);
+    }
+  });
+};
+
 export const updateEntry = async (entry: MealEntry): Promise<void> => {
   await db.mealEntries.put(entry);
 };

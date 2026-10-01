@@ -196,6 +196,18 @@ export const WEIGHT_UNITS = ['g', 'kg'] as const;
  * Lives in `core/` (not beside the Dexie table) because a backup file carries
  * the settings row, and the backup validator is pure.
  */
+/**
+ * People who eat together, such as a family. A group lets one meal be logged
+ * for every member at once and the day be seen side by side. It owns nothing:
+ * each member's entries and targets stay their own.
+ */
+export interface ProfileGroup {
+  id: string;
+  name: string;
+  /** Profile ids, at least one, no repeats. */
+  memberIds: string[];
+}
+
 export interface Settings {
   id: 'singleton';
   activeProfileId: string | null;

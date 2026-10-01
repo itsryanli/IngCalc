@@ -402,6 +402,10 @@ body {
   font-size: var(--fs-sm);
 }
 
+/* Groups sit under the profiles, as their own section. */
+.profile-groups { margin-top: var(--sp-6); }
+.profile-groups__title { margin: 0 0 var(--sp-2); font-size: var(--fs-h1); }
+
 /* Portion split: the same row shape as the weight input, with a static unit
    in place of the segmented toggle. */
 .portion-split__unit {
@@ -1005,6 +1009,11 @@ body {
 /* The "Add something" row, spaced from Breakfast the same as each meal
    card is spaced from the next. */
 .log__add { margin-bottom: var(--sp-4); }
+
+/* The group's day: one row per person, their two figures with thin bars. */
+.group-day__list { list-style: none; margin: 0; padding: 0; }
+.group-day__row + .group-day__row { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--border); }
+.group-day__figure { margin: var(--sp-2) 0 var(--sp-1); font-size: var(--fs-sm); color: var(--text-dim); }
 
 /* One meal, its subtotal and its entries — a card each, with an icon, so the
    four meals read as separate sections at a glance. */

@@ -7,16 +7,17 @@ import { db } from './db';
 
 const allTables = () => [
   db.profiles, db.userIngredients, db.settings, db.batches, db.cookSessions, db.mealEntries, db.dayLogs,
+  db.groups,
 ];
 
 async function readTables(): Promise<BackupTables> {
-  const [profiles, userIngredients, settings, batches, cookSessions, mealEntries, dayLogs] =
+  const [profiles, userIngredients, settings, batches, cookSessions, mealEntries, dayLogs, groups] =
     await Promise.all([
       db.profiles.toArray(), db.userIngredients.toArray(), db.settings.toArray(),
       db.batches.toArray(), db.cookSessions.toArray(), db.mealEntries.toArray(),
-      db.dayLogs.toArray(),
+      db.dayLogs.toArray(), db.groups.toArray(),
     ]);
-  return { profiles, userIngredients, settings, batches, cookSessions, mealEntries, dayLogs };
+  return { profiles, userIngredients, settings, batches, cookSessions, mealEntries, dayLogs, groups };
 }
 
 /** One read transaction, so the seven tables are a single consistent snapshot. */
@@ -63,5 +64,6 @@ export const applyRestore = (
     await db.cookSessions.bulkAdd(w.cookSessions);
     await db.mealEntries.bulkAdd(w.mealEntries);
     await db.dayLogs.bulkAdd(w.dayLogs);
+    await db.groups.bulkAdd(w.groups);
     return plan;
   });

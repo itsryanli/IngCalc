@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { backupStatus, type BackupStatus } from '../core/backupReminder';
 import { exportAll, hasUserData } from '../storage/backup';
 import { getSettings, markBackedUp } from '../storage/settings';
@@ -13,18 +13,29 @@ export function useBackup(today: Date = new Date()) {
   const [status, setStatus] = useState<BackupStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const generationRef = useRef(0);
+
+  const fetchStatus = useCallback(async (gen: number) => {
     try {
       const [settings, hasData] = await Promise.all([getSettings(), hasUserData()]);
-      setStatus(backupStatus(settings.lastBackupAt, hasData, Date.now()));
+      if (gen === generationRef.current) setStatus(backupStatus(settings.lastBackupAt, hasData, Date.now()));
     } catch (err) {
       // Storage being unreadable is reported elsewhere; the reminder just stays away.
       console.error('Reading the backup status failed', err);
-      setStatus(null);
+      if (gen === generationRef.current) setStatus(null);
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const gen = ++generationRef.current;
+    void fetchStatus(gen);
+    return () => { generationRef.current += 1; };
+  }, [fetchStatus]);
+
+  const load = useCallback(async () => {
+    const gen = ++generationRef.current;
+    await fetchStatus(gen);
+  }, [fetchStatus]);
 
   const backUp = async (): Promise<void> => {
     setError(null);

@@ -89,6 +89,57 @@ const enterWeight = async (grams: number) => {
   await userEvent.type(input, `${grams}`);
 };
 
+const family = {
+  id: 'g1', name: 'Family',
+  members: [
+    { id: 'p1', name: 'Ryan', targets },
+    { id: 'p2', name: 'Mei', targets: { kcal: 1800, proteinG: 90, micros: {} } },
+  ],
+};
+
+describe('AddEntryForm: logging for a group', () => {
+  beforeEach(async () => { await db.open(); await db.mealEntries.clear(); await db.dayLogs.clear(); });
+
+  it('hides the choice when there are no groups', () => {
+    renderForm();
+    expect(screen.queryByLabelText(/who ate this/i)).toBeNull();
+  });
+
+  it('logs the same portion for everyone, each with their own day targets', async () => {
+    const onSaved = vi.fn();
+    renderForm({ onSaved, groups: [family], profileName: 'Ryan' });
+    await userEvent.selectOptions(screen.getByLabelText(/who ate this/i), 'g1');
+    await userEvent.click(screen.getByTestId('available-s1'));
+    expect(screen.getByLabelText(/how many portions each/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    const written = await db.mealEntries.toArray();
+    expect(written.map((e) => e.profileId).sort()).toEqual(['p1', 'p2']);
+    expect(written.every((e) => e.kind === 'portion' && e.portions === 1)).toBe(true);
+    expect((await db.dayLogs.get('p2:2026-09-19'))!.targets.kcal).toBe(1800);
+    expect(onSaved).toHaveBeenCalled();
+  });
+
+  it('refuses a group meal that would eat more than the cook has, and saves nothing', async () => {
+    renderForm({ groups: [family] });
+    await userEvent.selectOptions(screen.getByLabelText(/who ate this/i), 'g1');
+    await userEvent.click(screen.getByTestId('available-s1'));
+    const portions = screen.getByLabelText(/how many portions each/i);
+    await userEvent.clear(portions);
+    await userEvent.type(portions, '3');
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/not enough for all 2 people/i);
+    expect(await db.mealEntries.count()).toBe(0);
+  });
+
+  it('never offers the group when editing one person\'s entry', () => {
+    const existing = weightEntry();
+    renderForm({ groups: [family], editing: existing, allEntries: [existing] });
+    expect(screen.queryByLabelText(/who ate this/i)).toBeNull();
+  });
+});
+
 describe('AddEntryForm', () => {
   beforeEach(async () => { await db.open(); await db.mealEntries.clear(); await db.dayLogs.clear(); });
 

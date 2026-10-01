@@ -207,3 +207,48 @@ describe('ProfileScreen deleting', () => {
     }
   });
 });
+
+describe('ProfileScreen groups', () => {
+  beforeEach(async () => { await db.groups.clear(); });
+
+  it('offers groups only once there are two people', () => {
+    renderScreen({ profiles: [ryan] });
+    expect(screen.queryByRole('button', { name: /add a group/i })).toBeNull();
+  });
+
+  it('creates a group of everyone by default', async () => {
+    renderScreen();
+    fireEvent.click(screen.getByRole('button', { name: /add a group/i }));
+    fireEvent.change(screen.getByLabelText(/group name/i), { target: { value: 'Family' } });
+    fireEvent.click(screen.getByRole('button', { name: /save group/i }));
+
+    const card = await screen.findByText('Family');
+    expect(card.closest('article')).toHaveTextContent('Ryan, Mei');
+    const [saved] = await db.groups.toArray();
+    expect(saved).toMatchObject({ name: 'Family', memberIds: ['p1', 'p2'] });
+  });
+
+  it('needs a name and at least two people', async () => {
+    renderScreen();
+    fireEvent.click(screen.getByRole('button', { name: /add a group/i }));
+    fireEvent.click(screen.getByRole('button', { name: /save group/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/name/i);
+
+    fireEvent.change(screen.getByLabelText(/group name/i), { target: { value: 'Family' } });
+    fireEvent.click(screen.getByLabelText('Mei'));
+    fireEvent.click(screen.getByRole('button', { name: /save group/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/two people/i);
+    expect(await db.groups.count()).toBe(0);
+  });
+
+  it('deletes a group but keeps its people', async () => {
+    await db.groups.put({ id: 'g1', name: 'Family', memberIds: ['p1', 'p2'] });
+    renderScreen();
+    const card = within(await screen.findByTestId('group-g1'));
+    fireEvent.click(card.getByRole('button', { name: /delete group/i }));
+    fireEvent.click(card.getByRole('button', { name: /yes, delete/i }));
+
+    await waitFor(() => expect(screen.queryByTestId('group-g1')).toBeNull());
+    expect(screen.getByTestId('profile-p2')).toBeInTheDocument();
+  });
+});

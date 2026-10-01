@@ -6,14 +6,16 @@ import { CATEGORY_YIELD } from '../../data/categoryYield';
 import { DV_US } from '../../data/dvUS';
 import { RETENTION } from '../../data/retentionTable';
 import { RNI_MIN_AGE, rniFor } from '../../data/rniMY';
-import { AddEntryForm } from '../components/AddEntryForm';
+import { AddEntryForm, type GroupOption } from '../components/AddEntryForm';
 import { BackupReminder } from '../components/BackupReminder';
 import { DayNav } from '../components/DayNav';
 import { DayProgress } from '../components/DayProgress';
+import { GroupDay } from '../components/GroupDay';
 import { MealGroup } from '../components/MealGroup';
 import { NutrientTable } from '../components/NutrientTable';
 import { todayIso } from '../dates';
 import { useCatalogue } from '../useCatalogue';
+import { useGroups } from '../useGroups';
 import { useKitchen } from '../useKitchen';
 import { useLog } from '../useLog';
 
@@ -31,13 +33,36 @@ function labelForHour(hour: number): MealLabel {
 
 type View = { kind: 'list' } | { kind: 'form'; label: MealLabel; editing?: MealEntry };
 
-export function LogScreen({ profile, today = new Date() }: { profile: Profile | null; today?: Date }) {
+export function LogScreen({ profile, profiles = [], today = new Date() }: {
+  profile: Profile | null;
+  /** Everyone, so a group's members can be named and measured. */
+  profiles?: readonly Profile[];
+  today?: Date;
+}) {
   const [date, setDate] = useState(() => todayIso(today));
   const [view, setView] = useState<View>({ kind: 'list' });
 
   const { catalogue } = useCatalogue();
   const kitchen = useKitchen();
   const log = useLog(profile?.id ?? null, date);
+  const { groups } = useGroups();
+  // Bumped on every change, so the group overview re-reads everyone's day.
+  const [version, setVersion] = useState(0);
+
+  // Only groups the active profile eats with.
+  const myGroups = useMemo(
+    () => (profile === null ? [] : groups.filter((g) => g.memberIds.includes(profile.id))),
+    [groups, profile],
+  );
+
+  const groupOptions: GroupOption[] = useMemo(() => myGroups.map((g) => ({
+    id: g.id,
+    name: g.name,
+    members: g.memberIds
+      .map((id) => profiles.find((p) => p.id === id))
+      .filter((p): p is Profile => p !== undefined)
+      .map((p) => ({ id: p.id, name: p.name, targets: snapshotTargets(p, today, rniFor, DV_US) })),
+  })), [myGroups, profiles, today]);
 
   const ctx: MealContext = useMemo(() => ({
     sessions: kitchen.sessions,
@@ -86,7 +111,10 @@ export function LogScreen({ profile, today = new Date() }: { profile: Profile | 
           allEntries={kitchen.entries}
           targets={targets}
           editing={view.editing}
+          profileName={profile.name}
+          groups={groupOptions}
           onSaved={() => {
+            setVersion((v) => v + 1);
             // Both: useLog holds the day, useKitchen holds every entry and so
             // every remainder. Refreshing one leaves the other stale.
             void log.refresh();
@@ -99,7 +127,7 @@ export function LogScreen({ profile, today = new Date() }: { profile: Profile | 
     );
   }
 
-  const afterChange = () => { void log.refresh(); void kitchen.refresh(); };
+  const afterChange = () => { void log.refresh(); void kitchen.refresh(); setVersion((v) => v + 1); };
   const storageError = log.storageError ?? kitchen.storageError;
 
   return (
@@ -139,6 +167,10 @@ export function LogScreen({ profile, today = new Date() }: { profile: Profile | 
           onEdit={(entry) => setView({ kind: 'form', label: entry.label, editing: entry })}
           onChanged={afterChange}
         />
+      ))}
+
+      {myGroups.map((g) => (
+        <GroupDay key={g.id} group={g} profiles={profiles} date={date} ctx={ctx} today={today} version={version} />
       ))}
 
       {log.entries.length > 0 && (
