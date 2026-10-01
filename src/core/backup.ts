@@ -203,6 +203,7 @@ const SPECS: Record<Exclude<TableName, 'mealEntries'>, readonly Spec[]> = {
     ['active profile', (r) => r.activeProfileId === null || isId(r.activeProfileId)],
     ['landing tab', (r) => isOneOf(LANDING_TABS)(r.landingTab)],
     ['weight unit', (r) => isOneOf(WEIGHT_UNITS)(r.defaultWeightUnit)],
+    ['last backup time', (r) => isOptional(isNonNegative)(r.lastBackupAt)],
   ],
   batches: [
     ID,
@@ -211,6 +212,7 @@ const SPECS: Record<Exclude<TableName, 'mealEntries'>, readonly Spec[]> = {
     ['price', (r) => bounded(isNonNegative, MAX_PRICE_MYR)(sub(r.purchase).pricePaidMYR)],
     ['location', (r) => typeof sub(r.purchase).location === 'string'],
     ['date', (r) => isIsoDate(sub(r.purchase).date)],
+    ['shopping trip', (r) => isOptional(isId)(sub(r.purchase).tripId)],
     CREATED,
   ],
   cookSessions: [

@@ -21,3 +21,8 @@ export const saveSettings = async (s: Settings): Promise<void> => { await db.set
 export const setActiveProfile = async (id: string | null): Promise<void> => {
   await saveSettings({ ...(await getSettings()), activeProfileId: id });
 };
+
+/** Read-modify-write, for the same reason as `setActiveProfile`. */
+export const markBackedUp = async (at: number = Date.now()): Promise<void> => {
+  await saveSettings({ ...(await getSettings()), lastBackupAt: at });
+};

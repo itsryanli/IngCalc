@@ -7,6 +7,7 @@ import { DV_US } from '../../data/dvUS';
 import { RETENTION } from '../../data/retentionTable';
 import { RNI_MIN_AGE, rniFor } from '../../data/rniMY';
 import { AddEntryForm } from '../components/AddEntryForm';
+import { BackupReminder } from '../components/BackupReminder';
 import { DayNav } from '../components/DayNav';
 import { DayProgress } from '../components/DayProgress';
 import { MealGroup } from '../components/MealGroup';
@@ -104,6 +105,8 @@ export function LogScreen({ profile, today = new Date() }: { profile: Profile | 
   return (
     <section className="screen">
       <h2>Log</h2>
+
+      <BackupReminder today={today} />
 
       <DayNav date={date} today={todayIso(today)} onChange={setDate} />
 

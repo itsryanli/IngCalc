@@ -68,6 +68,21 @@ describe('AddBatchForm creating', () => {
     expect(saved[0]!.purchase.date).toBe('2026-09-19');
   });
 
+  it('keeps an edited item in its shopping trip', async () => {
+    const inTrip: Batch = { ...existing, purchase: { ...existing.purchase, tripId: 't1' } };
+    await db.batches.put(inTrip);
+    const onSaved = vi.fn();
+    render(<AddBatchForm {...props} onSaved={onSaved} batch={inTrip} />);
+
+    fireEvent.change(screen.getByLabelText(/price/i), { target: { value: '22' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const saved = await db.batches.get('b1');
+    expect(saved!.purchase.tripId).toBe('t1');
+    expect(saved!.purchase.pricePaidMYR).toBe(22);
+  });
+
   it('requires an ingredient', async () => {
     render(<AddBatchForm {...props} />);
     fireEvent.change(screen.getByLabelText(/^raw weight/i), { target: { value: '1000' } });

@@ -44,6 +44,24 @@ const errorsFor = (table: string, row: unknown): string[] => {
   return r.ok ? [] : r.errors;
 };
 
+describe('parseBackup: shopping trips and backup reminders', () => {
+  it('accepts a purchase that belongs to a shopping trip', () => {
+    expect(errorsFor('batches', { ...VALID.batches, purchase: { ...purchase, tripId: 't1' } })).toEqual([]);
+  });
+
+  it('rejects an empty trip id', () => {
+    expect(errorsFor('batches', { ...VALID.batches, purchase: { ...purchase, tripId: '' } })).not.toEqual([]);
+  });
+
+  it('accepts settings that record the last backup', () => {
+    expect(errorsFor('settings', { ...VALID.settings, lastBackupAt: 1_790_000_000_000 })).toEqual([]);
+  });
+
+  it('rejects a last-backup time that is not a number', () => {
+    expect(errorsFor('settings', { ...VALID.settings, lastBackupAt: 'yesterday' })).not.toEqual([]);
+  });
+});
+
 describe('parseBackup: envelope', () => {
   it('rejects text that is not JSON', () => {
     expect(parseBackup('{not json')).toEqual({ ok: false, errors: [NOT_READABLE] });

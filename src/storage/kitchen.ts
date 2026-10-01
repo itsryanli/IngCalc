@@ -53,3 +53,8 @@ export const deleteBatchCascade = async (batchId: string): Promise<void> => {
     await db.batches.delete(batchId);
   });
 };
+
+/** A shopping trip's items, all or nothing: a half-saved receipt would undercount the trip. */
+export const saveBatches = async (batches: readonly Batch[]): Promise<void> => {
+  await db.transaction('rw', db.batches, async () => { await db.batches.bulkPut([...batches]); });
+};

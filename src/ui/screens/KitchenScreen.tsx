@@ -4,6 +4,7 @@ import type { Batch, CookSession, Ingredient } from '../../core/types';
 import { AddBatchForm } from '../components/AddBatchForm';
 import { BatchCard } from '../components/BatchCard';
 import { CookSessionForm } from '../components/CookSessionForm';
+import { ShoppingTripForm } from '../components/ShoppingTripForm';
 import { STATE_LABELS } from '../labels';
 import { useCatalogue } from '../useCatalogue';
 import { useKitchen } from '../useKitchen';
@@ -14,6 +15,8 @@ const GROUP_ORDER: BatchState[] = ['raw', 'partiallyCooked', 'cooked', 'finished
 
 type View =
   | { kind: 'list' }
+  // A new purchase: one or more items from one shopping trip.
+  | { kind: 'tripForm' }
   // `initialIngredientId` carries an ingredient just created via the add-ingredient
   // flow back into the picker, so it is preselected rather than lost.
   | { kind: 'batchForm'; batch?: Batch; initialIngredientId?: string }
@@ -36,6 +39,16 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
     for (const b of ordered) out.get(batchState(b, sessions, entries))!.push(b);
     return out;
   }, [batches, sessions, entries]);
+
+  // Shops already used, most recent first, as suggestions for the next trip.
+  const pastLocations = useMemo(() => {
+    const seen = new Set<string>();
+    for (const b of [...batches].sort((x, y) => y.createdAt - x.createdAt)) {
+      const l = b.purchase.location.trim();
+      if (l !== '') seen.add(l);
+    }
+    return [...seen];
+  }, [batches]);
 
   const ingredientFor = (batch: Batch) =>
     catalogue.find((i) => i.id === batch.ingredientId) ?? null;
@@ -66,6 +79,21 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
           initialName={view.typedName}
           onSaved={(added) => handleIngredientAdded(added, view.batch)}
           onCancel={() => setView({ kind: 'batchForm', batch: view.batch })}
+        />
+      </section>
+    );
+  }
+
+  if (view.kind === 'tripForm') {
+    return (
+      <section className="screen">
+        <ShoppingTripForm
+          catalogue={catalogue}
+          pastLocations={pastLocations}
+          today={today}
+          onSaved={() => { void afterChange(); }}
+          onCancel={backToList}
+          onCatalogueChanged={() => { void refreshCatalogue(); }}
         />
       </section>
     );
@@ -134,7 +162,7 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
         <button
           type="button"
           className="btn btn--primary"
-          onClick={() => setView({ kind: 'batchForm' })}
+          onClick={() => setView({ kind: 'tripForm' })}
         >
           Log a purchase
         </button>

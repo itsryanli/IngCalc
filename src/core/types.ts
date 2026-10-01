@@ -61,6 +61,12 @@ export interface Purchase {
   pricePaidMYR: MYR;
   location: string;
   date: IsoDate;
+  /**
+   * Shared by every item logged in one shopping trip, so the trip can be read
+   * back as one receipt (for example by a budget export). Absent on purchases
+   * logged before trips existed.
+   */
+  tripId?: string;
 }
 
 /**
@@ -195,4 +201,6 @@ export interface Settings {
   activeProfileId: string | null;
   landingTab: (typeof LANDING_TABS)[number];
   defaultWeightUnit: (typeof WEIGHT_UNITS)[number];
+  /** When a backup file was last downloaded (ms since epoch). Absent until the first one. */
+  lastBackupAt?: number;
 }

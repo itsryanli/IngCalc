@@ -72,7 +72,8 @@ export function AddBatchForm({
       id: batch?.id ?? newId(),
       ingredientId,
       rawWeightG,
-      purchase: { pricePaidMYR: myr(price), location: location.trim(), date },
+      // Spread first, so editing one item of a shopping trip keeps it in that trip.
+      purchase: { ...batch?.purchase, pricePaidMYR: myr(price), location: location.trim(), date },
       createdAt: batch?.createdAt ?? Date.now(),
     };
 

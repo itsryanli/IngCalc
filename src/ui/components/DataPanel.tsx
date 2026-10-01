@@ -3,9 +3,8 @@ import {
   MAX_BACKUP_BYTES, NOT_READABLE, parseBackup, planSummary, restoredSummary, TOO_LARGE,
   type BackupTables, type RestoreMode, type RestorePlan,
 } from '../../core/backup';
-import { applyRestore, exportAll, previewRestore } from '../../storage/backup';
-import { todayIso } from '../dates';
-import { downloadText } from '../download';
+import { applyRestore, previewRestore } from '../../storage/backup';
+import { useBackup } from '../useBackup';
 
 type Stage =
   | { kind: 'idle' }
@@ -49,14 +48,9 @@ export function DataPanel({ onExportPurchases, onExportMeals, onRestored, today 
     setBusy(false);
   };
 
+  const backup = useBackup(today);
   const downloadBackup = async () => {
-    try {
-      const file = await exportAll();
-      downloadText(`ingcalc-backup-${todayIso(today)}.json`, 'application/json', JSON.stringify(file, null, 2));
-    } catch (err) {
-      console.error('Creating a backup failed', err);
-      setErrors(['The backup could not be created.']);
-    }
+    await backup.backUp();
   };
 
   const pickFile = async (file: File | undefined) => {
@@ -117,6 +111,8 @@ export function DataPanel({ onExportPurchases, onExportMeals, onRestored, today 
     }
     reset();
     setDone(restoredSummary(result.value));
+    // A replace restores the backup's own record of when it was last backed up.
+    void backup.reload();
     onRestored();
   };
 
@@ -150,7 +146,11 @@ export function DataPanel({ onExportPurchases, onExportMeals, onRestored, today 
         </button>
         <p className="data-panel__note">
           Everything on this device, in one file. Keep it somewhere other than this phone.
+          {backup.status !== null && (
+            <> <span data-testid="last-backup">{backup.status.text}.</span></>
+          )}
         </p>
+        {backup.error !== null && <p role="alert">{backup.error}</p>}
 
         {stage.kind === 'idle' && (
           <label className="btn btn--secondary data-panel__restore">

@@ -23,6 +23,10 @@ async function readTables(): Promise<BackupTables> {
 export const readAllTables = (): Promise<BackupTables> =>
   db.transaction('r', allTables(), readTables);
 
+/** Whether there is anything a lost phone would cost: purchases or logged meals. */
+export const hasUserData = async (): Promise<boolean> =>
+  (await db.batches.count()) + (await db.mealEntries.count()) > 0;
+
 export const exportAll = async (now: Date = new Date()): Promise<BackupFile> =>
   makeBackup(await readAllTables(), now);
 

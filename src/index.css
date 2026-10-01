@@ -642,6 +642,11 @@ body {
 }
 
 .banner--warn { background: var(--estimate-soft); color: var(--estimate); border: 1px solid currentColor; }
+/* The backup nudge: the message, then its one action, left-aligned under it. */
+.backup-reminder { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); }
+.backup-reminder__text { margin: 0; }
+.backup-reminder .btn { background: var(--surface); }
+
 .banner--info { background: var(--accent-soft); color: var(--accent); border: 1px solid currentColor; }
 
 .app [role='alert'] {
@@ -884,6 +889,42 @@ body {
 .session .btn-row { margin-top: var(--sp-3); }
 
 .batch__sessions li + li { margin-top: var(--sp-3); }
+
+/* A shopping trip: each item in its own inset panel, like a cook in a batch. */
+.trip-items { list-style: none; margin: 0 0 var(--sp-4); padding: 0; }
+
+.trip-item {
+  padding: var(--sp-3);
+  background: var(--surface-sunken);
+  border-radius: var(--radius);
+}
+
+.trip-item + .trip-item { margin-top: var(--sp-3); }
+.trip-item .field:last-child { margin-bottom: 0; }
+
+.trip-item__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  min-height: var(--tap-min);
+}
+
+.trip-item__label {
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.trip-total {
+  margin: var(--sp-4) 0 0;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
 
 /* Advisory, not an error: a deviation flag must read as "worth a look", never
    as a failure, because the cook it describes is kept either way. */
