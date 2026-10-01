@@ -100,8 +100,9 @@ export function AddIngredientScreen({
       <details className="label-paste">
         <summary>Fill in from a nutrition label</summary>
         <p className="screen__hint">
-          Point your phone's camera at the label and copy its text (Live Text on iPhone,
-          Google Lens on Android), then paste it here.
+          On iPhone, tap and hold in the box below and choose Scan Text, then point the
+          camera at the label. Or copy the label's text from the camera or a photo (Live
+          Text on iPhone, Google Lens on Android) and paste it here.
         </p>
         <div className="field">
           <label htmlFor="label-text">Label text</label>
