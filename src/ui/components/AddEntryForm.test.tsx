@@ -228,7 +228,7 @@ describe('AddEntryForm', () => {
     // The fixture only calibrates a roasted yield (0.71) for chicken; the form
     // defaults the method select to 'boiled', which falls through to the
     // category default instead and would not reproduce meals.test.ts's 44.1g.
-    fireEvent.change(screen.getByLabelText(/how was it cooked/i), { target: { value: 'roasted' } });
+    fireEvent.change(screen.getByLabelText(/how was it prepared/i), { target: { value: 'roasted' } });
     await enterWeight(142);
 
     // The readout is the whole reason Calc's hand-off was removed: the form

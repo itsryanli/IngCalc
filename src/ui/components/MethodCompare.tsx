@@ -3,6 +3,7 @@ import type { NutrientKey } from '../../core/types';
 import { METHOD_LABELS } from '../labels';
 
 const SOURCE_NOTE: Record<MethodRow['yieldSource'], string> = {
+  notCooked: 'not cooked',
   measured: 'your cooks',
   published: 'published',
   categoryDefault: 'rough estimate',

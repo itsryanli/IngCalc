@@ -164,6 +164,38 @@ describe('AddIngredientScreen', () => {
       expect(saved.sourceRef).toBe('Nutrition label');
     });
 
+    it('highlights each value that came from the label until it is edited', () => {
+      render(<AddIngredientScreen initialName="x" onSaved={vi.fn()} />);
+      paste(LABEL);
+      expect(screen.getByLabelText(/^protein/i).closest('.field')).toHaveClass('field--from-label');
+      expect(screen.getAllByText(/from label/i)).toHaveLength(4);
+      expect(screen.getByLabelText(/^sodium/i).closest('.field')).not.toHaveClass('field--from-label');
+
+      fireEvent.change(screen.getByLabelText(/^protein/i), { target: { value: '12' } });
+      expect(screen.getByLabelText(/^protein/i).closest('.field')).not.toHaveClass('field--from-label');
+      expect(screen.getAllByText(/from label/i)).toHaveLength(3);
+    });
+
+    it('marks a label food as eaten without cooking, which can be unticked', async () => {
+      const onSaved = vi.fn();
+      render(<AddIngredientScreen initialName="Crackers" onSaved={onSaved} />);
+      paste(LABEL);
+      const box = screen.getByLabelText(/usually eaten without cooking/i);
+      expect(box).toBeChecked();
+      fireEvent.click(screen.getByRole('button', { name: /save/i }));
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      expect((await db.userIngredients.toArray())[0]!.defaultMethod).toBe('asIs');
+    });
+
+    it('saves no usual method when the box is left unticked', async () => {
+      const onSaved = vi.fn();
+      render(<AddIngredientScreen initialName="Petai" onSaved={onSaved} />);
+      expect(screen.getByLabelText(/usually eaten without cooking/i)).not.toBeChecked();
+      fireEvent.click(screen.getByRole('button', { name: /save/i }));
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      expect((await db.userIngredients.toArray())[0]!.defaultMethod).toBeUndefined();
+    });
+
     it('records no source when the values were typed in', async () => {
       const onSaved = vi.fn();
       render(<AddIngredientScreen initialName="Petai" onSaved={onSaved} />);

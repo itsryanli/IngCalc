@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CATEGORIES, NUTRIENT_KEYS, type Category, type Ingredient, type NutrientKey, type NutrientProfile } from '../../core/types';
+import { CATEGORIES, NOT_COOKED, NUTRIENT_KEYS, type Category, type Ingredient, type NutrientKey, type NutrientProfile } from '../../core/types';
 import { zeroNutrients } from '../../core/nutrients';
 import { parseLabel, type LabelReading } from '../../core/labelParse';
 import { saveUserIngredient } from '../../storage/userIngredients';
@@ -33,6 +33,9 @@ export function AddIngredientScreen({
   const [name, setName] = useState(initialName);
   const [category, setCategory] = useState<Category>('other');
   const [absorbsWater, setAbsorbsWater] = useState(false);
+  const [eatenAsIs, setEatenAsIs] = useState(false);
+  /** Fields filled from a label and not yet touched: highlighted so each gets checked. */
+  const [fromLabel, setFromLabel] = useState<ReadonlySet<NutrientKey>>(new Set());
   const [entries, setEntries] = useState<Entries>(emptyEntries);
   const [error, setError] = useState<string | null>(null);
   const [labelText, setLabelText] = useState('');
@@ -50,6 +53,19 @@ export function AddIngredientScreen({
       if (v !== undefined) next[k] = String(v);
     }
     setEntries(next);
+    setFromLabel(new Set(NUTRIENT_KEYS.filter((k) => r.values[k] !== undefined)));
+    // Packaged food with a label is nearly always eaten as it comes.
+    setEatenAsIs(true);
+  };
+
+  const changeNutrient = (k: NutrientKey, value: string) => {
+    setEntries((s) => ({ ...s, [k]: value }));
+    setFromLabel((s) => {
+      if (!s.has(k)) return s;
+      const next = new Set(s);
+      next.delete(k);
+      return next;
+    });
   };
 
   const filled = reading === null ? [] : NUTRIENT_KEYS.filter((k) => reading.values[k] !== undefined);
@@ -76,6 +92,7 @@ export function AddIngredientScreen({
       per100gRaw,
       publishedYield: {},
       absorbsWater,
+      ...(eatenAsIs ? { defaultMethod: NOT_COOKED } : {}),
       source: 'user',
       ...(filled.length > 0 ? { sourceRef: 'Nutrition label' } : {}),
       archived: false,
@@ -120,7 +137,7 @@ export function AddIngredientScreen({
                 <p>
                   Filled in {filled.length} {filled.length === 1 ? 'value' : 'values'} {BASIS[reading.basis]}
                   {reading.servingGrams !== undefined && ` (serving: ${reading.servingGrams} g)`}.
-                  Check each one against the label before saving.
+                  They're highlighted below: check each one against the label before saving.
                 </p>
                 {missing.length > 0 && (
                   <p>Not on the label, so left blank (saved as zero): {missing.map((k) => LABELS[k].replace(/ \(.*\)$/, '')).join(', ')}.</p>
@@ -149,12 +166,20 @@ export function AddIngredientScreen({
         Absorbs water when cooked (rice, pasta, dried beans)
       </label>
 
+      <label className="checkbox-row">
+        <input type="checkbox" checked={eatenAsIs} onChange={(e) => setEatenAsIs(e.target.checked)} />
+        Usually eaten without cooking (bread, crackers, yogurt, fruit)
+      </label>
+
       <fieldset>
         <legend>Nutrients per 100g raw</legend>
         <div className="nutrient-grid">
       {NUTRIENT_KEYS.map((k) => (
-        <div key={k} className="field">
-          <label htmlFor={`n-${k}`}>{LABELS[k]}</label>
+        <div key={k} className={`field${fromLabel.has(k) ? ' field--from-label' : ''}`}>
+          <label htmlFor={`n-${k}`}>
+            {LABELS[k]}
+            {fromLabel.has(k) && <span className="from-label-tag"> from label</span>}
+          </label>
           {/* type="text" with inputMode="decimal" allows validation to catch non-numeric input that
               type="number" would sanitise away, rendering the Number.isFinite guard reachable.
               inputMode preserves the numeric keypad on mobile devices. */}
@@ -163,7 +188,7 @@ export function AddIngredientScreen({
             type="text"
             inputMode="decimal"
             value={entries[k]}
-            onChange={(e) => setEntries((s) => ({ ...s, [k]: e.target.value }))}
+            onChange={(e) => changeNutrient(k, e.target.value)}
           />
         </div>
       ))}

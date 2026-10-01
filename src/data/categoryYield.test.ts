@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { CATEGORIES, COOK_METHODS } from '../core/types';
+import { CATEGORIES, HEAT_METHODS } from '../core/types';
 import { CATEGORY_YIELD } from './categoryYield';
 
 describe('CATEGORY_YIELD', () => {
   it('covers every category and method pair', () => {
     for (const c of CATEGORIES) {
-      for (const m of COOK_METHODS) {
+      for (const m of HEAT_METHODS) {
         const v = CATEGORY_YIELD[c][m];
         expect(typeof v, `${c}.${m}`).toBe('number');
       }
@@ -14,7 +14,7 @@ describe('CATEGORY_YIELD', () => {
 
   it('keeps every factor within a plausible range', () => {
     for (const c of CATEGORIES) {
-      for (const m of COOK_METHODS) {
+      for (const m of HEAT_METHODS) {
         const v = CATEGORY_YIELD[c][m];
         expect(v, `${c}.${m}`).toBeGreaterThan(0.3);
         expect(v, `${c}.${m}`).toBeLessThanOrEqual(3.5);

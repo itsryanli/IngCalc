@@ -175,6 +175,28 @@ describe('CalcScreen', () => {
   });
 });
 
+describe('CalcScreen, not cooked', () => {
+  it('starts fruit on not cooked and shows its nutrients without a cooking step', async () => {
+    render(<CalcScreen profile={null} today={today} />);
+    await pickIngredient(/^Banana/);
+    fireEvent.change(screen.getByLabelText(/^weight/i), { target: { value: '120' } });
+    expect(screen.getByRole('combobox', { name: /method/i })).toHaveValue('asIs');
+    expect(await screen.findByText(/not cooked — weight unchanged/i)).toBeInTheDocument();
+    expect(screen.queryByText(/this weight is/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('result-weight')).not.toBeInTheDocument();
+    expect(screen.queryByText(/which method keeps the most/i)).not.toBeInTheDocument();
+  });
+
+  it('brings the cooking steps back when a cooking method is chosen', async () => {
+    render(<CalcScreen profile={null} today={today} />);
+    await pickIngredient(/^Banana/);
+    fireEvent.change(screen.getByLabelText(/^weight/i), { target: { value: '120' } });
+    fireEvent.change(screen.getByRole('combobox', { name: /method/i }), { target: { value: 'steamed' } });
+    expect(await screen.findByTestId('result-weight')).toBeInTheDocument();
+    expect(screen.getByText(/which method keeps the most/i)).toBeInTheDocument();
+  });
+});
+
 describe('CalcScreen calibration', () => {
   beforeEach(async () => {
     await db.batches.clear();

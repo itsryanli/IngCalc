@@ -196,6 +196,7 @@ const SPECS: Record<Exclude<TableName, 'mealEntries'>, readonly Spec[]> = {
       && Object.entries(r.publishedYield)
         .every(([k, f]) => isOneOf(COOK_METHODS)(k) && bounded(isPositive, MAX_YIELD_FACTOR)(f))],
     ['water absorption', (r) => typeof r.absorbsWater === 'boolean'],
+    ['usual cooking method', (r) => isOptional(isOneOf(COOK_METHODS))(r.defaultMethod)],
     // Built-in ingredients are code, not data: a backup can only carry the user's own.
     ['source', (r) => r.source === 'user'],
     ['source reference', (r) => isOptional((v) => typeof v === 'string')(r.sourceRef)],

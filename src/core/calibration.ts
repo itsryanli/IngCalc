@@ -1,4 +1,4 @@
-import type { Batch, CookMethod, CookSession, Ingredient, YieldSample } from './types';
+import { NOT_COOKED, type Batch, type CookMethod, type CookSession, type Ingredient, type YieldSample } from './types';
 import type { CategoryYield } from './yieldResolver';
 import { formatG, type Grams } from './units';
 
@@ -38,7 +38,9 @@ export const referenceFactor = (
   ingredient: Ingredient,
   method: CookMethod,
   categoryYield: CategoryYield,
-): number => ingredient.publishedYield[method] ?? categoryYield[ingredient.category][method];
+): number => (method === NOT_COOKED
+  ? 1
+  : ingredient.publishedYield[method] ?? categoryYield[ingredient.category][method]);
 
 export interface YieldBounds {
   min: number;

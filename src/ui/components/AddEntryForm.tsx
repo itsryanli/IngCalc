@@ -1,7 +1,8 @@
 import { useId, useMemo, useState } from 'react';
 import { cookedRemainingG, EPSILON } from '../../core/batch';
 import { entryNutrients, validateEntry, type MealContext } from '../../core/meals';
-import { COOK_METHODS, type CookMethod, type DayLog, type DayLogTargets, type Ingredient,
+import { startingMethod } from '../../core/methods';
+import { COOK_METHODS, NOT_COOKED, type CookMethod, type DayLog, type DayLogTargets, type Ingredient,
   type IsoDate, type MealEntry, type MealEntryFields, type MealLabel } from '../../core/types';
 import { g, type Grams } from '../../core/units';
 import { addEntries, addEntry, dayLogId, updateEntry } from '../../storage/meals';
@@ -319,20 +320,24 @@ export function AddEntryForm({
           <IngredientPicker
             catalogue={catalogue}
             value={ingredientId}
-            onChange={setIngredientId}
+            onChange={(id) => {
+              setIngredientId(id);
+              const picked = catalogue.find((i) => i.id === id);
+              if (picked !== undefined) setMethod((m) => startingMethod(picked, m));
+            }}
             // Adding an ingredient mid-meal is a Kitchen job; keeping the flow
             // out of here is what stops this form growing a second screen.
             onAddNew={() => setError('Add new ingredients from the Kitchen tab.')}
           />
           <div className="field">
-            <label htmlFor={`${ids}-method`}>How was it cooked?</label>
+            <label htmlFor={`${ids}-method`}>How was it prepared?</label>
             <select id={`${ids}-method`} value={method}
                     onChange={(e) => setMethod(e.target.value as CookMethod)}>
               {COOK_METHODS.map((m) => <option key={m} value={m}>{METHOD_LABELS[m]}</option>)}
             </select>
           </div>
           <WeightInput value={cookedG} unit={unit}
-                       label={each ? 'How much did each person eat? (cooked)' : 'How much did you eat? (cooked)'}
+                       label={`${each ? 'How much did each person eat?' : 'How much did you eat?'}${method === NOT_COOKED ? '' : ' (cooked)'}`}
                        onChange={setCookedG} onUnitChange={setUnit} />
         </>
       )}

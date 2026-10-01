@@ -1,6 +1,6 @@
-import type { Category, CookMethod, Ingredient, YieldSample } from './types';
+import { NOT_COOKED, type Category, type CookMethod, type HeatMethod, type Ingredient, type YieldSample } from './types';
 
-export type YieldSource = 'measured' | 'published' | 'categoryDefault';
+export type YieldSource = 'notCooked' | 'measured' | 'published' | 'categoryDefault';
 
 export interface ResolvedYield {
   factor: number;
@@ -9,7 +9,7 @@ export interface ResolvedYield {
   sampleCount: number;
 }
 
-export type CategoryYield = Record<Category, Record<CookMethod, number>>;
+export type CategoryYield = Record<Category, Record<HeatMethod, number>>;
 
 export function resolveYield(
   ingredient: Ingredient,
@@ -17,6 +17,9 @@ export function resolveYield(
   samples: readonly YieldSample[],
   categoryYield: CategoryYield,
 ): ResolvedYield {
+  // Not cooked: the weight cannot change, whatever the samples or tables say.
+  if (method === NOT_COOKED) return { factor: 1, source: 'notCooked', sampleCount: 0 };
+
   const usable = samples.filter(
     (s) =>
       s.ingredientId === ingredient.id &&

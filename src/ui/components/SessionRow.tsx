@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { cookedRemainingG, EPSILON, portionsRemaining } from '../../core/batch';
 import { flagYield } from '../../core/calibration';
 import { costPerPortion } from '../../core/cost';
-import type { Batch, CookSession, Ingredient, MealEntry } from '../../core/types';
+import { NOT_COOKED, type Batch, type CookSession, type Ingredient, type MealEntry } from '../../core/types';
 import { formatG, formatMYR } from '../../core/units';
 import { CATEGORY_YIELD } from '../../data/categoryYield';
 import { deleteCookSession, saveCookSession } from '../../storage/kitchen';
@@ -23,6 +23,7 @@ export function SessionRow({ batch, ingredient, session, entries, onChanged, onE
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const asIs = session.method === NOT_COOKED;
   const remaining = cookedRemainingG(session, entries);
   const portionsLeft = portionsRemaining(session, entries);
 
@@ -60,11 +61,12 @@ export function SessionRow({ batch, ingredient, session, entries, onChanged, onE
 
   return (
     <div className="session">
-      <p className="session__heading">Cook</p>
+      <p className="session__heading">{asIs ? 'Ready to eat' : 'Cook'}</p>
       <p className="session__summary" data-testid="session-summary">
-        {METHOD_LABELS[session.method]} · {formatG(session.rawUsedG)} raw →{' '}
-        {formatG(session.cookedWeightG)} cooked · {session.portionCount} portions ·{' '}
-        {formatIsoDate(session.cookedAt)}
+        {asIs
+          ? <>{METHOD_LABELS[session.method]} · {formatG(session.rawUsedG)}</>
+          : <>{METHOD_LABELS[session.method]} · {formatG(session.rawUsedG)} raw →{' '}{formatG(session.cookedWeightG)} cooked</>}
+        {' '}· {session.portionCount} portions · {formatIsoDate(session.cookedAt)}
       </p>
 
       {perPortion !== null && (
@@ -80,14 +82,15 @@ export function SessionRow({ batch, ingredient, session, entries, onChanged, onE
         </p>
       )}
 
-      <label className="checkbox-row">
+      {/* Nothing to learn a yield from when nothing was cooked. */}
+      {!asIs && <label className="checkbox-row">
         <input
           type="checkbox"
           checked={session.excludeFromCalibration}
           onChange={() => { void toggleExclude(); }}
         />
         Ignore this cook when working out my yields
-      </label>
+      </label>}
 
       <p className="session__remaining" data-testid="remaining">
         {/* EPSILON, not 0: eating every portion of a cook whose portion weight

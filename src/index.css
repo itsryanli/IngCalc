@@ -658,6 +658,21 @@ body {
 .label-paste__result p { margin: 0 0 var(--sp-2); }
 .label-paste__result p:last-child { margin-bottom: 0; }
 .label-paste__result ul { margin: 0; padding-left: var(--sp-5); }
+/* A value filled in from a label, not yet touched: compare it with the label. */
+.app .field--from-label input:not([type='checkbox']) {
+  background: var(--estimate-soft);
+  border-color: var(--estimate);
+}
+.from-label-tag {
+  margin-left: var(--sp-1);
+  padding: 0 var(--sp-2);
+  border-radius: 999px;
+  background: var(--estimate-soft);
+  color: var(--estimate);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 /* New version ready: floats just above the tab bar on every screen. */
 .update-banner {
