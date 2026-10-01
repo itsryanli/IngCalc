@@ -127,6 +127,7 @@ describe('parseBackup: each guard rejects each field it checks', () => {
     ['userIngredients', 'added ingredient', 'water absorption', { absorbsWater: 'no' }],
     ['userIngredients', 'added ingredient', 'source', { source: 'usda' }],
     ['userIngredients', 'added ingredient', 'source reference', { sourceRef: 5 }],
+    ['userIngredients', 'added ingredient', 'usual cooking method', { defaultMethod: 'microwaved' }],
     ['userIngredients', 'added ingredient', 'archived flag', { archived: 1 }],
     ['settings', 'settings row', 'id', { id: 'other' }],
     ['settings', 'settings row', 'active profile', { activeProfileId: '' }],

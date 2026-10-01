@@ -76,9 +76,11 @@ export function NutrientTable({ totals, targets, assumedRetentionFor, belowRniAg
           <td colSpan={4}>
             {/* The asterisk marker relies on <abbr title>, which has no hover on a phone —
                 the actual target device for this app — so its meaning is otherwise invisible. */}
-            <p className="nutrient-table__legend">
-              * Retention assumed 100% — no sourced figure for this nutrient and cooking method.
-            </p>
+            {assumedRetentionFor.length > 0 && (
+              <p className="nutrient-table__legend">
+                * Retention assumed 100% — no sourced figure for this nutrient and cooking method.
+              </p>
+            )}
             <p className="nutrient-table__legend">
               Iron RNI shown at 15% dietary bioavailability (RNI Malaysia 2017). A less
               bioavailable diet needs a higher figure than this table shows.

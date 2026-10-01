@@ -3,9 +3,10 @@ import {
   rawRemainingG, validateCook, validateCookEdit, validateRawUsedEdit,
 } from '../../core/batch';
 import { flagYield } from '../../core/calibration';
-import { COOK_METHODS, type Batch, type CookMethod, type CookSession, type Ingredient, type MealEntry, type YieldSample } from '../../core/types';
+import { COOK_METHODS, NOT_COOKED, type Batch, type CookMethod, type CookSession, type Ingredient, type MealEntry, type YieldSample } from '../../core/types';
 import { g, type Grams } from '../../core/units';
 import { resolveYield } from '../../core/yieldResolver';
+import { startingMethod } from '../../core/methods';
 import { CATEGORY_YIELD } from '../../data/categoryYield';
 import { saveCookSession } from '../../storage/kitchen';
 import { todayIso } from '../dates';
@@ -38,7 +39,8 @@ export function CookSessionForm({
   // Cooking the whole remainder is the common case, so it is the default.
   const defaultRaw = session?.rawUsedG ?? rawRemainingG(batch, sessions);
 
-  const [method, setMethod] = useState<CookMethod>(session?.method ?? 'roasted');
+  const [method, setMethod] = useState<CookMethod>(session?.method ?? startingMethod(ingredient, 'roasted'));
+  const asIs = method === NOT_COOKED;
   const [rawUsedG, setRawUsedG] = useState<Grams>(defaultRaw);
   const [rawUnit, setRawUnit] = useState<WeightUnit>('g');
   const [cookedWeightG, setCookedWeightG] = useState<Grams>(session?.cookedWeightG ?? g(0));
@@ -56,15 +58,17 @@ export function CookSessionForm({
   // re-read it. Blocking happens in validateCook, which only refuses the
   // impossible band.
   const flag = useMemo(
-    () => (cookedWeightG > 0 && rawUsedG > 0
+    () => (!asIs && cookedWeightG > 0 && rawUsedG > 0
       ? flagYield({ method, rawUsedG, cookedWeightG }, ingredient, CATEGORY_YIELD)
       : null),
-    [method, rawUsedG, cookedWeightG, ingredient],
+    [asIs, method, rawUsedG, cookedWeightG, ingredient],
   );
 
   const submit = async () => {
     const portionCount = Number(portionText.trim());
-    const draft = { method, rawUsedG, cookedWeightG, portionCount, cookedAt };
+    // Not cooked: the weight it is eaten at is the weight it was bought at.
+    const finalCookedG = asIs ? rawUsedG : cookedWeightG;
+    const draft = { method, rawUsedG, cookedWeightG: finalCookedG, portionCount, cookedAt };
 
     // When editing, this session's own raw weight must be measured against
     // what the OTHER sessions left, not against the whole-batch remainder
@@ -95,7 +99,7 @@ export function CookSessionForm({
       batchId: batch.id,
       method,
       rawUsedG,
-      cookedWeightG,
+      cookedWeightG: finalCookedG,
       cookedAt,
       portionCount,
       excludeFromCalibration: session?.excludeFromCalibration ?? false,
@@ -121,7 +125,11 @@ export function CookSessionForm({
 
   return (
     <div className="screen">
-      <h3>{editing ? 'Edit this cook' : `Cook some ${ingredient.name.toLowerCase()}`}</h3>
+      <h3>
+        {editing
+          ? 'Edit this cook'
+          : `${asIs ? 'Use' : 'Cook'} some ${ingredient.name.toLowerCase()}`}
+      </h3>
 
       <div className="field">
         <label htmlFor="cook-method">Cooking method</label>
@@ -137,20 +145,22 @@ export function CookSessionForm({
       <YieldBadge resolved={resolved} published={ingredient.publishedYield[method]} />
 
       <WeightInput
-        label="Raw weight used"
+        label={asIs ? 'Weight used' : 'Raw weight used'}
         value={rawUsedG}
         unit={rawUnit}
         onChange={setRawUsedG}
         onUnitChange={setRawUnit}
       />
 
-      <WeightInput
-        label="Cooked weight"
-        value={cookedWeightG}
-        unit={cookedUnit}
-        onChange={setCookedWeightG}
-        onUnitChange={setCookedUnit}
-      />
+      {!asIs && (
+        <WeightInput
+          label="Cooked weight"
+          value={cookedWeightG}
+          unit={cookedUnit}
+          onChange={setCookedWeightG}
+          onUnitChange={setCookedUnit}
+        />
+      )}
 
       {flag !== null && (
         <p className={`flag flag--${flag.kind}`} data-testid="outlier-warning">
@@ -172,7 +182,7 @@ export function CookSessionForm({
       </div>
 
       <div className="field">
-        <label htmlFor="cook-date">Date cooked</label>
+        <label htmlFor="cook-date">{asIs ? 'Date' : 'Date cooked'}</label>
         <input
           id="cook-date"
           type="date"

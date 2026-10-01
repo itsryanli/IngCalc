@@ -1,5 +1,5 @@
 // src/core/nutrition.ts
-import type { CalcStep, CookMethod, Ingredient, NutrientKey, NutrientProfile, YieldSample } from './types';
+import { NOT_COOKED, type CalcStep, type CookMethod, type Ingredient, type NutrientKey, type NutrientProfile, type YieldSample } from './types';
 
 // Re-exported so existing importers keep working; the type itself now lives in types.ts.
 export type { CalcStep };
@@ -32,6 +32,8 @@ const round = (n: number, dp = 1): string => n.toFixed(dp);
 
 function yieldNote(y: ResolvedYield): string {
   switch (y.source) {
+    case 'notCooked':
+      return 'not cooked — weight unchanged';
     case 'measured':
       return `your average across ${y.sampleCount} cook${y.sampleCount === 1 ? '' : 's'}`;
     case 'published':
@@ -84,16 +86,18 @@ export function computeCooked(input: CookInput): CookedResult {
       sourceNote: ingredient.sourceRef,
     },
     {
-      label: `Yield (${method})`,
+      label: method === NOT_COOKED ? 'Not cooked' : `Yield (${method})`,
       detail: `× ${yieldUsed.factor.toFixed(2)}`,
-      value: `${round(cookedWeightG, 0)}g cooked`,
+      value: `${round(cookedWeightG, 0)}g${method === NOT_COOKED ? '' : ' cooked'}`,
       sourceNote: yieldNote(yieldUsed),
     },
     {
       label: 'Protein retention',
       detail: `× ${proteinRetention.factor.toFixed(2)}`,
       value: `${round(totals.protein)}g protein`,
-      sourceNote: proteinRetention.assumed ? 'assumed 100% — no sourced figure' : 'category retention factor — coarse estimate',
+      sourceNote: method === NOT_COOKED
+        ? 'not cooked — nothing lost'
+        : proteinRetention.assumed ? 'assumed 100% — no sourced figure' : 'category retention factor — coarse estimate',
     },
     {
       label: 'Per 100g cooked',

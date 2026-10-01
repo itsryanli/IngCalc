@@ -1,4 +1,4 @@
-import { COOK_METHODS, type CookMethod, type Ingredient, type NutrientKey, type YieldSample } from './types';
+import { HEAT_METHODS, type CookMethod, type Ingredient, type NutrientKey, type YieldSample } from './types';
 import { resolveYield, type CategoryYield, type YieldSource } from './yieldResolver';
 import { retentionFor, type RetentionLookup } from './retention';
 
@@ -23,7 +23,8 @@ export function compareMethods(
   retention: RetentionLookup,
   highlight: readonly NutrientKey[],
 ): MethodRow[] {
-  const rows = COOK_METHODS.map((method): MethodRow => {
+  // Heat methods only: "not cooked" is not a way of cooking to compare against.
+  const rows = HEAT_METHODS.map((method): MethodRow => {
     const y = resolveYield(ingredient, method, samples, categoryYield);
 
     const retainedPct: Partial<Record<NutrientKey, number>> = {};

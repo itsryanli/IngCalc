@@ -18,10 +18,19 @@ export const CATEGORIES = [
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
 
+/**
+ * 'asIs' is "not cooked": fruit, yogurt, bread, crackers. It is a method rather
+ * than a separate path so every form, backup and export handles it for free;
+ * the yield and retention lookups short-circuit it to exactly 1.
+ */
 export const COOK_METHODS = [
-  'boiled', 'steamed', 'panFried', 'stirFried', 'deepFried', 'roasted', 'grilled',
+  'asIs', 'boiled', 'steamed', 'panFried', 'stirFried', 'deepFried', 'roasted', 'grilled',
 ] as const;
 export type CookMethod = (typeof COOK_METHODS)[number];
+export const NOT_COOKED = 'asIs' satisfies CookMethod;
+/** The methods that actually apply heat: the ones yield tables and comparisons cover. */
+export type HeatMethod = Exclude<CookMethod, typeof NOT_COOKED>;
+export const HEAT_METHODS = COOK_METHODS.filter((m): m is HeatMethod => m !== NOT_COOKED);
 
 export interface Ingredient {
   id: string;
@@ -31,6 +40,8 @@ export interface Ingredient {
   publishedYield: Partial<Record<CookMethod, number>>;
   /** Rice, pasta and dried legumes absorb water: a yield above 1 is correct, not an error. */
   absorbsWater: boolean;
+  /** The method forms start on for this ingredient, e.g. 'asIs' for crackers. */
+  defaultMethod?: CookMethod;
   source: 'usda' | 'user';
   sourceRef?: string;
   archived: boolean;

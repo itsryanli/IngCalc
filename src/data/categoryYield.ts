@@ -13,9 +13,9 @@
 // original, uncorrected estimate and remains as unverified as the day this file
 // was written. Values are category means and are labelled 'categoryDefault' in
 // the UI so the user knows they are rough.
-import type { Category, CookMethod } from '../core/types';
+import type { Category, HeatMethod } from '../core/types';
 
-export const CATEGORY_YIELD: Record<Category, Record<CookMethod, number>> = {
+export const CATEGORY_YIELD: Record<Category, Record<HeatMethod, number>> = {
   meat:      { boiled: 0.70, steamed: 0.75, panFried: 0.72, stirFried: 0.73, deepFried: 0.78, roasted: 0.73, grilled: 0.71 },
   seafood:   { boiled: 0.78, steamed: 0.82, panFried: 0.78, stirFried: 0.80, deepFried: 0.83, roasted: 0.79, grilled: 0.77 },
   egg:       { boiled: 1.00, steamed: 0.98, panFried: 0.88, stirFried: 0.88, deepFried: 0.90, roasted: 0.92, grilled: 0.90 },

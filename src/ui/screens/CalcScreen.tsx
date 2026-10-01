@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { COOK_METHODS, type CookMethod, type Ingredient, type NutrientKey, type Profile } from '../../core/types';
+import { startingMethod } from '../../core/methods';
+import { COOK_METHODS, NOT_COOKED, type CookMethod, type Ingredient, type NutrientKey, type Profile } from '../../core/types';
 import { g, type Grams } from '../../core/units';
 import { computeCooked, rawFromCooked } from '../../core/nutrition';
 import { perPortion } from '../../core/batch';
@@ -41,6 +42,14 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
   const [addIngredientError, setAddIngredientError] = useState<string | null>(null);
 
   const ingredient = catalogue.find((i) => i.id === ingredientId) ?? null;
+  const asIs = method === NOT_COOKED;
+
+  // Each ingredient starts on its usual method (crackers: not cooked), which
+  // the person can still change.
+  const selectIngredient = (picked: Ingredient | undefined) => {
+    setIngredientId(picked?.id ?? '');
+    if (picked !== undefined) setMethod((m) => startingMethod(picked, m));
+  };
 
   const handleAddNew = (typedName: string) => {
     setAddIngredientError(null);
@@ -75,7 +84,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
 
     if (confirmed.some((i) => i.id === added.id)) {
       setAddIngredientError(null);
-      setIngredientId(added.id);
+      selectIngredient(added);
     } else {
       setAddIngredientError(
         `"${added.name}" was saved, but could not be loaded back into the list just now. ` +
@@ -86,13 +95,13 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
 
   const result = useMemo(() => {
     if (ingredient === null || weight <= 0) return null;
-    const rawG = entered === 'raw'
+    const rawG = entered === 'raw' || method === NOT_COOKED
       ? weight
       : rawFromCooked(ingredient, weight, method, samples, CATEGORY_YIELD).rawWeightG;
     const cooked = computeCooked({
       ingredient, rawG, method, samples, categoryYield: CATEGORY_YIELD, retention: RETENTION,
     });
-    return { cooked, shownWeight: entered === 'raw' ? cooked.cookedWeightG : rawG };
+    return { cooked, shownWeight: entered === 'raw' || method === NOT_COOKED ? cooked.cookedWeightG : rawG };
   }, [ingredient, weight, entered, method, samples]);
 
   // Kept apart from `result` so changing the split does not recompute the cook.
@@ -136,14 +145,14 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
           <IngredientPicker
             catalogue={catalogue}
             value={ingredientId}
-            onChange={setIngredientId}
+            onChange={(id) => selectIngredient(catalogue.find((i) => i.id === id))}
             onAddNew={handleAddNew}
           />
           {addIngredientError !== null && <p role="alert">{addIngredientError}</p>}
 
           <WeightInput label="Weight" value={weight} unit={unit} onChange={setWeight} onUnitChange={setUnit} />
 
-          <fieldset>
+          {!asIs && <fieldset>
             <legend>This weight is</legend>
             <div className="choice-row">
             {(['raw', 'cooked'] as const).map((s) => (
@@ -153,7 +162,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
               </label>
             ))}
             </div>
-          </fieldset>
+          </fieldset>}
 
           <div className="field">
           <label htmlFor="method">Cooking method</label>
@@ -165,10 +174,12 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
           {result !== null && (
             <>
               <div className="card">
-                <p className="result" data-testid="result-weight">
-                  {result.shownWeight.toLocaleString('en-MY', { maximumFractionDigits: 0 })}g{' '}
-                  <span className="result__unit">{entered === 'raw' ? 'cooked' : 'raw'}</span>
-                </p>
+                {!asIs && (
+                  <p className="result" data-testid="result-weight">
+                    {result.shownWeight.toLocaleString('en-MY', { maximumFractionDigits: 0 })}g{' '}
+                    <span className="result__unit">{entered === 'raw' ? 'cooked' : 'raw'}</span>
+                  </p>
+                )}
 
                 <CalcTrace steps={result.cooked.steps} />
               </div>
@@ -201,12 +212,14 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
                 </p>
               )}
 
-              <div className="card">
-                <h3 className="card__title">Which method keeps the most</h3>
-                <div className="table-scroll">
-                  <MethodCompare rows={rows} highlight={HIGHLIGHT} />
+              {!asIs && (
+                <div className="card">
+                  <h3 className="card__title">Which method keeps the most</h3>
+                  <div className="table-scroll">
+                    <MethodCompare rows={rows} highlight={HIGHLIGHT} />
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
         </>

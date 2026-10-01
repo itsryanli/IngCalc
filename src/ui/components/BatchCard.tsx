@@ -5,7 +5,8 @@ import {
 import {
   costPerKgCooked, costPerKgRaw, proteinPerMYRRaw, proteinPerMYRRetained,
 } from '../../core/cost';
-import type { Batch, CookSession, Ingredient, MealEntry } from '../../core/types';
+import { NOT_COOKED, type Batch, type CookSession, type Ingredient, type MealEntry } from '../../core/types';
+import { startingMethod } from '../../core/methods';
 import { formatG, formatMYR } from '../../core/units';
 import { RETENTION } from '../../data/retentionTable';
 import { deleteBatchCascade } from '../../storage/kitchen';
@@ -156,7 +157,7 @@ export function BatchCard({
         <div className="btn-row">
           {remaining > 0 && ingredient !== null && (
             <button type="button" className="btn btn--primary" onClick={() => onCook(batch)}>
-              Cook some
+              {startingMethod(ingredient, 'roasted') === NOT_COOKED ? 'Use some' : 'Cook some'}
             </button>
           )}
           <button type="button" className="btn btn--secondary" onClick={() => onEditBatch(batch)}>

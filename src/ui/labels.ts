@@ -14,6 +14,7 @@ import type { Grams } from '../core/units';
  * makes that worse ("DeepFried"), so the mapping has to be explicit.
  */
 export const METHOD_LABELS: Record<CookMethod, string> = {
+  asIs: 'Not cooked (as is)',
   boiled: 'Boiled',
   steamed: 'Steamed',
   panFried: 'Pan-fried',
@@ -126,6 +127,8 @@ export function yieldSentence(resolved: ResolvedYield, published?: number): stri
   const factor = resolved.factor.toFixed(2);
 
   switch (resolved.source) {
+    case 'notCooked':
+      return 'Not cooked: weight and nutrients stay as they are';
     case 'measured': {
       const cooks = `${resolved.sampleCount} cook${resolved.sampleCount === 1 ? '' : 's'}`;
       const against = published === undefined ? '' : ` (published: ${published.toFixed(2)})`;

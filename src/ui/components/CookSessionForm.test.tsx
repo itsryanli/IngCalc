@@ -221,4 +221,34 @@ describe('CookSessionForm', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect((await db.cookSessions.toArray())[0]!.excludeFromCalibration).toBe(true);
   });
+
+  describe('not cooked (as is)', () => {
+    const yogurtBatch: Batch = { ...batch, id: 'b2', ingredientId: 'greek-yogurt', rawWeightG: g(500) };
+
+    it('starts yogurt on not cooked and asks only for the weight used', () => {
+      render(<CookSessionForm {...props} batch={yogurtBatch} ingredient={bundled('greek-yogurt')} />);
+      expect(screen.getByRole('heading', { name: /use some greek yogurt/i })).toBeInTheDocument();
+      expect(screen.getByLabelText(/cooking method/i)).toHaveValue('asIs');
+      expect(screen.getByLabelText(/^weight used/i)).toHaveValue(500);
+      expect(screen.queryByLabelText(/cooked weight/i)).not.toBeInTheDocument();
+    });
+
+    it('saves the weight used as the weight eaten', async () => {
+      const onSaved = vi.fn();
+      render(<CookSessionForm {...props} batch={yogurtBatch} ingredient={bundled('greek-yogurt')} onSaved={onSaved} />);
+      fireEvent.change(screen.getByLabelText(/^weight used/i), { target: { value: '200' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      const saved = onSaved.mock.calls[0]![0] as CookSession;
+      expect(saved.method).toBe('asIs');
+      expect(saved.rawUsedG).toBe(200);
+      expect(saved.cookedWeightG).toBe(200);
+    });
+
+    it('still starts chicken on a cooking method', () => {
+      render(<CookSessionForm {...props} />);
+      expect(screen.getByLabelText(/cooking method/i)).toHaveValue('roasted');
+      expect(screen.getByLabelText(/cooked weight/i)).toBeInTheDocument();
+    });
+  });
 });
