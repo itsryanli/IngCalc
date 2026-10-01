@@ -659,6 +659,21 @@ body {
 .label-paste__result p:last-child { margin-bottom: 0; }
 .label-paste__result ul { margin: 0; padding-left: var(--sp-5); }
 
+/* New version ready: floats just above the tab bar on every screen. */
+.update-banner {
+  position: fixed;
+  z-index: 30;
+  left: var(--sp-4);
+  right: var(--sp-4);
+  bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px) + var(--sp-3));
+  max-width: var(--content-max);
+  margin: 0 auto;
+  box-shadow: var(--shadow);
+}
+.update-banner__text { margin: 0 0 var(--sp-3); font-weight: 600; }
+.update-banner__actions { display: flex; gap: var(--sp-3); }
+.update-banner__actions .btn { flex: 1 1 0; }
+
 /* Banners */
 .banner {
   padding: var(--sp-3) var(--sp-4);

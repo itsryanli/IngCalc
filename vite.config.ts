@@ -45,7 +45,11 @@ export default defineConfig({
     react(),
     contentSecurityPolicy(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt', not 'autoUpdate': a new version waits until the person taps
+      // Reload in UpdatePrompt, so it never reloads over a half-filled form.
+      registerType: 'prompt',
+      // UpdatePrompt registers the service worker itself.
+      injectRegister: false,
       manifest: {
         name: 'IngCalc',
         short_name: 'IngCalc',

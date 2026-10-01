@@ -104,6 +104,9 @@ still stays on your phone, because the app only saves to the phone's browser sto
    - **iPhone (Safari):** Share button → **Add to Home Screen**
    - **Android (Chrome):** ⋮ menu → **Install app** (or **Add to Home screen**)
 3. **Open it from the home-screen icon.** After the first load it works offline.
+4. **Getting updates.** When a new version has been published, the app shows
+   "A new version of IngCalc is ready" the next time you return to it. Tap
+   **Reload** when you're not in the middle of something.
 
 > **GitHub Pages** also works. The included workflow
 > (`.github/workflows/deploy.yml`) builds the app and publishes it on every push
