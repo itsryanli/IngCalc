@@ -84,7 +84,7 @@ export function DishForm({
     if (!result.ok) { setError(result.message); return; }
     setError(null);
 
-    const { per100g, unknownNutrients } = result.figures;
+    const { per100g, unknownNutrients, partialNutrients } = result.figures;
     const saved: Ingredient = {
       id: mode === 'edit' && dish !== undefined ? dish.id : newId(),
       name: name.trim(),
@@ -94,6 +94,7 @@ export function DishForm({
       absorbsWater: false,
       defaultMethod: NOT_COOKED,
       ...(unknownNutrients.length === 0 ? {} : { unknownNutrients }),
+      ...(partialNutrients.length === 0 ? {} : { partialNutrients }),
       recipe: used,
       source: 'user',
       sourceRef: 'Your recipe',
@@ -186,9 +187,15 @@ export function DishForm({
             The ingredients listed weigh {round(check.figures.inputWeightG, 0)} g; the dish weighs {round(finishedG, 0)} g.
             {finishedG > check.figures.inputWeightG && ' It weighs more than what is listed, which is right if water went in.'}
           </p>
+          {check.figures.partialNutrients.length > 0 && (
+            <p className="screen__hint">
+              Shown as &ldquo;at least&rdquo;, because some ingredients have no figure:{' '}
+              {check.figures.partialNutrients.join(', ')}.
+            </p>
+          )}
           {check.figures.unknownNutrients.length > 0 && (
             <p className="screen__hint">
-              Not known for this dish, because an ingredient has no figure:{' '}
+              Not known for this dish, because no ingredient has a figure:{' '}
               {check.figures.unknownNutrients.join(', ')}.
             </p>
           )}

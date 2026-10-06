@@ -48,6 +48,12 @@ export interface Ingredient {
    * list is what lets the app say "not known" or "at least" instead of a false 0.
    */
   unknownNutrients?: NutrientKey[];
+  /**
+   * Nutrients whose figure is only a lower bound: a dish where some of what
+   * went in had no figure for them (seeds whose label left out iron, in a loaf
+   * whose flour has it). Shown as "at least".
+   */
+  partialNutrients?: NutrientKey[];
   /** Present when this is a dish the person made: what went in, and what it weighed after. */
   recipe?: Recipe;
   source: 'usda' | 'user';

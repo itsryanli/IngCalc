@@ -115,14 +115,18 @@ export interface DayTotals {
 
 const MICROS: readonly NutrientKey[] = ['potassium', 'iron', 'magnesium', 'zinc', 'calcium', 'sodium'];
 
-/** The nutrients this entry has no figure for. */
+/** What an ingredient has no full figure for: unknown outright, or only a lower bound. */
+const incompleteOf = (i: Ingredient | undefined): readonly NutrientKey[] =>
+  [...(i?.unknownNutrients ?? []), ...(i?.partialNutrients ?? [])];
+
+/** The nutrients this entry has no full figure for, so a total including it is "at least". */
 export function unknownNutrientsOf(entry: MealEntry, ctx: MealContext): readonly NutrientKey[] {
   if (entry.kind === 'quick') {
     return NUTRIENT_KEYS.filter((k) => k !== 'kcal' && !(k === 'protein' && entry.proteinG !== undefined));
   }
-  if (entry.kind === 'ingredient') return ctx.ingredientById(entry.ingredientId)?.unknownNutrients ?? [];
+  if (entry.kind === 'ingredient') return incompleteOf(ctx.ingredientById(entry.ingredientId));
   const session = ctx.sessions.find((s) => s.id === entry.cookSessionId);
-  return (session === undefined ? undefined : ingredientForSession(session, ctx))?.unknownNutrients ?? [];
+  return incompleteOf(session === undefined ? undefined : ingredientForSession(session, ctx));
 }
 
 /**

@@ -3,8 +3,10 @@ import { NUTRIENT_KEYS, type Ingredient, type NutrientKey, type NutrientProfile,
 
 export interface DishFigures {
   per100g: NutrientProfile;
-  /** Nutrients some ingredient has no figure for: the dish cannot know them either. */
+  /** Nutrients no ingredient has a figure for. */
   unknownNutrients: NutrientKey[];
+  /** Nutrients only some ingredients have a figure for: the dish's figure is "at least". */
+  partialNutrients: NutrientKey[];
   /** Total weight of the listed ingredients, before water was driven off. */
   inputWeightG: number;
 }
@@ -26,21 +28,30 @@ export function dishFigures(
 
   let totals = zeroNutrients();
   let inputWeightG = 0;
-  const unknown = new Set<NutrientKey>();
+  // Per nutrient: how many ingredients lack a figure, and how many have only a partial one.
+  const missing = new Map<NutrientKey, number>();
+  const partial = new Set<NutrientKey>();
   for (const item of recipe.items) {
     const ingredient = ingredientById(item.ingredientId);
     if (ingredient === undefined) return { ok: false, message: 'Choose an ingredient for every row.' };
     if (!(item.grams > 0)) return { ok: false, message: `Enter how much ${ingredient.name.toLowerCase()} went in.` };
     totals = addNutrients(totals, scaleNutrients(ingredient.per100gRaw, item.grams / 100));
     inputWeightG += item.grams;
-    for (const k of ingredient.unknownNutrients ?? []) unknown.add(k);
+    for (const k of ingredient.unknownNutrients ?? []) missing.set(k, (missing.get(k) ?? 0) + 1);
+    for (const k of ingredient.partialNutrients ?? []) partial.add(k);
   }
+
+  const unknownNutrients = NUTRIENT_KEYS.filter((k) => missing.get(k) === recipe.items.length);
+  const partialNutrients = NUTRIENT_KEYS.filter(
+    (k) => !unknownNutrients.includes(k) && ((missing.get(k) ?? 0) > 0 || partial.has(k)),
+  );
 
   return {
     ok: true,
     figures: {
       per100g: scaleNutrients(totals, 100 / recipe.finishedWeightG),
-      unknownNutrients: NUTRIENT_KEYS.filter((k) => unknown.has(k)),
+      unknownNutrients,
+      partialNutrients,
       inputWeightG,
     },
   };

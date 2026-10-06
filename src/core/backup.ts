@@ -208,6 +208,7 @@ const SPECS: Record<Exclude<TableName, 'mealEntries'>, readonly Spec[]> = {
     ['water absorption', (r) => typeof r.absorbsWater === 'boolean'],
     ['usual cooking method', (r) => isOptional(isOneOf(COOK_METHODS))(r.defaultMethod)],
     ['recipe', (r) => isOptional(isRecipe)(r.recipe)],
+    ['partly known nutrients', (r) => isOptional((v) => Array.isArray(v) && v.every(isOneOf(NUTRIENT_KEYS)))(r.partialNutrients)],
     ['unknown nutrients', (r) => isOptional((v) => Array.isArray(v) && v.every(isOneOf(NUTRIENT_KEYS)))(r.unknownNutrients)],
     // Built-in ingredients are code, not data: a backup can only carry the user's own.
     ['source', (r) => r.source === 'user'],

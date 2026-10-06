@@ -82,8 +82,8 @@ export function NutrientTable({
                 )}
               </th>
               <td>{floor}{fmt(totals[key], UNITS[key])}</td>
-              <td>{floor}{pct(totals[key], target?.rni, 'RNI')}</td>
-              <td>{floor}{pct(totals[key], target?.dv, 'DV')}</td>
+              <td>{target?.rni === undefined ? '' : floor}{pct(totals[key], target?.rni, 'RNI')}</td>
+              <td>{target?.dv === undefined ? '' : floor}{pct(totals[key], target?.dv, 'DV')}</td>
             </tr>
           );
         })}

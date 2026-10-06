@@ -32,9 +32,23 @@ describe('dishFigures', () => {
     expect(dry.figures.per100g.protein).toBeCloseTo(wet.figures.per100g.protein * 2, 6);
   });
 
-  it('marks a nutrient unknown when any ingredient does not know it', () => {
-    const r = dishFigures({ items: [{ ingredientId: 'Flour', grams: g(500) }, { ingredientId: 'Seeds', grams: g(100) }], finishedWeightG: g(800) }, lookup);
-    expect(r.ok && r.figures.unknownNutrients).toEqual(['iron']);
+  it('gives "at least" when only some ingredients know a nutrient, and "not known" when none do', () => {
+    const both = dishFigures({ items: [{ ingredientId: 'Flour', grams: g(500) }, { ingredientId: 'Seeds', grams: g(100) }], finishedWeightG: g(800) }, lookup);
+    if (!both.ok) throw new Error('expected a dish');
+    // Flour's iron is known, the seeds' is not: the loaf has at least the flour's.
+    expect(both.figures.partialNutrients).toEqual(['iron']);
+    expect(both.figures.unknownNutrients).toEqual([]);
+    expect(both.figures.per100g.iron).toBeCloseTo(18 / 8, 6);
+
+    const seedsOnly = dishFigures({ items: [{ ingredientId: 'Seeds', grams: g(100) }], finishedWeightG: g(90) }, lookup);
+    expect(seedsOnly.ok && seedsOnly.figures.unknownNutrients).toEqual(['iron']);
+    expect(seedsOnly.ok && seedsOnly.figures.partialNutrients).toEqual([]);
+  });
+
+  it('carries an ingredient\'s own "at least" into the dish', () => {
+    const loaf = { ...make('Loaf', { iron: 2 }), partialNutrients: ['iron' as const] };
+    const r = dishFigures({ items: [{ ingredientId: 'Loaf', grams: g(100) }], finishedWeightG: g(100) }, (id) => (id === 'Loaf' ? loaf : undefined));
+    expect(r.ok && r.figures.partialNutrients).toEqual(['iron']);
   });
 
   it('explains what is missing rather than guessing', () => {

@@ -204,6 +204,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
                 targets={targets}
                 assumedRetentionFor={result.cooked.assumedRetentionFor}
                 unknown={ingredient?.unknownNutrients ?? []}
+                atLeastFor={ingredient?.partialNutrients ?? []}
                 belowRniAge={belowRniAge}
               />
                 </div>
