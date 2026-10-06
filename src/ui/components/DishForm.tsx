@@ -169,7 +169,7 @@ export function DishForm({
         ))}
       </ol>
 
-      <button type="button" className="btn btn--secondary" onClick={() => setRows((list) => [...list, emptyRow()])}>
+      <button type="button" className="btn btn--secondary dish-form__add" onClick={() => setRows((list) => [...list, emptyRow()])}>
         Add another ingredient
       </button>
 

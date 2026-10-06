@@ -772,6 +772,7 @@ body {
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
 }
+.dish-form__add { margin-bottom: var(--sp-4); }
 .dish-form__preview { margin-top: var(--sp-4); }
 .dish-form__per100 { margin: 0 0 var(--sp-2); }
 
