@@ -7,10 +7,12 @@ import { archiveUserIngredient, restoreUserIngredient } from '../../storage/user
  * away. Archiving only hides one from the pickers: past meals and batches keep
  * using it, and it can be brought back, so it needs no confirmation.
  */
-export function MyIngredients({ ingredients, onEdit, onChanged }: {
+export function MyIngredients({ ingredients, onEdit, onMakeAgain, onChanged }: {
   /** The person's own ingredients, archived ones included. */
   ingredients: readonly Ingredient[];
   onEdit: (ingredient: Ingredient) => void;
+  /** For a dish: record a new bake, saved as a new version. */
+  onMakeAgain?: (dish: Ingredient) => void;
   onChanged: () => void;
 }) {
   const [showArchived, setShowArchived] = useState(false);
@@ -38,7 +40,16 @@ export function MyIngredients({ ingredients, onEdit, onChanged }: {
       <ul className="my-ingredients__list">
         {active.map((i) => (
           <li key={i.id} className="my-ingredients__row">
-            <span className="my-ingredients__name">{i.name}</span>
+            <span className="my-ingredients__name">
+              {i.name}
+              {i.recipe !== undefined && <span className="my-ingredients__kind">dish</span>}
+            </span>
+            {i.recipe !== undefined && onMakeAgain !== undefined && (
+              <button type="button" className="btn btn--secondary btn--small" aria-label={`Made ${i.name} again`}
+                      onClick={() => onMakeAgain(i)}>
+                Made again
+              </button>
+            )}
             <button type="button" className="btn btn--secondary btn--small" aria-label={`Edit ${i.name}`}
                     onClick={() => onEdit(i)}>
               Edit

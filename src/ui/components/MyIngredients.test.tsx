@@ -47,4 +47,14 @@ describe('MyIngredients', () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect((await db.userIngredients.get('t'))!.archived).toBe(false);
   });
+
+  it('marks dishes and offers to record a new bake', () => {
+    const onMakeAgain = vi.fn();
+    const bread = { ...mine('b', 'Seeded bread'), recipe: { items: [{ ingredientId: 'wheat-flour', grams: 500 as never }], finishedWeightG: 820 as never } };
+    render(<MyIngredients ingredients={[bread, mine('c', 'Oat crackers')]} onEdit={vi.fn()} onMakeAgain={onMakeAgain} onChanged={vi.fn()} />);
+    expect(screen.getByText('dish')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Made Seeded bread again' }));
+    expect(onMakeAgain).toHaveBeenCalledWith(bread);
+    expect(screen.queryByRole('button', { name: 'Made Oat crackers again' })).not.toBeInTheDocument();
+  });
 });

@@ -5,6 +5,7 @@ import { AddBatchForm } from '../components/AddBatchForm';
 import { BatchCard } from '../components/BatchCard';
 import { CookSessionForm } from '../components/CookSessionForm';
 import { MyIngredients } from '../components/MyIngredients';
+import { DishForm, type DishMode } from '../components/DishForm';
 import { ShoppingTripForm } from '../components/ShoppingTripForm';
 import { STATE_LABELS } from '../labels';
 import { recentIngredientIds } from '../../core/recent';
@@ -26,7 +27,8 @@ type View =
   // `batch` remembers which batch (if any) was being edited when "add a new
   // ingredient" was tapped, so cancelling or saving returns to that same form.
   | { kind: 'addIngredient'; typedName: string; batch?: Batch }
-  | { kind: 'editIngredient'; ingredient: Ingredient };
+  | { kind: 'editIngredient'; ingredient: Ingredient }
+  | { kind: 'dishForm'; mode: DishMode; dish?: Ingredient };
 
 export function KitchenScreen({ today = new Date() }: { today?: Date }) {
   const { catalogue, all, refresh: refreshCatalogue } = useCatalogue();
@@ -80,6 +82,23 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
     void refreshCatalogue();
     setView({ kind: 'batchForm', batch: forBatch, initialIngredientId: added.id });
   };
+
+  if (view.kind === 'dishForm') {
+    return (
+      <section className="screen">
+        <DishForm
+          mode={view.mode}
+          {...(view.dish === undefined ? {} : { dish: view.dish })}
+          catalogue={catalogue}
+          all={all}
+          recentIds={recentIds}
+          onSaved={() => { void refreshCatalogue(); backToList(); }}
+          onCancel={backToList}
+          onCatalogueChanged={() => { void refreshCatalogue(); }}
+        />
+      </section>
+    );
+  }
 
   if (view.kind === 'editIngredient') {
     return (
@@ -189,6 +208,13 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
         >
           Log a purchase
         </button>
+        <button
+          type="button"
+          className="btn btn--secondary"
+          onClick={() => setView({ kind: 'dishForm', mode: 'new' })}
+        >
+          Make a dish
+        </button>
       </div>
 
       {!loading && batches.length === 0 && storageError === null && (
@@ -231,7 +257,10 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
 
       <MyIngredients
         ingredients={mine}
-        onEdit={(ingredient) => setView({ kind: 'editIngredient', ingredient })}
+        onEdit={(ingredient) => setView(ingredient.recipe === undefined
+          ? { kind: 'editIngredient', ingredient }
+          : { kind: 'dishForm', mode: 'edit', dish: ingredient })}
+        onMakeAgain={(dish) => setView({ kind: 'dishForm', mode: 'again', dish })}
         onChanged={() => { void refreshCatalogue(); }}
       />
     </section>
