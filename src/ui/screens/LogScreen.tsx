@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { dayTotals, type MealContext } from '../../core/meals';
 import { ageFrom, snapshotTargets } from '../../core/targets';
-import { MEAL_LABEL_KEYS, type MealEntry, type MealLabel, type Profile } from '../../core/types';
+import { MEAL_LABEL_KEYS, NUTRIENT_KEYS, type MealEntry, type MealLabel, type Profile } from '../../core/types';
 import { CATEGORY_YIELD } from '../../data/categoryYield';
 import { DV_US } from '../../data/dvUS';
 import { RETENTION } from '../../data/retentionTable';
@@ -238,9 +238,9 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
           <h3 className="card__title">Nutrients for the day</h3>
           {totals.unknownMicroEntries > 0 && (
             <p className="flag" data-testid="micro-floor">
-              At least these amounts — {totals.unknownMicroEntries} quick{' '}
-              {totals.unknownMicroEntries === 1 ? 'entry has' : 'entries have'} no
-              micronutrient figures, so the real total is higher.
+              Some figures are only &ldquo;at least&rdquo; — {totals.unknownMicroEntries}{' '}
+              {totals.unknownMicroEntries === 1 ? 'entry has' : 'entries have'} no figure for
+              some minerals (a quick add, or a label that left them out), so the real total is higher.
             </p>
           )}
           <div className="table-scroll">
@@ -248,6 +248,7 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
               totals={totals.totals}
               targets={targets.micros}
               assumedRetentionFor={[]}
+              atLeastFor={NUTRIENT_KEYS.filter((k) => (totals.unknownFor[k] ?? 0) > 0)}
               belowRniAge={ageFrom(profile, today) < RNI_MIN_AGE}
             />
           </div>

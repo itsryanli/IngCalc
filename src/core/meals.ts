@@ -5,8 +5,10 @@ import {
 import { addNutrients, mapNutrients, scaleNutrients, zeroNutrients } from './nutrients';
 import { computeCooked, computeRaw, rawFromCooked } from './nutrition';
 import { retentionFor, type RetentionLookup } from './retention';
-import type {
-  Batch, CookSession, Ingredient, MealEntry, MealEntryFields, NutrientProfile, YieldSample,
+import {
+  NUTRIENT_KEYS,
+  type Batch, type CookSession, type Ingredient, type MealEntry, type MealEntryFields,
+  type NutrientKey, type NutrientProfile, type YieldSample,
 } from './types';
 import { formatG, g } from './units';
 import type { CategoryYield } from './yieldResolver';
@@ -100,10 +102,27 @@ export function entryNutrients(entry: MealEntry, ctx: MealContext): NutrientProf
 
 export interface DayTotals {
   totals: NutrientProfile;
-  /** Entries contributing no micronutrient figures — always `quick` ones. */
+  /**
+   * Entries missing at least one micronutrient figure: every `quick` entry, and
+   * any entry whose ingredient has unknown minerals (a label that left them out).
+   */
   unknownMicroEntries: number;
-  /** Quick entries whose `proteinG` was left blank. */
+  /** Entries with no protein figure: a quick entry left blank, or an ingredient without one. */
   unknownProteinEntries: number;
+  /** Per nutrient, how many entries had no figure for it: where a total is only "at least". */
+  unknownFor: Partial<Record<NutrientKey, number>>;
+}
+
+const MICROS: readonly NutrientKey[] = ['potassium', 'iron', 'magnesium', 'zinc', 'calcium', 'sodium'];
+
+/** The nutrients this entry has no figure for. */
+export function unknownNutrientsOf(entry: MealEntry, ctx: MealContext): readonly NutrientKey[] {
+  if (entry.kind === 'quick') {
+    return NUTRIENT_KEYS.filter((k) => k !== 'kcal' && !(k === 'protein' && entry.proteinG !== undefined));
+  }
+  if (entry.kind === 'ingredient') return ctx.ingredientById(entry.ingredientId)?.unknownNutrients ?? [];
+  const session = ctx.sessions.find((s) => s.id === entry.cookSessionId);
+  return (session === undefined ? undefined : ingredientForSession(session, ctx))?.unknownNutrients ?? [];
 }
 
 /**
@@ -117,16 +136,17 @@ export function dayTotals(entries: readonly MealEntry[], ctx: MealContext): DayT
   let totals = zeroNutrients();
   let unknownMicroEntries = 0;
   let unknownProteinEntries = 0;
+  const unknownFor: Partial<Record<NutrientKey, number>> = {};
 
   for (const entry of entries) {
     totals = addNutrients(totals, entryNutrients(entry, ctx));
-    if (entry.kind === 'quick') {
-      unknownMicroEntries += 1;
-      if (entry.proteinG === undefined) unknownProteinEntries += 1;
-    }
+    const unknown = unknownNutrientsOf(entry, ctx);
+    if (unknown.some((k) => MICROS.includes(k))) unknownMicroEntries += 1;
+    if (unknown.includes('protein')) unknownProteinEntries += 1;
+    for (const k of unknown) unknownFor[k] = (unknownFor[k] ?? 0) + 1;
   }
 
-  return { totals, unknownMicroEntries, unknownProteinEntries };
+  return { totals, unknownMicroEntries, unknownProteinEntries, unknownFor };
 }
 
 /**

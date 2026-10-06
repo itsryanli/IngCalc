@@ -42,6 +42,12 @@ export interface Ingredient {
   absorbsWater: boolean;
   /** The method forms start on for this ingredient, e.g. 'asIs' for crackers. */
   defaultMethod?: CookMethod;
+  /**
+   * Nutrients nobody knows for this ingredient, e.g. the minerals a nutrition
+   * label leaves out. Stored as 0 in `per100gRaw` so every sum still works; this
+   * list is what lets the app say "not known" or "at least" instead of a false 0.
+   */
+  unknownNutrients?: NutrientKey[];
   source: 'usda' | 'user';
   sourceRef?: string;
   archived: boolean;

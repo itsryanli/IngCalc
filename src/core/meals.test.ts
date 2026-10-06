@@ -103,8 +103,30 @@ describe('dayTotals', () => {
 
   it('reports an empty day as zeroes with nothing unknown', () => {
     expect(dayTotals([], ctx)).toEqual({
-      totals: zeroNutrients(), unknownMicroEntries: 0, unknownProteinEntries: 0,
+      totals: zeroNutrients(), unknownMicroEntries: 0, unknownProteinEntries: 0, unknownFor: {},
     });
+  });
+
+  it('counts, per nutrient, the entries with no figure for it', () => {
+    const crackers = {
+      id: 'crackers', name: 'Crackers', category: 'other' as const,
+      per100gRaw: { ...zeroNutrients(), kcal: 400, protein: 10 }, publishedYield: {},
+      absorbsWater: false, source: 'user' as const, archived: false,
+      unknownNutrients: ['potassium' as const, 'iron' as const],
+    };
+    const withCrackers: MealContext = { ...ctx, ingredientById: (id) => (id === 'crackers' ? crackers : ctx.ingredientById(id)) };
+    const r = dayTotals([
+      { id: 'a', profileId: 'p', date: '2026-10-06', label: 'lunch', createdAt: 1,
+        kind: 'ingredient', ingredientId: 'crackers', method: 'asIs', cookedG: g(50) },
+      { id: 'b', profileId: 'p', date: '2026-10-06', label: 'lunch', createdAt: 2,
+        kind: 'quick', name: 'Kopi', kcal: 90, proteinG: 2 },
+    ], withCrackers);
+    expect(r.totals.kcal).toBe(290);
+    expect(r.unknownMicroEntries).toBe(2);
+    expect(r.unknownProteinEntries).toBe(0);
+    expect(r.unknownFor.potassium).toBe(2);
+    expect(r.unknownFor.carbs).toBe(1);
+    expect(r.unknownFor.kcal).toBeUndefined();
   });
 });
 

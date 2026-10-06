@@ -51,6 +51,20 @@ describe('AddIngredientScreen', () => {
     expect(saved.per100gRaw.magnesium).toBe(0);
   });
 
+  it('records a blank nutrient as not known, keeping 0 only for the sums', async () => {
+    const onSaved = vi.fn();
+    render(<AddIngredientScreen initialName="Petai" onSaved={onSaved} />);
+    fireEvent.change(screen.getByLabelText(/^protein/i), { target: { value: '6' } });
+    fireEvent.change(screen.getByLabelText(/^sodium/i), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const saved = (await db.userIngredients.toArray())[0]!;
+    expect(saved.unknownNutrients).toContain('iron');
+    expect(saved.unknownNutrients).not.toContain('protein');
+    // Typed as 0 means really zero, not unknown.
+    expect(saved.unknownNutrients).not.toContain('sodium');
+  });
+
   it('rejects non-numeric nutrient input and does not save', async () => {
     const onSaved = vi.fn();
     render(<AddIngredientScreen initialName="Petai" onSaved={onSaved} />);
@@ -213,6 +227,12 @@ describe('AddIngredientScreen', () => {
       absorbsWater: false, defaultMethod: 'asIs' as const, source: 'user' as const,
       sourceRef: 'Nutrition label', archived: false,
     };
+
+    it('shows an unknown nutrient as blank, not 0, when editing', () => {
+      render(<AddIngredientScreen editing={{ ...crackers, unknownNutrients: ['iron'] }} onSaved={vi.fn()} />);
+      expect(screen.getByLabelText(/^iron/i)).toHaveValue('');
+      expect(screen.getByLabelText(/^zinc/i)).toHaveValue('0');
+    });
 
     it('starts from what was saved and says edits reach past meals', () => {
       render(<AddIngredientScreen editing={crackers} onSaved={vi.fn()} />);

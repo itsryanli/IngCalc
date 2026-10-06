@@ -27,10 +27,10 @@ const emptyEntries = (): Entries => {
   return out;
 };
 
-/** The stored values as form text, so editing starts from what was saved. */
-const entriesFrom = (p: NutrientProfile): Entries => {
+/** The stored values as form text, so editing starts from what was saved; unknown ones blank. */
+const entriesFrom = (i: Ingredient): Entries => {
   const out = {} as Entries;
-  for (const k of NUTRIENT_KEYS) out[k] = String(p[k]);
+  for (const k of NUTRIENT_KEYS) out[k] = i.unknownNutrients?.includes(k) ? '' : String(i.per100gRaw[k]);
   return out;
 };
 
@@ -49,7 +49,7 @@ export function AddIngredientScreen({
   const [eatenAsIs, setEatenAsIs] = useState(editing?.defaultMethod === NOT_COOKED);
   /** Fields filled from a label and not yet touched: highlighted so each gets checked. */
   const [fromLabel, setFromLabel] = useState<ReadonlySet<NutrientKey>>(new Set());
-  const [entries, setEntries] = useState<Entries>(() => (editing === undefined ? emptyEntries() : entriesFrom(editing.per100gRaw)));
+  const [entries, setEntries] = useState<Entries>(() => (editing === undefined ? emptyEntries() : entriesFrom(editing)));
   const [error, setError] = useState<string | null>(null);
   const [labelText, setLabelText] = useState('');
   const [reading, setReading] = useState<LabelReading | null>(null);
@@ -88,9 +88,12 @@ export function AddIngredientScreen({
     if (name.trim() === '') { setError('Please enter a name'); return; }
 
     const per100gRaw: NutrientProfile = zeroNutrients();
+    // A blank is "not known", not zero: kept as 0 for the sums, and listed so
+    // the app can say so instead of showing a false 0.
+    const unknownNutrients: NutrientKey[] = [];
     for (const k of NUTRIENT_KEYS) {
       const raw = entries[k].trim();
-      if (raw === '') continue;
+      if (raw === '') { unknownNutrients.push(k); continue; }
       const value = Number(raw);
       if (!Number.isFinite(value)) { setError(`${LABELS[k]} must be a number`); return; }
       if (value < 0) { setError(`${LABELS[k]} cannot be negative`); return; }
@@ -111,6 +114,7 @@ export function AddIngredientScreen({
       publishedYield: editing?.publishedYield ?? {},
       absorbsWater,
       ...(defaultMethod === undefined ? {} : { defaultMethod }),
+      ...(unknownNutrients.length === 0 ? {} : { unknownNutrients }),
       source: 'user',
       ...(sourceRef === undefined ? {} : { sourceRef }),
       archived: editing?.archived ?? false,
@@ -131,7 +135,7 @@ export function AddIngredientScreen({
     <section className="screen">
       <h2>{editing === undefined ? 'Add an ingredient' : `Edit ${editing.name}`}</h2>
       <p className="screen__hint">
-        Values per 100g raw. Anything you leave blank is recorded as zero.
+        Values per 100g raw. Leave a value blank if you don't know it (type 0 only if it really is zero).
         {editing !== undefined && ' Changes apply everywhere this ingredient is used, including meals already logged.'}
       </p>
 
@@ -161,7 +165,7 @@ export function AddIngredientScreen({
                   They're highlighted below: check each one against the label before saving.
                 </p>
                 {missing.length > 0 && (
-                  <p>Not on the label, so left blank (saved as zero): {missing.map((k) => LABELS[k].replace(/ \(.*\)$/, '')).join(', ')}.</p>
+                  <p>Not on the label, so left blank and saved as not known: {missing.map((k) => LABELS[k].replace(/ \(.*\)$/, '')).join(', ')}.</p>
                 )}
               </>
             )}
