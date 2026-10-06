@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { startingMethod } from '../../core/methods';
+import { recentIngredientIds } from '../../core/recent';
 import { COOK_METHODS, NOT_COOKED, type CookMethod, type Ingredient, type NutrientKey, type Profile } from '../../core/types';
 import { g, type Grams } from '../../core/units';
 import { computeCooked, rawFromCooked } from '../../core/nutrition';
@@ -28,7 +29,9 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
   const { catalogue, refresh } = useCatalogue();
   // The point of Phase 2: resolveYield's `measured` branch has been
   // unreachable since Phase 1 because nothing produced samples.
-  const { samples, storageError: kitchenError } = useKitchen();
+  const { samples, batches, sessions, entries, storageError: kitchenError } = useKitchen();
+  const recentIds = useMemo(
+    () => recentIngredientIds(batches, sessions, entries), [batches, sessions, entries]);
   const [ingredientId, setIngredientId] = useState('');
   /** Whole containers, at least one. `PortionSplit` guarantees both, so dividing by it is safe. */
   const [portionCount, setPortionCount] = useState(1);
@@ -145,6 +148,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
           <IngredientPicker
             catalogue={catalogue}
             value={ingredientId}
+            recentIds={recentIds}
             onChange={(id) => selectIngredient(catalogue.find((i) => i.id === id))}
             onAddNew={handleAddNew}
           />

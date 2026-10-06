@@ -13,7 +13,11 @@ import { DayProgress } from '../components/DayProgress';
 import { GroupDay } from '../components/GroupDay';
 import { MealGroup } from '../components/MealGroup';
 import { NutrientTable } from '../components/NutrientTable';
-import { todayIso } from '../dates';
+import { dayName, todayIso } from '../dates';
+import { planRepeat, previousMeal } from '../../core/repeat';
+import { addEntries, dayLogId } from '../../storage/meals';
+import { entryItemName, MEAL_LABELS } from '../labels';
+import { newId } from '../newId';
 import { useCatalogue } from '../useCatalogue';
 import { useGroups } from '../useGroups';
 import { useKitchen } from '../useKitchen';
@@ -31,6 +35,9 @@ function labelForHour(hour: number): MealLabel {
   return 'snack';
 }
 
+/** The time a repeated meal is logged at; read on tap, never during render. */
+const clockMs = (): number => Date.now();
+
 type View = { kind: 'list' } | { kind: 'form'; label: MealLabel; editing?: MealEntry };
 
 export function LogScreen({ profile, profiles = [], today = new Date() }: {
@@ -41,6 +48,7 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
 }) {
   const [date, setDate] = useState(() => todayIso(today));
   const [view, setView] = useState<View>({ kind: 'list' });
+  const [repeatNotice, setRepeatNotice] = useState<{ text: string; warn: boolean } | null>(null);
 
   const { catalogue, all } = useCatalogue();
   const kitchen = useKitchen();
@@ -128,6 +136,33 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
   }
 
   const afterChange = () => { void log.refresh(); void kitchen.refresh(); setVersion((v) => v + 1); };
+
+  // Copies what was eaten, never more than a cook still holds; anything that
+  // no longer fits is named rather than silently dropped.
+  const repeatMeal = async (label: MealLabel, from: { date: string; entries: MealEntry[] }) => {
+    const plan = planRepeat(from.entries, ctx, kitchen.entries, { profileId: profile.id, date, label });
+    const meal = MEAL_LABELS[label].toLowerCase();
+    const skipped = plan.skipped.map((s) => `${entryItemName(s.entry, ctx)} (${s.reason.replace(/\.$/, '').toLowerCase()})`);
+    if (plan.fields.length === 0) {
+      setRepeatNotice({ text: `Nothing could be copied: ${skipped.join('; ')}.`, warn: true });
+      return;
+    }
+    const now = clockMs();
+    try {
+      await addEntries(plan.fields.map((fields, i) => ({
+        entry: { id: newId(), profileId: profile.id, date, label, createdAt: now + i, ...fields },
+        snapshot: { id: dayLogId(profile.id, date), profileId: profile.id, date, targets },
+      })));
+    } catch (err) {
+      console.error('Repeating a meal failed', err);
+      setRepeatNotice({ text: 'Could not copy that meal — storage may be blocked or full. Please try again.', warn: true });
+      return;
+    }
+    setRepeatNotice(skipped.length === 0
+      ? { text: `Copied ${meal} from ${dayName(from.date, todayIso(today)).toLowerCase()}.`, warn: false }
+      : { text: `Copied ${plan.fields.length} of ${from.entries.length} items. Not copied: ${skipped.join('; ')}.`, warn: true });
+    afterChange();
+  };
   const storageError = log.storageError ?? kitchen.storageError;
 
   return (
@@ -136,7 +171,7 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
 
       <BackupReminder today={today} />
 
-      <DayNav date={date} today={todayIso(today)} onChange={setDate} />
+      <DayNav date={date} today={todayIso(today)} onChange={(d) => { setDate(d); setRepeatNotice(null); }} />
 
       {storageError !== null && <p role="alert" className="banner banner--warn">{storageError}</p>}
 
@@ -157,17 +192,31 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
         </button>
       </div>
 
-      {MEAL_LABEL_KEYS.map((label) => (
+      {repeatNotice !== null && (
+        <p role="status" className={`banner ${repeatNotice.warn ? 'banner--warn' : 'banner--info'}`}>
+          {repeatNotice.text}
+        </p>
+      )}
+
+      {MEAL_LABEL_KEYS.map((label) => {
+        const before = previousMeal(kitchen.entries, profile.id, label, date);
+        return (
         <MealGroup
           key={label}
           label={label}
           entries={log.entries.filter((e) => e.label === label)}
+          repeat={before === null ? undefined : {
+            from: dayName(before.date, todayIso(today)).toLowerCase(),
+            count: before.entries.length,
+            onRepeat: () => { void repeatMeal(label, before); },
+          }}
           ctx={ctx}
           onAdd={() => setView({ kind: 'form', label })}
           onEdit={(entry) => setView({ kind: 'form', label: entry.label, editing: entry })}
           onChanged={afterChange}
         />
-      ))}
+        );
+      })}
 
       {myGroups.map((g) => (
         <GroupDay key={g.id} group={g} profiles={profiles} date={date} ctx={ctx} today={today} version={version} />

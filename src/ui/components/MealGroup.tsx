@@ -15,9 +15,11 @@ interface Props {
   onAdd: () => void;
   onEdit: (entry: MealEntry) => void;
   onChanged: () => void;
+  /** Offered on an empty meal when this meal was logged on an earlier day. */
+  repeat?: { from: string; count: number; onRepeat: () => void };
 }
 
-export function MealGroup({ label, entries, ctx, onAdd, onEdit, onChanged }: Props) {
+export function MealGroup({ label, entries, ctx, onAdd, onEdit, onChanged, repeat }: Props) {
   // Reuses dayTotals rather than summing here: a meal is a day in miniature,
   // and two summing implementations would eventually disagree.
   const subtotal = entries.length === 0 ? null : dayTotals(entries, ctx).totals;
@@ -51,6 +53,11 @@ export function MealGroup({ label, entries, ctx, onAdd, onEdit, onChanged }: Pro
       </div>
 
       {entries.length === 0 && <p className="meal-group__empty">Nothing logged yet</p>}
+      {entries.length === 0 && repeat !== undefined && (
+        <button type="button" className="btn btn--secondary btn--small meal-group__repeat" onClick={repeat.onRepeat}>
+          Same as {repeat.from} ({repeat.count} {repeat.count === 1 ? 'item' : 'items'})
+        </button>
+      )}
 
       {entries.map((entry) => (
         <EntryRow key={entry.id} entry={entry} ctx={ctx} onEdit={onEdit} onDeleted={onChanged} />

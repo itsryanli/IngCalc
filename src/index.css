@@ -587,6 +587,15 @@ body {
 }
 
 .picker__option--add.is-active,
+.picker__tag {
+  margin-left: var(--sp-2);
+  padding: 0 var(--sp-2);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
 .picker__option--add:hover { background: var(--estimate-soft); color: var(--estimate); }
 
 /* Grouped nutrient inputs — two columns once there is room. */
@@ -703,6 +712,8 @@ body {
 .my-ingredients__row:last-child { border-bottom: none; }
 .my-ingredients__name { flex: 1 1 10rem; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .my-ingredients__row--archived .my-ingredients__name { color: var(--text-dim); }
+
+.meal-group__repeat { margin-top: var(--sp-2); }
 
 /* Banners */
 .banner {

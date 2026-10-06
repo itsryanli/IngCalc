@@ -7,6 +7,7 @@ import { CookSessionForm } from '../components/CookSessionForm';
 import { MyIngredients } from '../components/MyIngredients';
 import { ShoppingTripForm } from '../components/ShoppingTripForm';
 import { STATE_LABELS } from '../labels';
+import { recentIngredientIds } from '../../core/recent';
 import { useCatalogue } from '../useCatalogue';
 import { useKitchen } from '../useKitchen';
 import { AddIngredientScreen } from './AddIngredientScreen';
@@ -42,6 +43,9 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
     for (const b of ordered) out.get(batchState(b, sessions, entries))!.push(b);
     return out;
   }, [batches, sessions, entries]);
+
+  const recentIds = useMemo(
+    () => recentIngredientIds(batches, sessions, entries), [batches, sessions, entries]);
 
   // Shops already used, most recent first, as suggestions for the next trip.
   const pastLocations = useMemo(() => {
@@ -105,6 +109,7 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
     return (
       <section className="screen">
         <ShoppingTripForm
+          recentIds={recentIds}
           catalogue={catalogue}
           pastLocations={pastLocations}
           today={today}
@@ -120,6 +125,7 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
     return (
       <section className="screen">
         <AddBatchForm
+          recentIds={recentIds}
           catalogue={catalogue}
           batch={view.batch}
           sessions={sessions}

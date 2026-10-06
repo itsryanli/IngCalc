@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from 'react';
 import { cookedRemainingG, EPSILON } from '../../core/batch';
 import { entryNutrients, validateEntry, type MealContext } from '../../core/meals';
 import { startingMethod } from '../../core/methods';
+import { recentIngredientIds } from '../../core/recent';
 import { COOK_METHODS, NOT_COOKED, type CookMethod, type DayLog, type DayLogTargets, type Ingredient,
   type IsoDate, type MealEntry, type MealEntryFields, type MealLabel } from '../../core/types';
 import { g, type Grams } from '../../core/units';
@@ -100,6 +101,11 @@ export function AddEntryForm({
 
   // Entries excluding the one being edited, so a cook the edit already occupies
   // still shows the room that entry is using.
+  const recentIds = useMemo(
+    () => recentIngredientIds(ctx.batches, ctx.sessions, allEntries),
+    [ctx.batches, ctx.sessions, allEntries],
+  );
+
   const others = useMemo(
     () => allEntries.filter((e) => e.id !== (editing?.id ?? null)),
     [allEntries, editing],
@@ -319,6 +325,7 @@ export function AddEntryForm({
         <>
           <IngredientPicker
             catalogue={catalogue}
+            recentIds={recentIds}
             value={ingredientId}
             onChange={(id) => {
               setIngredientId(id);

@@ -93,6 +93,27 @@ describe('LogScreen', () => {
     await db.userIngredients.clear();
   });
 
+  it('copies a meal from the last day it was logged into an empty meal', async () => {
+    await seedQuickEntry({ date: '2026-09-18', kcal: 450, proteinG: 25 });
+    render(<LogScreen profile={profile} today={new Date(2026, 8, 19)} />);
+    const repeat = await screen.findByRole('button', { name: 'Same as yesterday (1 item)' });
+    await userEvent.click(repeat);
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Copied lunch from yesterday.');
+    await waitFor(() => expect(screen.getByTestId('kcal-progress')).toHaveTextContent('450'));
+    const today = (await db.mealEntries.toArray()).filter((e) => e.date === '2026-09-19');
+    expect(today).toHaveLength(1);
+    expect(today[0]).toMatchObject({ label: 'lunch', kind: 'quick', kcal: 450, proteinG: 25 });
+    // The meal is no longer empty, so the offer goes away.
+    expect(screen.queryByRole('button', { name: /same as yesterday/i })).not.toBeInTheDocument();
+  });
+
+  it('does not offer to repeat a meal that was never logged before', async () => {
+    render(<LogScreen profile={profile} today={new Date(2026, 8, 19)} />);
+    await screen.findByTestId('day-name');
+    expect(screen.queryByRole('button', { name: /same as/i })).not.toBeInTheDocument();
+  });
+
   it('asks for a profile before anything else', () => {
     render(<LogScreen profile={null} today={new Date(2026, 8, 19)} />);
     expect(screen.getByTestId('log-no-profile')).toBeInTheDocument();
