@@ -12,6 +12,7 @@ import { DayNav } from '../components/DayNav';
 import { DayProgress } from '../components/DayProgress';
 import { GroupDay } from '../components/GroupDay';
 import { MealGroup } from '../components/MealGroup';
+import { WeekCard } from '../components/WeekCard';
 import { NutrientTable } from '../components/NutrientTable';
 import { dayName, todayIso } from '../dates';
 import { planRepeat, previousMeal } from '../../core/repeat';
@@ -217,6 +218,16 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
         />
         );
       })}
+
+      <WeekCard
+        profileId={profile.id}
+        endDate={date}
+        entries={kitchen.entries}
+        batches={kitchen.batches}
+        samples={kitchen.samples}
+        ctx={ctx}
+        version={version}
+      />
 
       {myGroups.map((g) => (
         <GroupDay key={g.id} group={g} profiles={profiles} date={date} ctx={ctx} today={today} version={version} />
