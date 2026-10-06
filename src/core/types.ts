@@ -48,9 +48,28 @@ export interface Ingredient {
    * list is what lets the app say "not known" or "at least" instead of a false 0.
    */
   unknownNutrients?: NutrientKey[];
+  /** Present when this is a dish the person made: what went in, and what it weighed after. */
+  recipe?: Recipe;
   source: 'usda' | 'user';
   sourceRef?: string;
   archived: boolean;
+}
+
+export interface RecipeItem {
+  ingredientId: string;
+  /** Raw weight that went in. Water can be left out: the finished weight accounts for it. */
+  grams: Grams;
+}
+
+/**
+ * A dish made from other ingredients, e.g. a loaf of bread. Its per-100 g
+ * figures are worked out from these and stored on the ingredient, so every
+ * screen treats a dish like any other ingredient.
+ */
+export interface Recipe {
+  items: RecipeItem[];
+  /** What the finished dish weighed: baking or cooking drives water off, so this sets the concentration. */
+  finishedWeightG: Grams;
 }
 
 export const SEXES = ['male', 'female'] as const;

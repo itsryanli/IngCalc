@@ -147,6 +147,16 @@ const MAX_KCAL = 100_000;
 const MAX_PROTEIN_G = 10_000;
 const MAX_NUTRIENT = 100_000;
 const MAX_YIELD_FACTOR = 10;
+const MAX_RECIPE_ITEMS = 100;
+
+/** A dish's recipe: some ingredients by weight, and what the finished dish weighed. */
+const isRecipe = (v: unknown): boolean =>
+  isRecord(v)
+  && Array.isArray(v.items) && v.items.length > 0 && v.items.length <= MAX_RECIPE_ITEMS
+  && v.items.every((i: unknown) => isRecord(i)
+    && typeof i.ingredientId === 'string' && i.ingredientId !== ''
+    && bounded(isPositive, MAX_BACKUP_GRAMS)(i.grams))
+  && bounded(isPositive, MAX_BACKUP_GRAMS)(v.finishedWeightG);
 const MAX_HEIGHT_CM = 300;
 const MAX_WEIGHT_KG = 1000;
 const MAX_SESSIONS_PER_WEEK = 100;
@@ -197,6 +207,7 @@ const SPECS: Record<Exclude<TableName, 'mealEntries'>, readonly Spec[]> = {
         .every(([k, f]) => isOneOf(COOK_METHODS)(k) && bounded(isPositive, MAX_YIELD_FACTOR)(f))],
     ['water absorption', (r) => typeof r.absorbsWater === 'boolean'],
     ['usual cooking method', (r) => isOptional(isOneOf(COOK_METHODS))(r.defaultMethod)],
+    ['recipe', (r) => isOptional(isRecipe)(r.recipe)],
     ['unknown nutrients', (r) => isOptional((v) => Array.isArray(v) && v.every(isOneOf(NUTRIENT_KEYS)))(r.unknownNutrients)],
     // Built-in ingredients are code, not data: a backup can only carry the user's own.
     ['source', (r) => r.source === 'user'],
