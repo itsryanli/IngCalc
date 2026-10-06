@@ -11,3 +11,7 @@ export const saveUserIngredient = async (i: Ingredient): Promise<void> => {
 export const archiveUserIngredient = async (id: string): Promise<void> => {
   await db.userIngredients.update(id, { archived: true });
 };
+
+export const restoreUserIngredient = async (id: string): Promise<void> => {
+  await db.userIngredients.update(id, { archived: false });
+};

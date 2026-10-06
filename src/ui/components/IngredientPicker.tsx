@@ -10,9 +10,11 @@ interface Props {
   onChange: (id: string) => void;
   /** Opens the add-ingredient flow, seeded with whatever the user had typed. */
   onAddNew: (initialName: string) => void;
+  /** Recently used ingredient ids, newest first: listed at the top before anything is typed. */
+  recentIds?: readonly string[];
 }
 
-export function IngredientPicker({ catalogue, value, onChange, onAddNew }: Props) {
+export function IngredientPicker({ catalogue, value, onChange, onAddNew, recentIds = [] }: Props) {
   const inputId = useId();
   const listId = useId();
   const selected = catalogue.find((i) => i.id === value) ?? null;
@@ -27,7 +29,16 @@ export function IngredientPicker({ catalogue, value, onChange, onAddNew }: Props
   // add-ingredient flow auto-selects) visible in the field.
   const display = open ? query : (selected?.name ?? '');
 
-  const matches = rankIngredients(catalogue, open ? query : '');
+  const typed = open ? query.trim() : '';
+  // Before anything is typed, recent ingredients come first; once typing starts
+  // the ranking alone decides, so a search is never pushed down by history.
+  const recent = typed === ''
+    ? recentIds.flatMap((id) => catalogue.filter((i) => i.id === id))
+    : [];
+  const matches = [
+    ...recent,
+    ...rankIngredients(catalogue, typed).filter((i) => !recent.includes(i)),
+  ];
   const addLabel = query.trim() === '' ? 'Add a new ingredient' : `Add "${query.trim()}"`;
   // The add row is always last, so its index is the match count.
   const addIndex = matches.length;
@@ -109,6 +120,7 @@ export function IngredientPicker({ catalogue, value, onChange, onAddNew }: Props
               onMouseDown={(e) => { e.preventDefault(); choose(i); }}
             >
               {ing.name}
+              {i < recent.length && <span className="picker__tag" aria-hidden="true">Recent</span>}
             </li>
           ))}
 

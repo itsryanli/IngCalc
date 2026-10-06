@@ -28,6 +28,8 @@ function parsePrice(text: string): number | null {
 
 interface Props {
   catalogue: readonly Ingredient[];
+  /** Recently used ingredient ids, offered first in each item's picker. */
+  recentIds?: readonly string[];
   /** Shops already used, offered as suggestions. */
   pastLocations: readonly string[];
   today?: Date;
@@ -46,7 +48,7 @@ interface Props {
  * screen, so the items already entered are not lost on the way.
  */
 export function ShoppingTripForm({
-  catalogue, pastLocations, today = new Date(), onSaved, onCancel, onCatalogueChanged,
+  catalogue, recentIds = [], pastLocations, today = new Date(), onSaved, onCancel, onCatalogueChanged,
 }: Props) {
   const ids = useId();
   const [location, setLocation] = useState('');
@@ -145,6 +147,7 @@ export function ShoppingTripForm({
             item={it}
             index={i}
             catalogue={catalogue}
+            recentIds={recentIds}
             removable={items.length > 1}
             onChange={(patch) => update(it.key, patch)}
             onRemove={() => setItems((list) => list.filter((x) => x.key !== it.key))}
@@ -179,10 +182,11 @@ export function ShoppingTripForm({
   );
 }
 
-function TripItem({ item, index, catalogue, removable, onChange, onRemove, onAddNew }: {
+function TripItem({ item, index, catalogue, recentIds, removable, onChange, onRemove, onAddNew }: {
   item: Item;
   index: number;
   catalogue: readonly Ingredient[];
+  recentIds: readonly string[];
   removable: boolean;
   onChange: (patch: Partial<Item>) => void;
   onRemove: () => void;
@@ -207,6 +211,7 @@ function TripItem({ item, index, catalogue, removable, onChange, onRemove, onAdd
 
       <IngredientPicker
         catalogue={catalogue}
+        recentIds={recentIds}
         value={item.ingredientId}
         onChange={(ingredientId) => onChange({ ingredientId })}
         onAddNew={onAddNew}

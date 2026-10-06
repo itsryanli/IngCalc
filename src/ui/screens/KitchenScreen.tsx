@@ -4,8 +4,10 @@ import type { Batch, CookSession, Ingredient } from '../../core/types';
 import { AddBatchForm } from '../components/AddBatchForm';
 import { BatchCard } from '../components/BatchCard';
 import { CookSessionForm } from '../components/CookSessionForm';
+import { MyIngredients } from '../components/MyIngredients';
 import { ShoppingTripForm } from '../components/ShoppingTripForm';
 import { STATE_LABELS } from '../labels';
+import { recentIngredientIds } from '../../core/recent';
 import { useCatalogue } from '../useCatalogue';
 import { useKitchen } from '../useKitchen';
 import { AddIngredientScreen } from './AddIngredientScreen';
@@ -23,10 +25,12 @@ type View =
   | { kind: 'cookForm'; batch: Batch; session?: CookSession }
   // `batch` remembers which batch (if any) was being edited when "add a new
   // ingredient" was tapped, so cancelling or saving returns to that same form.
-  | { kind: 'addIngredient'; typedName: string; batch?: Batch };
+  | { kind: 'addIngredient'; typedName: string; batch?: Batch }
+  | { kind: 'editIngredient'; ingredient: Ingredient };
 
 export function KitchenScreen({ today = new Date() }: { today?: Date }) {
-  const { catalogue, refresh: refreshCatalogue } = useCatalogue();
+  const { catalogue, all, refresh: refreshCatalogue } = useCatalogue();
+  const mine = useMemo(() => all.filter((i) => i.source === 'user'), [all]);
   const { batches, sessions, samples, entries, loading, storageError, refresh } = useKitchen();
   const [view, setView] = useState<View>({ kind: 'list' });
   const [showFinished, setShowFinished] = useState(false);
@@ -40,6 +44,9 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
     return out;
   }, [batches, sessions, entries]);
 
+  const recentIds = useMemo(
+    () => recentIngredientIds(batches, sessions, entries), [batches, sessions, entries]);
+
   // Shops already used, most recent first, as suggestions for the next trip.
   const pastLocations = useMemo(() => {
     const seen = new Set<string>();
@@ -50,8 +57,10 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
     return [...seen];
   }, [batches]);
 
+  // From every ingredient, archived ones included: archiving hides an ingredient
+  // from new choices, not from the batches already bought.
   const ingredientFor = (batch: Batch) =>
-    catalogue.find((i) => i.id === batch.ingredientId) ?? null;
+    all.find((i) => i.id === batch.ingredientId) ?? null;
 
   const backToList = () => setView({ kind: 'list' });
 
@@ -72,6 +81,18 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
     setView({ kind: 'batchForm', batch: forBatch, initialIngredientId: added.id });
   };
 
+  if (view.kind === 'editIngredient') {
+    return (
+      <section className="screen">
+        <AddIngredientScreen
+          editing={view.ingredient}
+          onSaved={() => { void refreshCatalogue(); void afterChange(); }}
+          onCancel={backToList}
+        />
+      </section>
+    );
+  }
+
   if (view.kind === 'addIngredient') {
     return (
       <section className="screen">
@@ -88,6 +109,7 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
     return (
       <section className="screen">
         <ShoppingTripForm
+          recentIds={recentIds}
           catalogue={catalogue}
           pastLocations={pastLocations}
           today={today}
@@ -103,6 +125,7 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
     return (
       <section className="screen">
         <AddBatchForm
+          recentIds={recentIds}
           catalogue={catalogue}
           batch={view.batch}
           sessions={sessions}
@@ -205,6 +228,12 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
           Hide finished
         </button>
       )}
+
+      <MyIngredients
+        ingredients={mine}
+        onEdit={(ingredient) => setView({ kind: 'editIngredient', ingredient })}
+        onChanged={() => { void refreshCatalogue(); }}
+      />
     </section>
   );
 }

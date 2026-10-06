@@ -10,6 +10,8 @@ import { WeightInput, type WeightUnit } from './WeightInput';
 
 interface Props {
   catalogue: readonly Ingredient[];
+  /** Recently used ingredient ids, offered first in the picker. */
+  recentIds?: readonly string[];
   /** Present when editing; absent when creating. */
   batch?: Batch;
   /** Required when editing, to guard a reduced purchase weight. */
@@ -24,7 +26,7 @@ interface Props {
 }
 
 export function AddBatchForm({
-  catalogue, batch, sessions = [], initialIngredientId, initialRawWeightG,
+  catalogue, recentIds = [], batch, sessions = [], initialIngredientId, initialRawWeightG,
   today = new Date(), onSaved, onCancel, onAddNew,
 }: Props) {
   const editing = batch !== undefined;
@@ -100,6 +102,7 @@ export function AddBatchForm({
 
       <IngredientPicker
         catalogue={catalogue}
+        recentIds={recentIds}
         value={ingredientId}
         onChange={setIngredientId}
         onAddNew={onAddNew}

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { dayTotals, type MealContext } from '../../core/meals';
 import { ageFrom, snapshotTargets } from '../../core/targets';
-import { MEAL_LABEL_KEYS, type MealEntry, type MealLabel, type Profile } from '../../core/types';
+import { MEAL_LABEL_KEYS, NUTRIENT_KEYS, type MealEntry, type MealLabel, type Profile } from '../../core/types';
 import { CATEGORY_YIELD } from '../../data/categoryYield';
 import { DV_US } from '../../data/dvUS';
 import { RETENTION } from '../../data/retentionTable';
@@ -12,8 +12,13 @@ import { DayNav } from '../components/DayNav';
 import { DayProgress } from '../components/DayProgress';
 import { GroupDay } from '../components/GroupDay';
 import { MealGroup } from '../components/MealGroup';
+import { WeekCard } from '../components/WeekCard';
 import { NutrientTable } from '../components/NutrientTable';
-import { todayIso } from '../dates';
+import { dayName, todayIso } from '../dates';
+import { planRepeat, previousMeal } from '../../core/repeat';
+import { addEntries, dayLogId } from '../../storage/meals';
+import { entryItemName, MEAL_LABELS } from '../labels';
+import { newId } from '../newId';
 import { useCatalogue } from '../useCatalogue';
 import { useGroups } from '../useGroups';
 import { useKitchen } from '../useKitchen';
@@ -31,6 +36,9 @@ function labelForHour(hour: number): MealLabel {
   return 'snack';
 }
 
+/** The time a repeated meal is logged at; read on tap, never during render. */
+const clockMs = (): number => Date.now();
+
 type View = { kind: 'list' } | { kind: 'form'; label: MealLabel; editing?: MealEntry };
 
 export function LogScreen({ profile, profiles = [], today = new Date() }: {
@@ -41,8 +49,9 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
 }) {
   const [date, setDate] = useState(() => todayIso(today));
   const [view, setView] = useState<View>({ kind: 'list' });
+  const [repeatNotice, setRepeatNotice] = useState<{ text: string; warn: boolean } | null>(null);
 
-  const { catalogue } = useCatalogue();
+  const { catalogue, all } = useCatalogue();
   const kitchen = useKitchen();
   const log = useLog(profile?.id ?? null, date);
   const { groups } = useGroups();
@@ -67,11 +76,11 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
   const ctx: MealContext = useMemo(() => ({
     sessions: kitchen.sessions,
     batches: kitchen.batches,
-    ingredientById: (id) => catalogue.find((i) => i.id === id),
+    ingredientById: (id) => all.find((i) => i.id === id),
     samples: kitchen.samples,
     categoryYield: CATEGORY_YIELD,
     retention: RETENTION,
-  }), [kitchen.sessions, kitchen.batches, kitchen.samples, catalogue]);
+  }), [kitchen.sessions, kitchen.batches, kitchen.samples, all]);
 
   const totals = useMemo(() => dayTotals(log.entries, ctx), [log.entries, ctx]);
 
@@ -128,6 +137,33 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
   }
 
   const afterChange = () => { void log.refresh(); void kitchen.refresh(); setVersion((v) => v + 1); };
+
+  // Copies what was eaten, never more than a cook still holds; anything that
+  // no longer fits is named rather than silently dropped.
+  const repeatMeal = async (label: MealLabel, from: { date: string; entries: MealEntry[] }) => {
+    const plan = planRepeat(from.entries, ctx, kitchen.entries, { profileId: profile.id, date, label });
+    const meal = MEAL_LABELS[label].toLowerCase();
+    const skipped = plan.skipped.map((s) => `${entryItemName(s.entry, ctx)} (${s.reason.replace(/\.$/, '').toLowerCase()})`);
+    if (plan.fields.length === 0) {
+      setRepeatNotice({ text: `Nothing could be copied: ${skipped.join('; ')}.`, warn: true });
+      return;
+    }
+    const now = clockMs();
+    try {
+      await addEntries(plan.fields.map((fields, i) => ({
+        entry: { id: newId(), profileId: profile.id, date, label, createdAt: now + i, ...fields },
+        snapshot: { id: dayLogId(profile.id, date), profileId: profile.id, date, targets },
+      })));
+    } catch (err) {
+      console.error('Repeating a meal failed', err);
+      setRepeatNotice({ text: 'Could not copy that meal — storage may be blocked or full. Please try again.', warn: true });
+      return;
+    }
+    setRepeatNotice(skipped.length === 0
+      ? { text: `Copied ${meal} from ${dayName(from.date, todayIso(today)).toLowerCase()}.`, warn: false }
+      : { text: `Copied ${plan.fields.length} of ${from.entries.length} items. Not copied: ${skipped.join('; ')}.`, warn: true });
+    afterChange();
+  };
   const storageError = log.storageError ?? kitchen.storageError;
 
   return (
@@ -136,7 +172,7 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
 
       <BackupReminder today={today} />
 
-      <DayNav date={date} today={todayIso(today)} onChange={setDate} />
+      <DayNav date={date} today={todayIso(today)} onChange={(d) => { setDate(d); setRepeatNotice(null); }} />
 
       {storageError !== null && <p role="alert" className="banner banner--warn">{storageError}</p>}
 
@@ -157,17 +193,41 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
         </button>
       </div>
 
-      {MEAL_LABEL_KEYS.map((label) => (
+      {repeatNotice !== null && (
+        <p role="status" className={`banner ${repeatNotice.warn ? 'banner--warn' : 'banner--info'}`}>
+          {repeatNotice.text}
+        </p>
+      )}
+
+      {MEAL_LABEL_KEYS.map((label) => {
+        const before = previousMeal(kitchen.entries, profile.id, label, date);
+        return (
         <MealGroup
           key={label}
           label={label}
           entries={log.entries.filter((e) => e.label === label)}
+          repeat={before === null ? undefined : {
+            from: dayName(before.date, todayIso(today)).toLowerCase(),
+            count: before.entries.length,
+            onRepeat: () => { void repeatMeal(label, before); },
+          }}
           ctx={ctx}
           onAdd={() => setView({ kind: 'form', label })}
           onEdit={(entry) => setView({ kind: 'form', label: entry.label, editing: entry })}
           onChanged={afterChange}
         />
-      ))}
+        );
+      })}
+
+      <WeekCard
+        profileId={profile.id}
+        endDate={date}
+        entries={kitchen.entries}
+        batches={kitchen.batches}
+        samples={kitchen.samples}
+        ctx={ctx}
+        version={version}
+      />
 
       {myGroups.map((g) => (
         <GroupDay key={g.id} group={g} profiles={profiles} date={date} ctx={ctx} today={today} version={version} />
@@ -178,9 +238,9 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
           <h3 className="card__title">Nutrients for the day</h3>
           {totals.unknownMicroEntries > 0 && (
             <p className="flag" data-testid="micro-floor">
-              At least these amounts — {totals.unknownMicroEntries} quick{' '}
-              {totals.unknownMicroEntries === 1 ? 'entry has' : 'entries have'} no
-              micronutrient figures, so the real total is higher.
+              Some figures are only &ldquo;at least&rdquo; — {totals.unknownMicroEntries}{' '}
+              {totals.unknownMicroEntries === 1 ? 'entry has' : 'entries have'} no figure for
+              some minerals (a quick add, or a label that left them out), so the real total is higher.
             </p>
           )}
           <div className="table-scroll">
@@ -188,6 +248,7 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
               totals={totals.totals}
               targets={targets.micros}
               assumedRetentionFor={[]}
+              atLeastFor={NUTRIENT_KEYS.filter((k) => (totals.unknownFor[k] ?? 0) > 0)}
               belowRniAge={ageFrom(profile, today) < RNI_MIN_AGE}
             />
           </div>

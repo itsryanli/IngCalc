@@ -68,3 +68,12 @@ export const updateEntry = async (entry: MealEntry): Promise<void> => {
 export const deleteEntry = async (id: string): Promise<void> => {
   await db.mealEntries.delete(id);
 };
+
+/** The frozen targets for each of these days that has any, keyed by date. */
+export const loadDayLogs = async (
+  profileId: string,
+  dates: readonly IsoDate[],
+): Promise<Map<IsoDate, DayLog>> => {
+  const logs = await db.dayLogs.bulkGet(dates.map((d) => dayLogId(profileId, d)));
+  return new Map(logs.filter((l): l is DayLog => l !== undefined).map((l) => [l.date, l]));
+};

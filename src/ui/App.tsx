@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { isStorageAvailable } from '../storage/db';
 import { getSettings } from '../storage/settings';
+import { requestPersistence } from '../storage/persistence';
 import { useProfiles } from './useProfiles';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { CalcScreen } from './screens/CalcScreen';
@@ -37,6 +38,7 @@ export function App() {
       if (cancelled) return;
       setStorageOk(ok);
       if (!ok) return;
+      void requestPersistence();
 
       // Profiles are `useProfiles`' job; this only needs the landing tab.
       const settings = await getSettings();

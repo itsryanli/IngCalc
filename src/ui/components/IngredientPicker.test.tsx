@@ -140,3 +140,42 @@ describe('IngredientPicker', () => {
     expect(input).toHaveValue('Kangkung (water spinach)');
   });
 });
+
+describe('IngredientPicker recent ingredients', () => {
+  const open = () => fireEvent.focus(screen.getByRole('combobox', { name: /ingredient/i }));
+  const names = () => screen.getAllByRole('option').map((o) => o.textContent);
+
+  it('lists recent ingredients first, marked, before anything is typed', () => {
+    render(<IngredientPicker catalogue={CATALOGUE} value="" onChange={vi.fn()} onAddNew={vi.fn()}
+                             recentIds={['kangkung', 'brown-rice']} />);
+    open();
+    expect(names().slice(0, 3)).toEqual([
+      'Kangkung (water spinach)Recent', 'Brown rice, long grainRecent', 'Chicken breast, skinless',
+    ]);
+    // Listed once, not again further down.
+    expect(names().filter((n) => n?.startsWith('Kangkung'))).toHaveLength(1);
+  });
+
+  it('keeps the recent tag out of the option name, so it reads as the ingredient', () => {
+    render(<IngredientPicker catalogue={CATALOGUE} value="" onChange={vi.fn()} onAddNew={vi.fn()}
+                             recentIds={['kangkung']} />);
+    open();
+    expect(screen.getByRole('option', { name: 'Kangkung (water spinach)' })).toBeInTheDocument();
+  });
+
+  it('lets the search alone decide once something is typed', () => {
+    render(<IngredientPicker catalogue={CATALOGUE} value="" onChange={vi.fn()} onAddNew={vi.fn()}
+                             recentIds={['kangkung']} />);
+    open();
+    fireEvent.change(screen.getByRole('combobox', { name: /ingredient/i }), { target: { value: 'chicken' } });
+    expect(names()[0]).toBe('Chicken breast, skinless');
+    expect(screen.queryByText('Recent')).not.toBeInTheDocument();
+  });
+
+  it('ignores a recent id that is no longer in the list, such as an archived ingredient', () => {
+    render(<IngredientPicker catalogue={CATALOGUE} value="" onChange={vi.fn()} onAddNew={vi.fn()}
+                             recentIds={['gone', 'bendi']} />);
+    open();
+    expect(names()[0]).toBe('Bendi (okra), rawRecent');
+  });
+});

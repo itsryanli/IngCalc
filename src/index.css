@@ -587,6 +587,15 @@ body {
 }
 
 .picker__option--add.is-active,
+.picker__tag {
+  margin-left: var(--sp-2);
+  padding: 0 var(--sp-2);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
 .picker__option--add:hover { background: var(--estimate-soft); color: var(--estimate); }
 
 /* Grouped nutrient inputs — two columns once there is room. */
@@ -688,6 +697,64 @@ body {
 .update-banner__text { margin: 0 0 var(--sp-3); font-weight: 600; }
 .update-banner__actions { display: flex; gap: var(--sp-3); }
 .update-banner__actions .btn { flex: 1 1 0; }
+
+/* My ingredients: a name, then its actions, on one line where it fits. */
+.my-ingredients { margin-top: var(--sp-5); }
+.my-ingredients__list { list-style: none; margin: 0 0 var(--sp-3); padding: 0; }
+.my-ingredients__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+.my-ingredients__row:last-child { border-bottom: none; }
+.my-ingredients__name { flex: 1 1 10rem; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.my-ingredients__row--archived .my-ingredients__name { color: var(--text-dim); }
+
+.meal-group__repeat { margin-top: var(--sp-2); }
+
+/* Your last 7 days: one dot a day, filled when protein was reached. An
+   unlogged day is a faint outline, never a red mark or a broken streak. */
+.week__dots {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-1);
+  margin: 0 0 var(--sp-3);
+  padding: 0;
+  list-style: none;
+}
+.week__day { display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); flex: 1 1 0; }
+.week__dot {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+}
+.week__dot--hit { background: var(--accent); }
+.week__dot--logged { background: var(--accent-soft); }
+.week__dot--off { border-color: var(--border-strong); border-style: dashed; }
+.week__weekday { font-size: var(--fs-xs); color: var(--text-dim); }
+.week__line { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); }
+.week__tag {
+  margin-left: var(--sp-2);
+  padding: 0 var(--sp-2);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.week__milestones { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-3) 0 0; padding: 0; list-style: none; }
+.week__milestone {
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
 
 /* Banners */
 .banner {

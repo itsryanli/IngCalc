@@ -45,9 +45,15 @@ interface Props {
    * mode this prop exists to avoid.
    */
   belowRniAge?: boolean;
+  /** Nutrients with no figure at all (one food whose label left them out): shown as "Not known". */
+  unknown?: readonly NutrientKey[];
+  /** Totals that leave out foods with no figure: shown as "at least". */
+  atLeastFor?: readonly NutrientKey[];
 }
 
-export function NutrientTable({ totals, targets, assumedRetentionFor, belowRniAge = false }: Props) {
+export function NutrientTable({
+  totals, targets, assumedRetentionFor, belowRniAge = false, unknown = [], atLeastFor = [],
+}: Props) {
   return (
     <table>
       <thead>
@@ -56,6 +62,17 @@ export function NutrientTable({ totals, targets, assumedRetentionFor, belowRniAg
       <tbody>
         {NUTRIENT_KEYS.map((key) => {
           const target = targets[key];
+          if (unknown.includes(key)) {
+            return (
+              <tr key={key} className="nutrient-table__unknown">
+                <th scope="row">{LABELS[key]}</th>
+                <td>Not known</td>
+                <td>—</td>
+                <td>—</td>
+              </tr>
+            );
+          }
+          const floor = atLeastFor.includes(key) ? 'at least ' : '';
           return (
             <tr key={key}>
               <th scope="row">
@@ -64,9 +81,9 @@ export function NutrientTable({ totals, targets, assumedRetentionFor, belowRniAg
                   <abbr title="Retention assumed 100% — no sourced figure for this nutrient and method"> *</abbr>
                 )}
               </th>
-              <td>{fmt(totals[key], UNITS[key])}</td>
-              <td>{pct(totals[key], target?.rni, 'RNI')}</td>
-              <td>{pct(totals[key], target?.dv, 'DV')}</td>
+              <td>{floor}{fmt(totals[key], UNITS[key])}</td>
+              <td>{floor}{pct(totals[key], target?.rni, 'RNI')}</td>
+              <td>{floor}{pct(totals[key], target?.dv, 'DV')}</td>
             </tr>
           );
         })}

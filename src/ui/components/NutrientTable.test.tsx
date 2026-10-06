@@ -76,4 +76,17 @@ describe('NutrientTable', () => {
     render(<NutrientTable totals={totals} targets={targets} assumedRetentionFor={[]} />);
     expect(screen.queryByText(/publishes figures for ages 19 and over/i)).not.toBeInTheDocument();
   });
+
+  it('shows a nutrient nobody knows as "Not known", never as 0', () => {
+    render(<NutrientTable totals={totals} targets={targets} assumedRetentionFor={[]} unknown={['zinc']} />);
+    const row = screen.getByRole('row', { name: /^zinc/i });
+    expect(row).toHaveTextContent('Not known');
+    expect(row).not.toHaveTextContent('0mg');
+  });
+
+  it('marks a total that leaves some foods out as "at least"', () => {
+    render(<NutrientTable totals={totals} targets={targets} assumedRetentionFor={[]} atLeastFor={['potassium']} />);
+    expect(screen.getByRole('row', { name: /potassium/i })).toHaveTextContent(/at least/);
+    expect(screen.getByRole('row', { name: /^zinc/i })).not.toHaveTextContent(/at least/);
+  });
 });
