@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DataPanel } from './DataPanel';
+import * as persistenceModule from '../../storage/persistence';
 import { MAX_BACKUP_BYTES, NOT_READABLE, TOO_LARGE } from '../../core/backup';
 import { db } from '../../storage/db';
 import { g, myr } from '../../core/units';
@@ -149,5 +150,26 @@ describe('DataPanel: restore', () => {
     expect(onRestored).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalledWith('Restoring a backup failed', expect.any(Error));
     expect(await db.batches.count()).toBe(0);
+  });
+
+  describe('persistent storage', () => {
+    it('says when the browser has agreed to keep the data', async () => {
+      vi.spyOn(persistenceModule, 'checkPersistence').mockResolvedValue('persisted');
+      render(<DataPanel onExportPurchases={null} onExportMeals={null} onRestored={vi.fn()} />);
+      expect(await screen.findByTestId('persistence')).toHaveTextContent(/agreed to keep/i);
+    });
+
+    it('urges backups when the browser may clear the data', async () => {
+      vi.spyOn(persistenceModule, 'checkPersistence').mockResolvedValue('notPersisted');
+      render(<DataPanel onExportPurchases={null} onExportMeals={null} onRestored={vi.fn()} />);
+      expect(await screen.findByTestId('persistence')).toHaveTextContent(/may clear.*backups/i);
+    });
+
+    it('says nothing when the browser cannot tell', async () => {
+      vi.spyOn(persistenceModule, 'checkPersistence').mockResolvedValue('unsupported');
+      render(<DataPanel onExportPurchases={null} onExportMeals={null} onRestored={vi.fn()} />);
+      await screen.findByText(/download backup/i);
+      expect(screen.queryByTestId('persistence')).not.toBeInTheDocument();
+    });
   });
 });

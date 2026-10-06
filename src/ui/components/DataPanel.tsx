@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   MAX_BACKUP_BYTES, NOT_READABLE, parseBackup, planSummary, restoredSummary, TOO_LARGE,
   type BackupTables, type RestoreMode, type RestorePlan,
 } from '../../core/backup';
 import { applyRestore, previewRestore } from '../../storage/backup';
+import { checkPersistence, type Persistence } from '../../storage/persistence';
 import { useBackup } from '../useBackup';
 
 type Stage =
@@ -49,6 +50,12 @@ export function DataPanel({ onExportPurchases, onExportMeals, onRestored, today 
   };
 
   const backup = useBackup(today);
+  const [persistence, setPersistence] = useState<Persistence>('unsupported');
+  useEffect(() => {
+    let cancelled = false;
+    void checkPersistence().then((p) => { if (!cancelled) setPersistence(p); });
+    return () => { cancelled = true; };
+  }, []);
   const downloadBackup = async () => {
     await backup.backUp();
   };
@@ -150,6 +157,13 @@ export function DataPanel({ onExportPurchases, onExportMeals, onRestored, today 
             <> <span data-testid="last-backup">{backup.status.text}.</span></>
           )}
         </p>
+        {persistence !== 'unsupported' && (
+          <p className="data-panel__note" data-testid="persistence">
+            {persistence === 'persisted'
+              ? 'This browser has agreed to keep the app\'s data, even when the phone is low on space.'
+              : 'This browser may clear the app\'s data if the phone runs low on space, so keep regular backups.'}
+          </p>
+        )}
         {backup.error !== null && <p role="alert">{backup.error}</p>}
 
         {stage.kind === 'idle' && (
