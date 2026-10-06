@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AddIngredientScreen } from './AddIngredientScreen';
+import { zeroNutrients } from '../../core/nutrients';
 import { db } from '../../storage/db';
 import * as userIngredientsModule from '../../storage/userIngredients';
 
@@ -202,6 +203,45 @@ describe('AddIngredientScreen', () => {
       fireEvent.click(screen.getByRole('button', { name: /save/i }));
       await waitFor(() => expect(onSaved).toHaveBeenCalled());
       expect((await db.userIngredients.toArray())[0]!.sourceRef).toBeUndefined();
+    });
+  });
+
+  describe('editing', () => {
+    const crackers = {
+      id: 'my-crackers', name: 'Oat crackers', category: 'other' as const,
+      per100gRaw: { ...zeroNutrients(), kcal: 400, protein: 1.25 }, publishedYield: {},
+      absorbsWater: false, defaultMethod: 'asIs' as const, source: 'user' as const,
+      sourceRef: 'Nutrition label', archived: false,
+    };
+
+    it('starts from what was saved and says edits reach past meals', () => {
+      render(<AddIngredientScreen editing={crackers} onSaved={vi.fn()} />);
+      expect(screen.getByRole('heading', { name: 'Edit Oat crackers' })).toBeInTheDocument();
+      expect(screen.getByLabelText(/^protein/i)).toHaveValue('1.25');
+      expect(screen.getByLabelText(/usually eaten without cooking/i)).toBeChecked();
+      expect(screen.getByText(/including meals already logged/i)).toBeInTheDocument();
+    });
+
+    it('saves a correction under the same id, keeping where the values came from', async () => {
+      await db.userIngredients.put(crackers);
+      const onSaved = vi.fn();
+      render(<AddIngredientScreen editing={crackers} onSaved={onSaved} />);
+      fireEvent.change(screen.getByLabelText(/^protein/i), { target: { value: '12.5' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      const all = await db.userIngredients.toArray();
+      expect(all).toHaveLength(1);
+      expect(all[0]).toMatchObject({ id: 'my-crackers', sourceRef: 'Nutrition label', defaultMethod: 'asIs' });
+      expect(all[0]!.per100gRaw.protein).toBe(12.5);
+    });
+
+    it('drops "not cooked" as the usual method when unticked', async () => {
+      const onSaved = vi.fn();
+      render(<AddIngredientScreen editing={crackers} onSaved={onSaved} />);
+      fireEvent.click(screen.getByLabelText(/usually eaten without cooking/i));
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      expect((await db.userIngredients.get('my-crackers'))!.defaultMethod).toBeUndefined();
     });
   });
 });

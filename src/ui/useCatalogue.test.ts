@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import 'fake-indexeddb/auto';
-import { mergeCatalogue, useCatalogue } from './useCatalogue';
+import { mergeAll, mergeCatalogue, useCatalogue } from './useCatalogue';
 import { zeroNutrients } from '../core/nutrients';
 import { db } from '../storage/db';
 import { saveUserIngredient } from '../storage/userIngredients';
@@ -33,6 +33,13 @@ describe('mergeCatalogue', () => {
   it('excludes archived entries', () => {
     const r = mergeCatalogue([make('a', 'Apple')], [make('b', 'Bad', { source: 'user', archived: true })]);
     expect(r.map((i) => i.id)).toEqual(['a']);
+  });
+});
+
+describe('mergeAll', () => {
+  it('keeps archived entries, for looking up what past meals used', () => {
+    const r = mergeAll([make('a', 'Apple')], [make('b', 'Bad', { source: 'user', archived: true })]);
+    expect(r.map((i) => i.id)).toEqual(['a', 'b']);
   });
 });
 

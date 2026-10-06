@@ -42,7 +42,7 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
   const [date, setDate] = useState(() => todayIso(today));
   const [view, setView] = useState<View>({ kind: 'list' });
 
-  const { catalogue } = useCatalogue();
+  const { catalogue, all } = useCatalogue();
   const kitchen = useKitchen();
   const log = useLog(profile?.id ?? null, date);
   const { groups } = useGroups();
@@ -67,11 +67,11 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
   const ctx: MealContext = useMemo(() => ({
     sessions: kitchen.sessions,
     batches: kitchen.batches,
-    ingredientById: (id) => catalogue.find((i) => i.id === id),
+    ingredientById: (id) => all.find((i) => i.id === id),
     samples: kitchen.samples,
     categoryYield: CATEGORY_YIELD,
     retention: RETENTION,
-  }), [kitchen.sessions, kitchen.batches, kitchen.samples, catalogue]);
+  }), [kitchen.sessions, kitchen.batches, kitchen.samples, all]);
 
   const totals = useMemo(() => dayTotals(log.entries, ctx), [log.entries, ctx]);
 

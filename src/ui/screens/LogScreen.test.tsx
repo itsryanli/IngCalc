@@ -7,6 +7,7 @@ import { db } from '../../storage/db';
 import { dayLogId } from '../../storage/meals';
 import type { Batch, CookSession, DayLogTargets, IsoDate, MealEntry, Profile } from '../../core/types';
 import { g } from '../../core/units';
+import { zeroNutrients } from '../../core/nutrients';
 
 const profile: Profile = {
   id: 'p1', name: 'Ryan', sex: 'male', birthYear: 1996,
@@ -74,6 +75,22 @@ describe('LogScreen', () => {
     await db.dayLogs.clear();
     await db.batches.clear();
     await db.cookSessions.clear();
+  });
+
+  it('keeps showing and counting a meal whose ingredient was later archived', async () => {
+    await db.userIngredients.put({
+      id: 'my-crackers', name: 'Oat crackers', category: 'other',
+      per100gRaw: { ...zeroNutrients(), kcal: 400, protein: 10 }, publishedYield: {},
+      absorbsWater: false, defaultMethod: 'asIs', source: 'user', archived: true,
+    });
+    await db.mealEntries.add({
+      id: 'e-crackers', profileId: profile.id, date: '2026-09-19', label: 'lunch', createdAt: 1,
+      kind: 'ingredient', ingredientId: 'my-crackers', method: 'asIs', cookedG: g(50),
+    });
+    render(<LogScreen profile={profile} today={new Date(2026, 8, 19)} />);
+    expect(await screen.findByText(/oat crackers/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('kcal-progress')).toHaveTextContent('200'));
+    await db.userIngredients.clear();
   });
 
   it('asks for a profile before anything else', () => {
