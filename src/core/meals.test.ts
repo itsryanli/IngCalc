@@ -128,6 +128,21 @@ describe('dayTotals', () => {
     expect(r.unknownFor.carbs).toBe(1);
     expect(r.unknownFor.kcal).toBeUndefined();
   });
+
+  it('counts a dish nutrient that is only "at least" as incomplete for the day', () => {
+    const bread = {
+      id: 'bread', name: 'Bread', category: 'other' as const,
+      per100gRaw: { ...zeroNutrients(), kcal: 280, iron: 2 }, publishedYield: {},
+      absorbsWater: false, source: 'user' as const, archived: false, partialNutrients: ['iron' as const],
+    };
+    const r = dayTotals([
+      { id: 'a', profileId: 'p', date: '2026-10-06', label: 'breakfast', createdAt: 1,
+        kind: 'ingredient', ingredientId: 'bread', method: 'asIs', cookedG: g(80) },
+    ], { ...ctx, ingredientById: (id) => (id === 'bread' ? bread : undefined) });
+    expect(r.totals.iron).toBeCloseTo(1.6, 6);
+    expect(r.unknownFor.iron).toBe(1);
+    expect(r.unknownMicroEntries).toBe(1);
+  });
 });
 
 describe('validateEntry', () => {
