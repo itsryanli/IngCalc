@@ -4,6 +4,8 @@ import { zeroNutrients } from '../../core/nutrients';
 import { parseLabel, type LabelReading } from '../../core/labelParse';
 import { saveUserIngredient } from '../../storage/userIngredients';
 import { newId } from '../newId';
+import { OnlineSearch } from '../components/OnlineSearch';
+import type { OffFood } from '../../core/openFoodFacts';
 
 const LABELS: Record<NutrientKey, string> = {
   kcal: 'Energy (kcal)', protein: 'Protein (g)', carbs: 'Carbohydrate (g)',
@@ -35,9 +37,11 @@ const entriesFrom = (i: Ingredient): Entries => {
 };
 
 export function AddIngredientScreen({
-  initialName = '', editing, onSaved, onCancel,
+  initialName = '', searchFor, editing, onSaved, onCancel,
 }: {
   initialName?: string;
+  /** Open on an online search for this name: "Search online for …" in a picker. */
+  searchFor?: string;
   /** One of the person's own ingredients, to change rather than add. */
   editing?: Ingredient;
   onSaved: (i: Ingredient) => void;
@@ -53,6 +57,29 @@ export function AddIngredientScreen({
   const [error, setError] = useState<string | null>(null);
   const [labelText, setLabelText] = useState('');
   const [reading, setReading] = useState<LabelReading | null>(null);
+  /** Where the highlighted values came from, which sets their tag and the saved source. */
+  const [fillSource, setFillSource] = useState<'label' | 'online' | null>(null);
+  const [picked, setPicked] = useState<OffFood | null>(null);
+
+  const fillFrom = (values: Partial<Record<NutrientKey, number>>) => {
+    const next = emptyEntries();
+    for (const k of NUTRIENT_KEYS) {
+      const v = values[k];
+      if (v !== undefined) next[k] = String(v);
+    }
+    setEntries(next);
+    setFromLabel(new Set(NUTRIENT_KEYS.filter((k) => values[k] !== undefined)));
+    // Packaged food is nearly always eaten as it comes.
+    setEatenAsIs(true);
+  };
+
+  const pickOnline = (food: OffFood) => {
+    fillFrom(food.values);
+    setName(food.brand !== '' && !food.name.toLowerCase().includes(food.brand.toLowerCase())
+      ? `${food.name} (${food.brand})` : food.name);
+    setPicked(food);
+    setFillSource('online');
+  };
 
   // Replaces every nutrient field, so pasting a second label never leaves values
   // from the first behind. Nothing is saved: the person checks the form first.
@@ -60,15 +87,8 @@ export function AddIngredientScreen({
     const r = parseLabel(labelText);
     setReading(r);
     if (Object.keys(r.values).length === 0) return;
-    const next = emptyEntries();
-    for (const k of NUTRIENT_KEYS) {
-      const v = r.values[k];
-      if (v !== undefined) next[k] = String(v);
-    }
-    setEntries(next);
-    setFromLabel(new Set(NUTRIENT_KEYS.filter((k) => r.values[k] !== undefined)));
-    // Packaged food with a label is nearly always eaten as it comes.
-    setEatenAsIs(true);
+    fillFrom(r.values);
+    setFillSource('label');
   };
 
   const changeNutrient = (k: NutrientKey, value: string) => {
@@ -102,7 +122,9 @@ export function AddIngredientScreen({
 
     setError(null);
     // An edit keeps the id, so every batch and meal that uses it sees the change.
-    const sourceRef = filled.length > 0 ? 'Nutrition label' : editing?.sourceRef;
+    const sourceRef = fillSource === 'online' && picked !== null
+      ? `Open Food Facts ${picked.code}`
+      : fillSource === 'label' ? 'Nutrition label' : editing?.sourceRef;
     const defaultMethod = eatenAsIs
       ? NOT_COOKED
       : editing?.defaultMethod === NOT_COOKED ? undefined : editing?.defaultMethod;
@@ -138,6 +160,22 @@ export function AddIngredientScreen({
         Values per 100g raw. Leave a value blank if you don't know it (type 0 only if it really is zero).
         {editing !== undefined && ' Changes apply everywhere this ingredient is used, including meals already logged.'}
       </p>
+
+      {editing === undefined && (
+        <OnlineSearch initialQuery={searchFor ?? initialName} autoSearch={searchFor !== undefined} onPick={pickOnline} />
+      )}
+      {fillSource === 'online' && picked !== null && (
+        <div role="status" className="banner banner--info label-paste__result">
+          <p>
+            Filled in {Object.keys(picked.values).length} values for {picked.name} from Open Food Facts
+            {picked.perMl && ' (per 100 ml, used as per 100 g)'}. They're highlighted below: anyone can
+            edit Open Food Facts, so check them against the pack if you have it.
+          </p>
+          {NUTRIENT_KEYS.some((k) => picked.values[k] === undefined) && (
+            <p>Not listed, so left blank and saved as not known: {NUTRIENT_KEYS.filter((k) => picked.values[k] === undefined).map((k) => LABELS[k].replace(/ \(.*\)$/, '')).join(', ')}.</p>
+          )}
+        </div>
+      )}
 
       <details className="label-paste">
         <summary>Fill in from a nutrition label</summary>
@@ -203,7 +241,7 @@ export function AddIngredientScreen({
         <div key={k} className={`field${fromLabel.has(k) ? ' field--from-label' : ''}`}>
           <label htmlFor={`n-${k}`}>
             {LABELS[k]}
-            {fromLabel.has(k) && <span className="from-label-tag"> from label</span>}
+            {fromLabel.has(k) && <span className="from-label-tag"> {fillSource === 'online' ? 'from search' : 'from label'}</span>}
           </label>
           {/* type="text" with inputMode="decimal" allows validation to catch non-numeric input that
               type="number" would sanitise away, rendering the Number.isFinite guard reachable.

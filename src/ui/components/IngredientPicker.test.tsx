@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 
 // Options are activated on mousedown, not click: the input's blur would otherwise
 // close the listbox before a click could land on it. fireEvent.click fires ONLY a
@@ -177,5 +177,59 @@ describe('IngredientPicker recent ingredients', () => {
                              recentIds={['gone', 'bendi']} />);
     open();
     expect(names()[0]).toBe('Bendi (okra), rawRecent');
+  });
+});
+
+describe('IngredientPicker online search', () => {
+  const setOnline = (on: boolean) => {
+    Object.defineProperty(navigator, 'onLine', { value: on, configurable: true });
+    window.dispatchEvent(new Event(on ? 'online' : 'offline'));
+  };
+  const typeIn = (text: string) => {
+    const input = screen.getByRole('combobox', { name: /ingredient/i });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: text } });
+  };
+
+  it('offers "Search online for …" below "Add …" while online', () => {
+    setOnline(true);
+    const onAddNew = vi.fn();
+    render(<IngredientPicker catalogue={CATALOGUE} value="" onChange={vi.fn()} onAddNew={onAddNew} />);
+    typeIn('Zus latte');
+    const options = screen.getAllByRole('option').map((o) => o.textContent);
+    expect(options.slice(-2)).toEqual(['Add "Zus latte"', 'Search online for “Zus latte”']);
+    press(screen.getByRole('option', { name: 'Search online for “Zus latte”' }));
+    expect(onAddNew).toHaveBeenCalledWith('Zus latte', true);
+  });
+
+  it('does not show it offline, and brings it back when the connection returns', () => {
+    setOnline(false);
+    render(<IngredientPicker catalogue={CATALOGUE} value="" onChange={vi.fn()} onAddNew={vi.fn()} />);
+    typeIn('Zus latte');
+    expect(screen.queryByRole('option', { name: /search online/i })).not.toBeInTheDocument();
+    act(() => setOnline(true));
+    expect(screen.getByRole('option', { name: /search online/i })).toBeInTheDocument();
+  });
+
+  it('does not show it before anything is typed, or where a form turns it off', () => {
+    setOnline(true);
+    const { unmount } = render(<IngredientPicker catalogue={CATALOGUE} value="" onChange={vi.fn()} onAddNew={vi.fn()} />);
+    fireEvent.focus(screen.getByRole('combobox', { name: /ingredient/i }));
+    expect(screen.queryByRole('option', { name: /search online/i })).not.toBeInTheDocument();
+    unmount();
+    render(<IngredientPicker catalogue={CATALOGUE} value="" onChange={vi.fn()} onAddNew={vi.fn()} searchOnline={false} />);
+    typeIn('Zus latte');
+    expect(screen.queryByRole('option', { name: /search online/i })).not.toBeInTheDocument();
+  });
+
+  it('reaches the search row with the arrow keys', () => {
+    setOnline(true);
+    const onAddNew = vi.fn();
+    render(<IngredientPicker catalogue={CATALOGUE} value="" onChange={vi.fn()} onAddNew={onAddNew} />);
+    typeIn('zzz');
+    const input = screen.getByRole('combobox', { name: /ingredient/i });
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onAddNew).toHaveBeenCalledWith('zzz', true);
   });
 });

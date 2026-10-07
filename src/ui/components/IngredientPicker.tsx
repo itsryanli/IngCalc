@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { Ingredient } from '../../core/types';
 import { rankIngredients } from '../rankIngredients';
+import { useOnline } from '../useOnline';
 
 
 interface Props {
@@ -8,13 +9,19 @@ interface Props {
   /** Currently selected ingredient id, or '' for none. */
   value: string;
   onChange: (id: string) => void;
-  /** Opens the add-ingredient flow, seeded with whatever the user had typed. */
-  onAddNew: (initialName: string) => void;
+  /**
+   * Opens the add-ingredient flow, seeded with whatever the user had typed;
+   * `searchOnline` when they chose "Search online for …" instead.
+   */
+  onAddNew: (initialName: string, searchOnline?: boolean) => void;
+  /** Offer "Search online for …" while the phone is online. On by default. */
+  searchOnline?: boolean;
   /** Recently used ingredient ids, newest first: listed at the top before anything is typed. */
   recentIds?: readonly string[];
 }
 
-export function IngredientPicker({ catalogue, value, onChange, onAddNew, recentIds = [] }: Props) {
+export function IngredientPicker({ catalogue, value, onChange, onAddNew, recentIds = [], searchOnline = true }: Props) {
+  const online = useOnline();
   const inputId = useId();
   const listId = useId();
   const selected = catalogue.find((i) => i.id === value) ?? null;
@@ -40,8 +47,11 @@ export function IngredientPicker({ catalogue, value, onChange, onAddNew, recentI
     ...rankIngredients(catalogue, typed).filter((i) => !recent.includes(i)),
   ];
   const addLabel = query.trim() === '' ? 'Add a new ingredient' : `Add "${query.trim()}"`;
-  // The add row is always last, so its index is the match count.
+  // The add row follows the matches, and the search row (when shown) follows it.
   const addIndex = matches.length;
+  const showSearch = searchOnline && online && query.trim() !== '';
+  const searchIndex = addIndex + 1;
+  const lastIndex = showSearch ? searchIndex : addIndex;
 
   useEffect(() => {
     if (!open) return;
@@ -53,6 +63,11 @@ export function IngredientPicker({ catalogue, value, onChange, onAddNew, recentI
   }, [open]);
 
   const choose = (index: number) => {
+    if (showSearch && index === searchIndex) {
+      setOpen(false);
+      onAddNew(query.trim(), true);
+      return;
+    }
     if (index === addIndex) {
       setOpen(false);
       onAddNew(query.trim());
@@ -74,7 +89,7 @@ export function IngredientPicker({ catalogue, value, onChange, onAddNew, recentI
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       if (!open) { setOpen(true); return; }
-      const last = addIndex;
+      const last = lastIndex;
       setActiveIndex((i) => {
         if (e.key === 'ArrowDown') return i >= last ? 0 : i + 1;
         return i <= 0 ? last : i - 1;
@@ -133,6 +148,18 @@ export function IngredientPicker({ catalogue, value, onChange, onAddNew, recentI
           >
             {addLabel}
           </li>
+
+          {showSearch && (
+            <li
+              id={`${listId}-${searchIndex}`}
+              role="option"
+              aria-selected={false}
+              className={`picker__option picker__option--search${searchIndex === activeIndex ? ' is-active' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); choose(searchIndex); }}
+            >
+              Search online for &ldquo;{query.trim()}&rdquo;
+            </li>
+          )}
         </ul>
       )}
     </div>
