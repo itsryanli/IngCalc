@@ -36,6 +36,10 @@ location and date along the way so your spending can be exported and analysed.
 Everything runs on your device. There is no backend and no account; data is stored
 in the browser (IndexedDB) and can be backed up to a JSON file.
 
+The one exception is optional: when you're online and choose "Search online for …" in
+the ingredient list, the name you typed is sent to [Open Food Facts](https://world.openfoodfacts.org),
+a free database of packaged foods. Nothing else is sent, and offline the option is hidden.
+
 ## Features
 
 - **Log** — the day's calorie and protein progress against your targets, with meals
@@ -143,7 +147,7 @@ See [Using it on your phone](#using-it-on-your-phone).
 |---|---|
 | **A web app (PWA), not a native app** | One codebase runs on any phone or laptop. You can try it without an app store, install it to your home screen, and use it offline with `vite-plugin-pwa`. |
 | **No backend, no accounts** | The app is used at the market, often with poor signal, so everything runs on the device. Your food and spending data never leaves it. A JSON backup covers the "lost my phone" case without a server to run or pay for. |
-| **A strict Content-Security-Policy** | The production build only allows connections to its own site (`connect-src 'self'`). So the browser itself enforces "your data never leaves the device": even a compromised dependency couldn't send your data anywhere. The dev server leaves the policy off, because hot reload needs inline scripts. |
+| **A strict Content-Security-Policy** | The production build only allows connections to its own site and to Open Food Facts for "Search online" (`connect-src 'self' https://world.openfoodfacts.org`). So the browser itself enforces that your data goes nowhere else: even a compromised dependency couldn't send it anywhere. The dev server leaves the policy off, because hot reload needs inline scripts. |
 | **TypeScript** | The typical bug in this domain isn't a crash. It's a believable wrong number: grams mixed up with kilograms, raw with cooked, per-100 g with per-portion, or price per kg with price paid. Branded types such as `Grams` and `MYR` turn those mix-ups into build errors. |
 | **React** | The screens are mostly forms and live results that update as you type. React's component model fits that, and it's widely known, so the code is easy for others to read. |
 | **Vite** | Fast dev server and builds with very little config, plus the PWA plugin and Vitest built on the same toolchain. |

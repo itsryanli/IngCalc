@@ -26,7 +26,7 @@ type View =
   | { kind: 'cookForm'; batch: Batch; session?: CookSession }
   // `batch` remembers which batch (if any) was being edited when "add a new
   // ingredient" was tapped, so cancelling or saving returns to that same form.
-  | { kind: 'addIngredient'; typedName: string; batch?: Batch }
+  | { kind: 'addIngredient'; typedName: string; batch?: Batch; searchOnline?: boolean }
   | { kind: 'editIngredient'; ingredient: Ingredient }
   | { kind: 'dishForm'; mode: DishMode; dish?: Ingredient };
 
@@ -117,6 +117,7 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
       <section className="screen">
         <AddIngredientScreen
           initialName={view.typedName}
+          {...(view.searchOnline === true ? { searchFor: view.typedName } : {})}
           onSaved={(added) => handleIngredientAdded(added, view.batch)}
           onCancel={() => setView({ kind: 'batchForm', batch: view.batch })}
         />
@@ -152,7 +153,7 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
           today={today}
           onSaved={() => { void afterChange(); }}
           onCancel={backToList}
-          onAddNew={(typedName) => setView({ kind: 'addIngredient', typedName, batch: view.batch })}
+          onAddNew={(typedName, searchOnline) => setView({ kind: 'addIngredient', typedName, batch: view.batch, searchOnline })}
         />
       </section>
     );
