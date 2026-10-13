@@ -58,6 +58,14 @@ Ingredient data comes from USDA FoodData Central, and cooking losses from the US
 Table of Nutrient Retention Factors. Where a value is estimated rather than looked up,
 the app says so.
 
+About 1,500 foods are bundled: 66 hand-checked ones with local names and published
+cooking yields, and roughly 1,400 raw and as-sold foods (vegetables, fruit, meat,
+fish, grains, beans, nuts, dairy, oils, herbs and spices) taken straight from USDA's
+SR Legacy dataset by `scripts/build-usda-foods.mjs`. Each cites its FDC id, and a
+nutrient USDA did not measure is shown as "not known" rather than zero. To rebuild,
+download the SR Legacy CSV from [FoodData Central](https://fdc.nal.usda.gov/download-datasets)
+and run `node scripts/build-usda-foods.mjs <folder>`.
+
 ## Getting started
 
 You need [Node.js](https://nodejs.org/) **22.12 or newer** (see `.nvmrc`; with nvm,

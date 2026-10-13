@@ -24,6 +24,7 @@
 // suite is expected to verify them. All are within the validation test's
 // plausibility bands.
 import type { Ingredient, NutrientProfile } from '../core/types';
+import { USDA_FOODS } from './usdaFoods';
 
 const n = (p: Partial<NutrientProfile>): NutrientProfile => ({
   kcal: 0, protein: 0, carbs: 0, fibre: 0, fat: 0,
@@ -31,7 +32,8 @@ const n = (p: Partial<NutrientProfile>): NutrientProfile => ({
   ...p,
 });
 
-export const INGREDIENTS: readonly Ingredient[] = [
+/** Hand-checked, with local names and published cooking yields. */
+export const CURATED: readonly Ingredient[] = [
   // ---------------------------------------------------------------- MEAT ---
   {
     id: 'chicken-breast',
@@ -932,6 +934,9 @@ export const INGREDIENTS: readonly Ingredient[] = [
     archived: false,
   },
 ];
+
+/** Every bundled ingredient: the curated set first, then the wider USDA catalogue. */
+export const INGREDIENTS: readonly Ingredient[] = [...CURATED, ...USDA_FOODS];
 
 const BY_ID = new Map(INGREDIENTS.map((i) => [i.id, i]));
 

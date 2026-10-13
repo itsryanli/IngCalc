@@ -52,7 +52,8 @@ describe('INGREDIENTS', () => {
   it('keeps macronutrients under 100g per 100g', () => {
     for (const ing of INGREDIENTS) {
       const { protein, carbs, fat } = ing.per100gRaw;
-      expect(protein + carbs + fat, ing.id).toBeLessThanOrEqual(100);
+      // Half a gram of slack for the source's own rounding (flaxseed oil: 100.09 g).
+      expect(protein + carbs + fat, ing.id).toBeLessThanOrEqual(100.5);
     }
   });
 

@@ -596,6 +596,7 @@ body {
   font-size: var(--fs-xs);
   font-weight: 600;
 }
+.picker__more { padding: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); color: var(--text-dim); }
 .picker__option--search { color: var(--accent); font-weight: 600; }
 .picker__option--add:hover { background: var(--estimate-soft); color: var(--estimate); }
 

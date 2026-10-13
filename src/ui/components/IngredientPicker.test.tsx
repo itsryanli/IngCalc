@@ -233,3 +233,24 @@ describe('IngredientPicker online search', () => {
     expect(onAddNew).toHaveBeenCalledWith('zzz', true);
   });
 });
+
+describe('IngredientPicker with a long list', () => {
+  const many = Array.from({ length: 120 }, (_, i) => make(`f${i}`, `Food ${String(i).padStart(3, '0')}`));
+
+  it('shows at most 50 foods and says how many more there are', () => {
+    render(<IngredientPicker catalogue={many} value="" onChange={vi.fn()} onAddNew={vi.fn()} searchOnline={false} />);
+    fireEvent.focus(screen.getByRole('combobox', { name: /ingredient/i }));
+    expect(screen.getAllByRole('option')).toHaveLength(51); // 50 foods + "Add a new ingredient"
+    expect(screen.getByText('Type to search 70 more')).toBeInTheDocument();
+  });
+
+  it('finds a food past the first 50 once a word is typed', () => {
+    const onChange = vi.fn();
+    render(<IngredientPicker catalogue={many} value="" onChange={onChange} onAddNew={vi.fn()} searchOnline={false} />);
+    const input = screen.getByRole('combobox', { name: /ingredient/i });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'Food 119' } });
+    press(screen.getByRole('option', { name: 'Food 119' }));
+    expect(onChange).toHaveBeenCalledWith('f119');
+  });
+});

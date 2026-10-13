@@ -21,6 +21,8 @@ interface Props {
   recentIds?: readonly string[];
 }
 
+const MAX_SHOWN = 50;
+
 export function IngredientPicker({ catalogue, value, onChange, onAddNew, recentIds = [], searchOnline = true }: Props) {
   const online = useOnline();
   const { on } = useAppPrefs();
@@ -44,10 +46,14 @@ export function IngredientPicker({ catalogue, value, onChange, onAddNew, recentI
   const recent = typed === ''
     ? recentIds.flatMap((id) => catalogue.filter((i) => i.id === id))
     : [];
-  const matches = [
+  const ranked = [
     ...recent,
     ...rankIngredients(catalogue, typed).filter((i) => !recent.includes(i)),
   ];
+  // Over a thousand foods: drawing them all would be slow on a phone and no
+  // help to scroll, so show the best few and ask for another word.
+  const matches = ranked.slice(0, MAX_SHOWN);
+  const hiddenCount = ranked.length - matches.length;
   const addLabel = query.trim() === '' ? 'Add a new ingredient' : `Add "${query.trim()}"`;
   // The add row follows the matches, and the search row (when shown) follows it.
   const addIndex = matches.length;
@@ -140,6 +146,12 @@ export function IngredientPicker({ catalogue, value, onChange, onAddNew, recentI
               {i < recent.length && <span className="picker__tag" aria-hidden="true">Recent</span>}
             </li>
           ))}
+
+          {hiddenCount > 0 && (
+            <li className="picker__more" role="presentation">
+              {typed === '' ? 'Type to search' : 'Keep typing to narrow down'} {hiddenCount.toLocaleString('en-MY')} more
+            </li>
+          )}
 
           <li
             id={`${listId}-${addIndex}`}

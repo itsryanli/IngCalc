@@ -35,7 +35,7 @@ describe('DishForm', () => {
     const onSaved = vi.fn();
     render(<DishForm {...base} mode="new" onSaved={onSaved} />);
     fireEvent.change(screen.getByLabelText(/dish name/i), { target: { value: 'Seeded bread' } });
-    await pick(1, /^Wheat flour/);
+    await pick(1, /^Wheat flour, white, all-purpose$/);
     weigh(1, '500');
     await pick(2, /^Peanuts/);
     weigh(2, '80');
