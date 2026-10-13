@@ -5,6 +5,7 @@ import { parseLabel, type LabelReading } from '../../core/labelParse';
 import { saveUserIngredient } from '../../storage/userIngredients';
 import { newId } from '../newId';
 import { OnlineSearch } from '../components/OnlineSearch';
+import { useAppPrefs } from '../features';
 import type { OffFood } from '../../core/openFoodFacts';
 
 const LABELS: Record<NutrientKey, string> = {
@@ -47,6 +48,7 @@ export function AddIngredientScreen({
   onSaved: (i: Ingredient) => void;
   onCancel?: () => void;
 }) {
+  const { on } = useAppPrefs();
   const [name, setName] = useState(editing?.name ?? initialName);
   const [category, setCategory] = useState<Category>(editing?.category ?? 'other');
   const [absorbsWater, setAbsorbsWater] = useState(editing?.absorbsWater ?? false);
@@ -161,7 +163,7 @@ export function AddIngredientScreen({
         {editing !== undefined && ' Changes apply everywhere this ingredient is used, including meals already logged.'}
       </p>
 
-      {editing === undefined && (
+      {editing === undefined && on('onlineSearch') && (
         <OnlineSearch initialQuery={searchFor ?? initialName} autoSearch={searchFor !== undefined} onPick={pickOnline} />
       )}
       {fillSource === 'online' && picked !== null && (
@@ -177,7 +179,7 @@ export function AddIngredientScreen({
         </div>
       )}
 
-      <details className="label-paste">
+      {on('labelPaste') && <details className="label-paste">
         <summary>Fill in from a nutrition label</summary>
         <p className="screen__hint">
           On iPhone, tap and hold in the box below and choose Scan Text, then point the
@@ -210,7 +212,7 @@ export function AddIngredientScreen({
             {reading.notes.length > 0 && <ul>{reading.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
           </div>
         )}
-      </details>
+      </details>}
 
       <div className="field">
         <label htmlFor="ing-name">Name</label>

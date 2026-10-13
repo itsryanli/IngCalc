@@ -1,5 +1,5 @@
 import {
-  CATEGORIES, COOK_METHODS, GOALS, LANDING_TABS, MEAL_LABEL_KEYS, NUTRIENT_KEYS, SEXES,
+  CATEGORIES, COOK_METHODS, FEATURE_KEYS, GOALS, HIDEABLE_TABS, LANDING_TABS, MEAL_LABEL_KEYS, NUTRIENT_KEYS, SEXES,
   WEIGHT_UNITS,
   type Batch, type CookSession, type DayLog, type Ingredient, type MealEntry, type Profile,
   type ProfileGroup, type Settings,
@@ -219,6 +219,8 @@ const SPECS: Record<Exclude<TableName, 'mealEntries'>, readonly Spec[]> = {
     ['id', (r) => r.id === 'singleton'],
     ['active profile', (r) => r.activeProfileId === null || isId(r.activeProfileId)],
     ['landing tab', (r) => isOneOf(LANDING_TABS)(r.landingTab)],
+    ['hidden tabs', (r) => isOptional((v) => Array.isArray(v) && v.every(isOneOf(HIDEABLE_TABS)))(r.hiddenTabs)],
+    ['switched-off features', (r) => isOptional((v) => Array.isArray(v) && v.every(isOneOf(FEATURE_KEYS)))(r.featuresOff)],
     ['weight unit', (r) => isOneOf(WEIGHT_UNITS)(r.defaultWeightUnit)],
     ['last backup time', (r) => isOptional(isNonNegative)(r.lastBackupAt)],
   ],

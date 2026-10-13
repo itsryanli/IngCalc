@@ -802,6 +802,12 @@ body {
 .online-search__name { font-weight: 600; overflow-wrap: anywhere; }
 .online-search__meta { font-size: var(--fs-sm); color: var(--text-dim); }
 
+.app-settings { margin-top: var(--sp-5); }
+.app-settings__row { align-items: flex-start; }
+.app-settings__name { display: block; font-weight: 600; color: var(--text); }
+.app-settings__what { display: block; font-weight: 400; font-size: var(--fs-sm); color: var(--text-dim); }
+.app-settings__note { margin: 0 0 var(--sp-2); }
+
 /* Banners */
 .banner {
   padding: var(--sp-3) var(--sp-4);

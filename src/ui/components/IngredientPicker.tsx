@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { Ingredient } from '../../core/types';
 import { rankIngredients } from '../rankIngredients';
 import { useOnline } from '../useOnline';
+import { useAppPrefs } from '../features';
 
 
 interface Props {
@@ -22,6 +23,7 @@ interface Props {
 
 export function IngredientPicker({ catalogue, value, onChange, onAddNew, recentIds = [], searchOnline = true }: Props) {
   const online = useOnline();
+  const { on } = useAppPrefs();
   const inputId = useId();
   const listId = useId();
   const selected = catalogue.find((i) => i.id === value) ?? null;
@@ -49,7 +51,7 @@ export function IngredientPicker({ catalogue, value, onChange, onAddNew, recentI
   const addLabel = query.trim() === '' ? 'Add a new ingredient' : `Add "${query.trim()}"`;
   // The add row follows the matches, and the search row (when shown) follows it.
   const addIndex = matches.length;
-  const showSearch = searchOnline && online && query.trim() !== '';
+  const showSearch = searchOnline && on('onlineSearch') && online && query.trim() !== '';
   const searchIndex = addIndex + 1;
   const lastIndex = showSearch ? searchIndex : addIndex;
 

@@ -6,6 +6,7 @@ import { BatchCard } from '../components/BatchCard';
 import { CookSessionForm } from '../components/CookSessionForm';
 import { MyIngredients } from '../components/MyIngredients';
 import { DishForm, type DishMode } from '../components/DishForm';
+import { useAppPrefs } from '../features';
 import { ShoppingTripForm } from '../components/ShoppingTripForm';
 import { STATE_LABELS } from '../labels';
 import { recentIngredientIds } from '../../core/recent';
@@ -31,6 +32,7 @@ type View =
   | { kind: 'dishForm'; mode: DishMode; dish?: Ingredient };
 
 export function KitchenScreen({ today = new Date() }: { today?: Date }) {
+  const { on } = useAppPrefs();
   const { catalogue, all, refresh: refreshCatalogue } = useCatalogue();
   const mine = useMemo(() => all.filter((i) => i.source === 'user'), [all]);
   const { batches, sessions, samples, entries, loading, storageError, refresh } = useKitchen();
@@ -209,13 +211,15 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
         >
           Log a purchase
         </button>
-        <button
-          type="button"
-          className="btn btn--secondary"
-          onClick={() => setView({ kind: 'dishForm', mode: 'new' })}
-        >
-          Make a dish
-        </button>
+        {on('dishes') && (
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={() => setView({ kind: 'dishForm', mode: 'new' })}
+          >
+            Make a dish
+          </button>
+        )}
       </div>
 
       {!loading && batches.length === 0 && storageError === null && (

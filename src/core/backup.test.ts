@@ -55,6 +55,7 @@ describe('parseBackup: shopping trips and backup reminders', () => {
 
   it('accepts settings that record the last backup', () => {
     expect(errorsFor('settings', { ...VALID.settings, lastBackupAt: 1_790_000_000_000 })).toEqual([]);
+    expect(errorsFor('settings', { ...VALID.settings, hiddenTabs: ['kitchen'], featuresOff: ['week'] })).toEqual([]);
   });
 
   it('rejects a last-backup time that is not a number', () => {
@@ -135,6 +136,8 @@ describe('parseBackup: each guard rejects each field it checks', () => {
     ['userIngredients', 'added ingredient', 'archived flag', { archived: 1 }],
     ['settings', 'settings row', 'id', { id: 'other' }],
     ['settings', 'settings row', 'active profile', { activeProfileId: '' }],
+    ['settings', 'settings row', 'hidden tabs', { hiddenTabs: ['calc'] }],
+    ['settings', 'settings row', 'switched-off features', { featuresOff: ['everything'] }],
     ['settings', 'settings row', 'landing tab', { landingTab: 'costs' }],
     ['settings', 'settings row', 'weight unit', { defaultWeightUnit: 'lb' }],
     ['batches', 'purchase', 'id', { id: '' }],
