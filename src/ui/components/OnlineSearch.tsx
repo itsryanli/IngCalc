@@ -47,15 +47,16 @@ export function OnlineSearch({ initialQuery, autoSearch, onPick }: {
     <details className="label-paste online-search" open={autoSearch}>
       <summary>Search online</summary>
       <p className="screen__hint">
-        Looks the name up on Open Food Facts, a free database of packaged foods. Only what you
-        type is sent; nothing else leaves your phone. Café and restaurant menus are rarely in it.
+        Looks a packaged food up on Open Food Facts, a free database, by name or by the barcode
+        number on the pack. Only what you type is sent; nothing else leaves your phone. Café and
+        restaurant menus are rarely in it.
       </p>
       <form
         className="online-search__form"
         onSubmit={(e) => { e.preventDefault(); void search(query); }}
       >
         <div className="field">
-          <label htmlFor={`${ids}-q`}>Food or product name</label>
+          <label htmlFor={`${ids}-q`}>Product name or barcode</label>
           <input id={`${ids}-q`} type="search" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <button type="submit" className="btn btn--secondary" disabled={query.trim() === '' || state.kind === 'searching'}>
@@ -66,7 +67,7 @@ export function OnlineSearch({ initialQuery, autoSearch, onPick }: {
       {state.kind === 'failed' && <p role="alert" className="banner banner--warn online-search__note">{state.message}</p>}
       {state.kind === 'done' && state.foods.length === 0 && (
         <p role="status" className="banner banner--warn online-search__note">
-          Nothing found. Try fewer words, the brand name, or fill it in from the label instead.
+          Nothing found. Try fewer words, the brand name or the barcode number, or fill it in from the label instead.
         </p>
       )}
       {state.kind === 'done' && state.foods.length > 0 && (
