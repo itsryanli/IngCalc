@@ -22,7 +22,7 @@ interface Props {
   today?: Date;
   onSaved: (batch: Batch) => void;
   onCancel: () => void;
-  onAddNew: (typedName: string) => void;
+  onAddNew: (typedName: string, searchOnline?: boolean) => void;
 }
 
 export function AddBatchForm({

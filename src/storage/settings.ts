@@ -23,6 +23,13 @@ export const setActiveProfile = async (id: string | null): Promise<void> => {
 };
 
 /** Read-modify-write, for the same reason as `setActiveProfile`. */
+export const updateSettings = async (patch: Partial<Omit<Settings, 'id'>>): Promise<Settings> => {
+  const next = { ...(await getSettings()), ...patch };
+  await saveSettings(next);
+  return next;
+};
+
+/** Read-modify-write, for the same reason as `setActiveProfile`. */
 export const markBackedUp = async (at: number = Date.now()): Promise<void> => {
   await saveSettings({ ...(await getSettings()), lastBackupAt: at });
 };

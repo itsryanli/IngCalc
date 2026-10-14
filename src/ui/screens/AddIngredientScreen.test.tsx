@@ -5,13 +5,14 @@ import { AddIngredientScreen } from './AddIngredientScreen';
 import { zeroNutrients } from '../../core/nutrients';
 import { db } from '../../storage/db';
 import * as userIngredientsModule from '../../storage/userIngredients';
+import * as offModule from '../../online/openFoodFacts';
 
 beforeEach(async () => { await db.userIngredients.clear(); });
 
 describe('AddIngredientScreen', () => {
   it('prefills the name from the failed search', () => {
     render(<AddIngredientScreen initialName="Petai" onSaved={vi.fn()} />);
-    expect(screen.getByLabelText(/name/i)).toHaveValue('Petai');
+    expect(screen.getByLabelText(/^name$/i)).toHaveValue('Petai');
   });
 
   it('saves a user ingredient marked as user-sourced', async () => {
@@ -262,6 +263,59 @@ describe('AddIngredientScreen', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
       await waitFor(() => expect(onSaved).toHaveBeenCalled());
       expect((await db.userIngredients.get('my-crackers'))!.defaultMethod).toBeUndefined();
+    });
+  });
+
+  describe('search online', () => {
+    const milo = {
+      code: '9556001', name: 'Milo Kotak', brand: 'Nestlé', quantity: '200 ml', perMl: true,
+      values: { kcal: 70, protein: 2.1, carbs: 11, fat: 1.6, sodium: 45 },
+    };
+
+    it('searches straight away when asked from the picker, and fills the form from a result', async () => {
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+      const search = vi.spyOn(offModule, 'searchOpenFoodFacts').mockResolvedValue({ ok: true, foods: [milo] });
+      const onSaved = vi.fn();
+      render(<AddIngredientScreen initialName="milo kotak" searchFor="milo kotak" onSaved={onSaved} />);
+      expect(search).toHaveBeenCalledWith('milo kotak');
+
+      fireEvent.click(await screen.findByRole('button', { name: /milo kotak/i }));
+      expect(screen.getByLabelText(/^name$/i)).toHaveValue('Milo Kotak (Nestlé)');
+      expect(screen.getByLabelText(/^protein/i)).toHaveValue('2.1');
+      expect(screen.getAllByText(/from search/i)).toHaveLength(5);
+      expect(screen.getByLabelText(/usually eaten without cooking/i)).toBeChecked();
+      expect(screen.getByRole('status')).toHaveTextContent(/per 100 ml, used as per 100 g/);
+
+      fireEvent.click(screen.getByRole('button', { name: /save ingredient/i }));
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      const saved = (await db.userIngredients.toArray())[0]!;
+      expect(saved).toMatchObject({ sourceRef: 'Open Food Facts 9556001', defaultMethod: 'asIs' });
+      expect(saved.unknownNutrients).toContain('iron');
+      search.mockRestore();
+    });
+
+    it('does not contact anything until asked', () => {
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+      const search = vi.spyOn(offModule, 'searchOpenFoodFacts');
+      render(<AddIngredientScreen initialName="Petai" onSaved={vi.fn()} />);
+      expect(screen.getByText('Search online')).toBeInTheDocument();
+      expect(search).not.toHaveBeenCalled();
+      search.mockRestore();
+    });
+
+    it('says when the search fails, and is hidden entirely offline', async () => {
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+      const search = vi.spyOn(offModule, 'searchOpenFoodFacts')
+        .mockResolvedValue({ ok: false, message: "Couldn't reach Open Food Facts. Check your connection and try again." });
+      const { unmount } = render(<AddIngredientScreen initialName="milo" searchFor="milo" onSaved={vi.fn()} />);
+      expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't reach Open Food Facts");
+      unmount();
+      search.mockRestore();
+
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+      render(<AddIngredientScreen initialName="milo" onSaved={vi.fn()} />);
+      expect(screen.queryByText('Search online')).not.toBeInTheDocument();
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
     });
   });
 });

@@ -3,9 +3,10 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// The app makes no network requests and keeps all data on the device. This
-// policy makes the browser enforce that: if a compromised dependency or deploy
-// tried to send IndexedDB contents elsewhere, connect-src 'self' would block it.
+// The app keeps all data on the device and makes one kind of network request:
+// an Open Food Facts search, when the person taps "Search online". This policy
+// makes the browser enforce that: a compromised dependency or deploy trying to
+// send IndexedDB contents anywhere else would be blocked by connect-src.
 // React's style={{...}} props go through the CSSOM, which style-src does not
 // restrict, so 'unsafe-inline' is not needed.
 export const CONTENT_SECURITY_POLICY = [
@@ -14,7 +15,8 @@ export const CONTENT_SECURITY_POLICY = [
   "style-src 'self'",
   "img-src 'self'",
   "font-src 'self'",
-  "connect-src 'self'",
+  // Open Food Facts, for "Search online" (src/online/openFoodFacts.ts), and nothing else.
+  "connect-src 'self' https://world.openfoodfacts.org",
   "manifest-src 'self'",
   "worker-src 'self'",
   "object-src 'none'",

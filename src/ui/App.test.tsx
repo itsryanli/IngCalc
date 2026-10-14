@@ -6,7 +6,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 import { db } from '../storage/db';
-import { saveSettings, setActiveProfile } from '../storage/settings';
+import { getSettings, saveSettings, setActiveProfile } from '../storage/settings';
 import { saveProfile } from '../storage/profiles';
 import { g, myr } from '../core/units';
 import type { Batch, Profile } from '../core/types';
@@ -251,4 +251,63 @@ describe('App error boundary', () => {
       vi.doUnmock('../core/batch');
     }
   });
+
+describe('Your app settings', () => {
+  const openSettings = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(await screen.findByRole('tab', { name: 'Profile' }));
+    return screen.findByRole('region', { name: 'Your app' });
+  };
+
+  it('hides a tab, remembers it, and can bring it back', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const panel = await openSettings(user);
+    await user.click(within(panel).getByRole('checkbox', { name: /^Kitchen/ }));
+    expect(screen.queryByRole('tab', { name: 'Kitchen' })).not.toBeInTheDocument();
+    await waitFor(async () => expect((await getSettings()).hiddenTabs).toEqual(['kitchen']));
+
+    await user.click(within(panel).getByRole('checkbox', { name: /^Kitchen/ }));
+    expect(await screen.findByRole('tab', { name: 'Kitchen' })).toBeInTheDocument();
+  });
+
+  it('opens on the chosen tab next time, and hides tabs from the start', async () => {
+    await saveSettings({ id: 'singleton', activeProfileId: null, landingTab: 'calc', defaultWeightUnit: 'g', hiddenTabs: ['log', 'costs'] });
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Calculator' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Log' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Costs' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Calc' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('moves the opening tab to Calc when that tab is hidden', async () => {
+    await saveSettings({ id: 'singleton', activeProfileId: null, landingTab: 'log', defaultWeightUnit: 'g' });
+    const user = userEvent.setup();
+    render(<App />);
+    const panel = await openSettings(user);
+    await user.click(within(panel).getByRole('checkbox', { name: /^Log/ }));
+    expect(within(panel).getByLabelText('Open the app on')).toHaveValue('calc');
+    await waitFor(async () => expect((await getSettings()).landingTab).toBe('calc'));
+  });
+
+  it('switches a feature off everywhere it appears', async () => {
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+    const user = userEvent.setup();
+    render(<App />);
+    const panel = await openSettings(user);
+    await user.click(within(panel).getByRole('checkbox', { name: /^Search online/ }));
+    await user.click(within(panel).getByRole('checkbox', { name: /^Fill in from a nutrition label/ }));
+    await waitFor(async () => expect((await getSettings()).featuresOff).toEqual(['labelPaste', 'onlineSearch']));
+
+    await user.click(screen.getByRole('tab', { name: 'Calc' }));
+    const input = await screen.findByRole('combobox', { name: /ingredient/i });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'spinach' } });
+    expect(screen.getByRole('option', { name: 'Add "spinach"' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /search online/i })).not.toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Add "spinach"' }));
+    expect(await screen.findByRole('heading', { name: 'Add an ingredient' })).toBeInTheDocument();
+    expect(screen.queryByText('Fill in from a nutrition label')).not.toBeInTheDocument();
+    expect(screen.queryByText('Search online')).not.toBeInTheDocument();
+  });
+});
 });

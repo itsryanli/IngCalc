@@ -6,6 +6,7 @@ import { BatchCard } from '../components/BatchCard';
 import { CookSessionForm } from '../components/CookSessionForm';
 import { MyIngredients } from '../components/MyIngredients';
 import { DishForm, type DishMode } from '../components/DishForm';
+import { useAppPrefs } from '../features';
 import { ShoppingTripForm } from '../components/ShoppingTripForm';
 import { STATE_LABELS } from '../labels';
 import { recentIngredientIds } from '../../core/recent';
@@ -26,11 +27,12 @@ type View =
   | { kind: 'cookForm'; batch: Batch; session?: CookSession }
   // `batch` remembers which batch (if any) was being edited when "add a new
   // ingredient" was tapped, so cancelling or saving returns to that same form.
-  | { kind: 'addIngredient'; typedName: string; batch?: Batch }
+  | { kind: 'addIngredient'; typedName: string; batch?: Batch; searchOnline?: boolean }
   | { kind: 'editIngredient'; ingredient: Ingredient }
   | { kind: 'dishForm'; mode: DishMode; dish?: Ingredient };
 
 export function KitchenScreen({ today = new Date() }: { today?: Date }) {
+  const { on } = useAppPrefs();
   const { catalogue, all, refresh: refreshCatalogue } = useCatalogue();
   const mine = useMemo(() => all.filter((i) => i.source === 'user'), [all]);
   const { batches, sessions, samples, entries, loading, storageError, refresh } = useKitchen();
@@ -117,6 +119,7 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
       <section className="screen">
         <AddIngredientScreen
           initialName={view.typedName}
+          {...(view.searchOnline === true ? { searchFor: view.typedName } : {})}
           onSaved={(added) => handleIngredientAdded(added, view.batch)}
           onCancel={() => setView({ kind: 'batchForm', batch: view.batch })}
         />
@@ -152,7 +155,7 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
           today={today}
           onSaved={() => { void afterChange(); }}
           onCancel={backToList}
-          onAddNew={(typedName) => setView({ kind: 'addIngredient', typedName, batch: view.batch })}
+          onAddNew={(typedName, searchOnline) => setView({ kind: 'addIngredient', typedName, batch: view.batch, searchOnline })}
         />
       </section>
     );
@@ -208,13 +211,15 @@ export function KitchenScreen({ today = new Date() }: { today?: Date }) {
         >
           Log a purchase
         </button>
-        <button
-          type="button"
-          className="btn btn--secondary"
-          onClick={() => setView({ kind: 'dishForm', mode: 'new' })}
-        >
-          Make a dish
-        </button>
+        {on('dishes') && (
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={() => setView({ kind: 'dishForm', mode: 'new' })}
+          >
+            Make a dish
+          </button>
+        )}
       </div>
 
       {!loading && batches.length === 0 && storageError === null && (

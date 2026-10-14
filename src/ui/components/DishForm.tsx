@@ -53,7 +53,7 @@ export function DishForm({
   // A new bake weighs something new, so "made again" asks for it afresh.
   const [finishedG, setFinishedG] = useState<Grams>(mode === 'edit' && dish?.recipe !== undefined ? dish.recipe.finishedWeightG : g(0));
   const [finishedUnit, setFinishedUnit] = useState<WeightUnit>('g');
-  const [adding, setAdding] = useState<{ key: string; typedName: string } | null>(null);
+  const [adding, setAdding] = useState<{ key: string; typedName: string; searchOnline?: boolean } | null>(null);
   // Ingredients added mid-recipe, usable before the catalogue has been re-read.
   const [added, setAdded] = useState<Ingredient[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -115,6 +115,7 @@ export function DishForm({
     return (
       <AddIngredientScreen
         initialName={adding.typedName}
+        {...(adding.searchOnline === true ? { searchFor: adding.typedName } : {})}
         onSaved={(ingredient) => {
           setAdded((list) => [...list, ingredient]);
           onCatalogueChanged();
@@ -160,7 +161,7 @@ export function DishForm({
               recentIds={recentIds}
               value={row.ingredientId}
               onChange={(ingredientId) => update(row.key, { ingredientId })}
-              onAddNew={(typedName) => setAdding({ key: row.key, typedName })}
+              onAddNew={(typedName, searchOnline) => setAdding({ key: row.key, typedName, searchOnline })}
             />
             <WeightInput label="How much went in" value={row.grams} unit={row.unit}
                          onChange={(grams) => update(row.key, { grams })}

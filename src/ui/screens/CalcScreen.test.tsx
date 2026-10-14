@@ -14,9 +14,12 @@ import { g, myr } from '../../core/units';
 // which is why press() dispatches mousedown rather than click.
 const press = (el: HTMLElement) => fireEvent.mouseDown(el);
 
+// With over a thousand foods the list shows only the best matches, so type the
+// name (taken from the pattern) as a person would, then pick it.
 const pickIngredient = async (labelText: RegExp) => {
   const input = await screen.findByRole('combobox', { name: /ingredient/i });
   fireEvent.focus(input);
+  fireEvent.change(input, { target: { value: labelText.source.replace(/[\^$\\]/g, '') } });
   press(await screen.findByRole('option', { name: labelText }));
 };
 
@@ -178,7 +181,7 @@ describe('CalcScreen', () => {
 describe('CalcScreen, not cooked', () => {
   it('starts fruit on not cooked and shows its nutrients without a cooking step', async () => {
     render(<CalcScreen profile={null} today={today} />);
-    await pickIngredient(/^Banana/);
+    await pickIngredient(/^Banana, raw$/);
     fireEvent.change(screen.getByLabelText(/^weight/i), { target: { value: '120' } });
     expect(screen.getByRole('combobox', { name: /method/i })).toHaveValue('asIs');
     expect(await screen.findByText(/not cooked — weight unchanged/i)).toBeInTheDocument();
@@ -189,7 +192,7 @@ describe('CalcScreen, not cooked', () => {
 
   it('brings the cooking steps back when a cooking method is chosen', async () => {
     render(<CalcScreen profile={null} today={today} />);
-    await pickIngredient(/^Banana/);
+    await pickIngredient(/^Banana, raw$/);
     fireEvent.change(screen.getByLabelText(/^weight/i), { target: { value: '120' } });
     fireEvent.change(screen.getByRole('combobox', { name: /method/i }), { target: { value: 'steamed' } });
     expect(await screen.findByTestId('result-weight')).toBeInTheDocument();

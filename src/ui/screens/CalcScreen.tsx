@@ -42,6 +42,8 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
   const [addingIngredient, setAddingIngredient] = useState(false);
   /** Seeds the add-ingredient form with whatever the user had typed into the picker. */
   const [addInitialName, setAddInitialName] = useState('');
+  /** True when the person chose "Search online for …" rather than "Add …". */
+  const [addSearch, setAddSearch] = useState(false);
   const [addIngredientError, setAddIngredientError] = useState<string | null>(null);
 
   const ingredient = catalogue.find((i) => i.id === ingredientId) ?? null;
@@ -54,7 +56,8 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
     if (picked !== undefined) setMethod((m) => startingMethod(picked, m));
   };
 
-  const handleAddNew = (typedName: string) => {
+  const handleAddNew = (typedName: string, searchOnline = false) => {
+    setAddSearch(searchOnline);
     setAddIngredientError(null);
     setAddInitialName(typedName);
     setAddingIngredient(true);
@@ -134,6 +137,7 @@ export function CalcScreen({ profile, today = new Date() }: { profile: Profile |
       {addingIngredient ? (
         <AddIngredientScreen
           initialName={addInitialName}
+          {...(addSearch ? { searchFor: addInitialName } : {})}
           onSaved={(added) => { void handleIngredientAdded(added); }}
           onCancel={handleAddCancelled}
         />

@@ -335,6 +335,7 @@ export function AddEntryForm({
             // Adding an ingredient mid-meal is a Kitchen job; keeping the flow
             // out of here is what stops this form growing a second screen.
             onAddNew={() => setError('Add new ingredients from the Kitchen tab.')}
+            searchOnline={false}
           />
           <div className="field">
             <label htmlFor={`${ids}-method`}>How was it prepared?</label>

@@ -232,6 +232,12 @@ export interface CalcStep {
 }
 
 export const LANDING_TABS = ['log', 'kitchen', 'calc'] as const;
+/** Tabs a person can hide. Calc and Profile always stay: Profile holds these settings. */
+export const HIDEABLE_TABS = ['log', 'kitchen', 'costs'] as const;
+export type HideableTab = (typeof HIDEABLE_TABS)[number];
+/** Optional features a person can switch off. All are on unless listed in `featuresOff`. */
+export const FEATURE_KEYS = ['labelPaste', 'onlineSearch', 'dishes', 'week'] as const;
+export type FeatureKey = (typeof FEATURE_KEYS)[number];
 export const WEIGHT_UNITS = ['g', 'kg'] as const;
 
 /**
@@ -257,4 +263,8 @@ export interface Settings {
   defaultWeightUnit: (typeof WEIGHT_UNITS)[number];
   /** When a backup file was last downloaded (ms since epoch). Absent until the first one. */
   lastBackupAt?: number;
+  /** Tabs the person has hidden. Absent means all shown. */
+  hiddenTabs?: HideableTab[];
+  /** Features the person has switched off. Absent means all on. */
+  featuresOff?: FeatureKey[];
 }

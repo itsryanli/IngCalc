@@ -13,6 +13,7 @@ import { DayProgress } from '../components/DayProgress';
 import { GroupDay } from '../components/GroupDay';
 import { MealGroup } from '../components/MealGroup';
 import { WeekCard } from '../components/WeekCard';
+import { useAppPrefs } from '../features';
 import { NutrientTable } from '../components/NutrientTable';
 import { dayName, todayIso } from '../dates';
 import { planRepeat, previousMeal } from '../../core/repeat';
@@ -47,6 +48,7 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
   profiles?: readonly Profile[];
   today?: Date;
 }) {
+  const { on } = useAppPrefs();
   const [date, setDate] = useState(() => todayIso(today));
   const [view, setView] = useState<View>({ kind: 'list' });
   const [repeatNotice, setRepeatNotice] = useState<{ text: string; warn: boolean } | null>(null);
@@ -219,7 +221,7 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
         );
       })}
 
-      <WeekCard
+      {on('week') && <WeekCard
         profileId={profile.id}
         endDate={date}
         entries={kitchen.entries}
@@ -227,7 +229,7 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
         samples={kitchen.samples}
         ctx={ctx}
         version={version}
-      />
+      />}
 
       {myGroups.map((g) => (
         <GroupDay key={g.id} group={g} profiles={profiles} date={date} ctx={ctx} today={today} version={version} />

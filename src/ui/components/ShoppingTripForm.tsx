@@ -54,7 +54,7 @@ export function ShoppingTripForm({
   const [location, setLocation] = useState('');
   const [date, setDate] = useState(todayIso(today));
   const [items, setItems] = useState<Item[]>(() => [emptyItem()]);
-  const [adding, setAdding] = useState<{ key: string; typedName: string } | null>(null);
+  const [adding, setAdding] = useState<{ key: string; typedName: string; searchOnline?: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const update = (key: string, patch: Partial<Item>) =>
@@ -104,6 +104,7 @@ export function ShoppingTripForm({
     return (
       <AddIngredientScreen
         initialName={adding.typedName}
+        {...(adding.searchOnline === true ? { searchFor: adding.typedName } : {})}
         onSaved={(added) => {
           onCatalogueChanged();
           update(adding.key, { ingredientId: added.id });
@@ -151,7 +152,7 @@ export function ShoppingTripForm({
             removable={items.length > 1}
             onChange={(patch) => update(it.key, patch)}
             onRemove={() => setItems((list) => list.filter((x) => x.key !== it.key))}
-            onAddNew={(typedName) => setAdding({ key: it.key, typedName })}
+            onAddNew={(typedName, searchOnline) => setAdding({ key: it.key, typedName, searchOnline })}
           />
         ))}
       </ol>
@@ -190,7 +191,7 @@ function TripItem({ item, index, catalogue, recentIds, removable, onChange, onRe
   removable: boolean;
   onChange: (patch: Partial<Item>) => void;
   onRemove: () => void;
-  onAddNew: (typedName: string) => void;
+  onAddNew: (typedName: string, searchOnline?: boolean) => void;
 }) {
   const priceId = useId();
   return (

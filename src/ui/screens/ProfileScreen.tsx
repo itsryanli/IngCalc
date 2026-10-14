@@ -5,6 +5,7 @@ import { GroupForm } from '../components/GroupForm';
 import { ProfileCard } from '../components/ProfileCard';
 import { ProfileForm } from '../components/ProfileForm';
 import { useGroups } from '../useGroups';
+import { AppSettings } from '../components/AppSettings';
 
 interface Props {
   profiles: Profile[];
@@ -127,6 +128,8 @@ export function ProfileScreen({
           </div>
         </div>
       )}
+
+      <AppSettings />
     </section>
   );
 }
