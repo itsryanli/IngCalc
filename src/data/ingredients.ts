@@ -348,7 +348,10 @@ export const CURATED: readonly Ingredient[] = [
     // boiled corrected by Task 9's golden-value suite: derived from FDC
     // 173756 (raw) vs FDC 173757 (cooked, boiled) — an exact lineage pair.
     per100gRaw: n({ kcal: 378, protein: 20.47, carbs: 62.95, fibre: 12.2, fat: 6.04, potassium: 718, iron: 4.31, magnesium: 79, zinc: 2.76, calcium: 57, sodium: 24 }),
-    publishedYield: { boiled: 2.31, steamed: 2.3 },
+    // boiled: dry matter (100 - water) of USDA's raw vs cooked pair, since boiling
+    // these only adds water; earlier figures here came from protein, which
+    // disagreed with the pair's own energy and carbohydrate.
+    publishedYield: { boiled: 2.32, steamed: 2.3 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 173756',
@@ -363,7 +366,10 @@ export const CURATED: readonly Ingredient[] = [
     // "Lentils, mature seeds" proxy; no pink/red-specific cooked entry
     // exists in FoodData Central).
     per100gRaw: n({ kcal: 358, protein: 23.91, carbs: 63.1, fibre: 10.8, fat: 2.17, potassium: 668, iron: 7.39, magnesium: 59, zinc: 3.6, calcium: 48, sodium: 7 }),
-    publishedYield: { boiled: 2.65, steamed: 2.3 },
+    // boiled: dry matter (100 - water) of USDA's raw vs cooked pair, since boiling
+    // these only adds water; earlier figures here came from protein, which
+    // disagreed with the pair's own energy and carbohydrate.
+    publishedYield: { boiled: 3.04, steamed: 2.3 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 174284',
@@ -378,7 +384,10 @@ export const CURATED: readonly Ingredient[] = [
     // 1.15 badly underestimated how much water raw peanuts absorb when
     // boiled in the shell/skin.
     per100gRaw: n({ kcal: 550.6, protein: 23.21, carbs: 26.5, fibre: 8.01, fat: 43.28, potassium: 635.6, iron: 1.55, magnesium: 179.7, zinc: 2.78, calcium: 49.13, sodium: 1.49 }),
-    publishedYield: { boiled: 1.72, roasted: 0.95 },
+    // boiled: dry matter (100 - water) of USDA's raw vs cooked pair, since boiling
+    // these only adds water; earlier figures here came from protein, which
+    // disagreed with the pair's own energy and carbohydrate.
+    publishedYield: { boiled: 1.63, roasted: 0.95 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 2515376',
@@ -397,7 +406,10 @@ export const CURATED: readonly Ingredient[] = [
     // rates, which no single mass-yield number can reconcile. Protein and
     // carbs remain excluded via KNOWN_DIVERGENCES in golden.test.ts.
     per100gRaw: n({ kcal: 446, protein: 36.49, carbs: 30.16, fibre: 9.3, fat: 19.94, potassium: 1797, iron: 15.7, magnesium: 280, zinc: 4.89, calcium: 277, sodium: 2 }),
-    publishedYield: { boiled: 2.6, steamed: 2.3 },
+    // boiled: dry matter (100 - water) of USDA's raw vs cooked pair, since boiling
+    // these only adds water; earlier figures here came from protein, which
+    // disagreed with the pair's own energy and carbohydrate.
+    publishedYield: { boiled: 2.44, steamed: 2.3 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 174270',
@@ -412,7 +424,10 @@ export const CURATED: readonly Ingredient[] = [
     // boiled corrected by Task 9's golden-value suite: derived from FDC
     // 169756 (raw) vs FDC 169757 (cooked, boiled).
     per100gRaw: n({ kcal: 365, protein: 7.1, carbs: 80, fibre: 1.3, fat: 0.7, potassium: 115, iron: 0.8, magnesium: 25, zinc: 1.1, calcium: 28, sodium: 5 }),
-    publishedYield: { boiled: 2.65, steamed: 2.4 },
+    // boiled: dry matter (100 - water) of USDA's raw vs cooked pair, since boiling
+    // these only adds water; earlier figures here came from protein, which
+    // disagreed with the pair's own energy and carbohydrate.
+    publishedYield: { boiled: 2.80, steamed: 2.4 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 169756',
@@ -425,7 +440,10 @@ export const CURATED: readonly Ingredient[] = [
     // boiled corrected by Task 9's golden-value suite: derived from FDC
     // 169703 (raw) vs FDC 169704 (cooked, boiled) — an exact lineage pair.
     per100gRaw: n({ kcal: 367, protein: 7.54, carbs: 76.25, fibre: 3.6, fat: 3.2, potassium: 250, iron: 1.29, magnesium: 116, zinc: 2.13, calcium: 9, sodium: 5 }),
-    publishedYield: { boiled: 2.75, steamed: 2.3 },
+    // boiled: dry matter (100 - water) of USDA's raw vs cooked pair, since boiling
+    // these only adds water; earlier figures here came from protein, which
+    // disagreed with the pair's own energy and carbohydrate.
+    publishedYield: { boiled: 2.97, steamed: 2.3 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 169703',
@@ -436,15 +454,14 @@ export const CURATED: readonly Ingredient[] = [
     name: 'Rolled oats, dry',
     category: 'grain',
     // boiled: derived from FDC 169705 (raw oats) vs FDC 173905 (cooked
-    // oatmeal, "regular and quick", cooked with water): implies a ~6.65x
-    // yield — a real, well-known property of cooked oatmeal (USDA's own
-    // reference preparation is very water-heavy, ~70 kcal/100g cooked,
-    // matching common "1 cup cooked oatmeal ≈ 166 kcal / 234 g" package
-    // figures). This was previously capped at 3.4 to fit ingredients.test.ts's
-    // then-3.5 ceiling; the controller raised that ceiling to 8.0 on this
-    // exact evidence, so the real, uncapped value is restored here.
+    // oatmeal, "regular and quick", cooked with water). USDA's reference
+    // preparation is very water-heavy (~70 kcal/100g cooked), so the yield is
+    // large: 5.60 by dry matter, which kcal (5.48) and carbs (5.52) agree with.
     per100gRaw: n({ kcal: 389, protein: 16.89, carbs: 66.27, fibre: 10.6, fat: 6.9, potassium: 429, iron: 4.72, magnesium: 177, zinc: 3.97, calcium: 54, sodium: 2 }),
-    publishedYield: { boiled: 6.65, steamed: 2.2 },
+    // boiled: dry matter (100 - water) of USDA's raw vs cooked pair, since boiling
+    // these only adds water; earlier figures here came from protein, which
+    // disagreed with the pair's own energy and carbohydrate.
+    publishedYield: { boiled: 5.60, steamed: 2.2 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 169705',
@@ -468,7 +485,10 @@ export const CURATED: readonly Ingredient[] = [
     // boiled corrected by Task 9's golden-value suite: derived from FDC
     // 169742 (raw) vs FDC 168914 (cooked, boiled) — an exact lineage pair.
     per100gRaw: n({ kcal: 364, protein: 5.95, carbs: 80.18, fibre: 1.6, fat: 0.56, potassium: 30, iron: 0.7, magnesium: 12, zinc: 0.74, calcium: 18, sodium: 182 }),
-    publishedYield: { boiled: 3.32, steamed: 2.5 },
+    // boiled: dry matter (100 - water) of USDA's raw vs cooked pair, since boiling
+    // these only adds water; earlier figures here came from protein, which
+    // disagreed with the pair's own energy and carbohydrate.
+    publishedYield: { boiled: 3.36, steamed: 2.5 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 169742',
@@ -481,7 +501,10 @@ export const CURATED: readonly Ingredient[] = [
     // boiled corrected by Task 9's golden-value suite: derived from FDC
     // 169731 (raw) vs FDC 169732 (cooked, boiled) — an exact lineage pair.
     per100gRaw: n({ kcal: 384, protein: 14.16, carbs: 71.27, fibre: 3.3, fat: 4.44, potassium: 244, iron: 4.01, magnesium: 58, zinc: 1.92, calcium: 35, sodium: 21 }),
-    publishedYield: { boiled: 3.12, steamed: 2.0 },
+    // boiled: dry matter (100 - water) of USDA's raw vs cooked pair, since boiling
+    // these only adds water; earlier figures here came from protein, which
+    // disagreed with the pair's own energy and carbohydrate.
+    publishedYield: { boiled: 2.82, steamed: 2.0 },
     absorbsWater: true,
     source: 'usda',
     sourceRef: 'FDC 169731',

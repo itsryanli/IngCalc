@@ -30,7 +30,7 @@ describe('USDA_FOODS', () => {
 
   it('starts fruit, dairy, oils and spices on not cooked, and marks dry grains and beans as absorbing water', () => {
     const byName = (n: string) => USDA_FOODS.find((f) => f.name === n)!;
-    expect(byName('Bananas, raw').defaultMethod).toBe('asIs');
+    expect(byName('Kumquats, raw').defaultMethod).toBe('asIs');
     expect(byName('Cheese, cheddar').defaultMethod).toBe('asIs');
     expect(byName('Spinach, raw').defaultMethod).toBeUndefined();
     expect(byName('Rice, white, glutinous, unenriched, uncooked').absorbsWater).toBe(true);
@@ -41,6 +41,30 @@ describe('USDA_FOODS', () => {
   it("leaves out branded products and USDA's bookkeeping notes", () => {
     for (const f of USDA_FOODS) {
       expect(f.name, f.id).not.toMatch(/Food Distribution Program|\bMORI-NU\b|Vitasoy/);
+    }
+  });
+
+  it('does not import a second copy of a hand-checked food', () => {
+    const curatedRefs = new Set(CURATED.map((c) => c.sourceRef));
+    expect(USDA_FOODS.filter((f) => curatedRefs.has(f.sourceRef))).toEqual([]);
+  });
+
+  it('carries yields from USDA\u2019s own raw/cooked pairs where the anchor is sound', () => {
+    const byName = (n: string) => USDA_FOODS.find((f) => f.name === n)!;
+    // Rice by dry matter: the same 2.80 as the hand-checked long-grain white rice.
+    expect(byName('Rice, white, long-grain, regular, raw, enriched').publishedYield).toEqual({ boiled: 2.8 });
+    // Fish by protein, which roasting does not remove.
+    expect(byName('Fish, salmon, Atlantic, wild, raw').publishedYield.roasted).toBe(0.78);
+    // Vegetables stay on the category estimate: draining washes solids out.
+    expect(byName('Spinach, raw').publishedYield).toEqual({});
+  });
+
+  it('keeps every derived yield inside the same bounds as the hand-checked data', () => {
+    for (const f of USDA_FOODS) {
+      for (const [m, y] of Object.entries(f.publishedYield)) {
+        expect(y, `${f.id}.${m}`).toBeGreaterThan(0.3);
+        expect(y, `${f.id}.${m}`).toBeLessThanOrEqual(f.absorbsWater ? 8 : 1.1);
+      }
     }
   });
 });
