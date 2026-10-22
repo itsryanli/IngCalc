@@ -91,9 +91,10 @@ export const RETENTION: RetentionTable = {
   grain: {
     // magnesium/zinc/calcium/iron corrected by Task 9's golden-value suite:
     // derived from 5 real grain raw+cooked FDC pairs (white rice, brown
-    // rice, rolled oats, bihun, yellow noodles). potassium's existing 0.80
-    // was already close to the derived average and is unchanged.
-    boiled:    { ...MACROS_INTACT, ...MINERALS_BOILED, potassium: 0.80, magnesium: 0.95, zinc: 0.95, calcium: 0.90, iron: 0.90 },
+    // rice, rolled oats, bihun, yellow noodles). potassium refitted to 0.90
+    // when rice yields moved from protein- to dry-matter-anchored (2.80 and
+    // 2.97): the pairs then imply 0.85 (white rice) and 1.02 (brown rice).
+    boiled:    { ...MACROS_INTACT, ...MINERALS_BOILED, potassium: 0.90, magnesium: 0.95, zinc: 0.95, calcium: 0.90, iron: 0.90 },
     steamed:   { ...MACROS_INTACT, ...MINERALS_STEAMED },
   },
   egg: {

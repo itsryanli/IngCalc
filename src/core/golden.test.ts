@@ -138,15 +138,10 @@ const KNOWN_DIVERGENCES: KnownDivergence[] = [
   // water) are different SR Legacy records for the same food, not a strict
   // raw/cooked pair, so no yield value derived from this pair can perfectly
   // reproduce the cooked reference's own kcal/carbs/potassium at once.
-  { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'kcal', reason: 'The raw reference (FDC 169705, plain "Oats") and cooked reference (FDC 173905, "regular and quick" oats cooked with water) are different SR Legacy records for the same food, not a strict raw/cooked pair. This persists even with the real, uncapped 6.65x yield restored — it is a lineage mismatch, not a plausibility-ceiling artifact.' },
-  { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'carbs', reason: 'Same raw/cooked FDC lineage mismatch as rolled-oats kcal above (FDC 169705 raw vs FDC 173905 cooked, different SR Legacy records for the same food).' },
-  { ingredientId: 'rolled-oats', method: 'boiled', nutrient: 'potassium', reason: 'Same raw/cooked lineage mismatch as rolled-oats kcal above; potassium is more leach-sensitive than kcal/carbs so the mismatch shows up more sharply here.' },
   { ingredientId: 'bihun', method: 'boiled', nutrient: 'potassium', reason: 'Rice noodles start from an already very low raw potassium figure (30mg/100g); the grain-category boiled potassium factor, tuned across rice/oats/noodles together, cannot hit this low a number exactly while also fitting white rice and brown rice.' },
   { ingredientId: 'yellow-noodles', method: 'boiled', nutrient: 'potassium', reason: 'Egg noodles leach potassium at a different rate than plain rice starch when boiled (FDC 169731 raw vs 169732 cooked, an exact lineage pair); the shared grain-boiled potassium factor cannot fit both rice and egg noodles at once.' },
   // ---- legume: differential macro leaching (protein/carbs/fibre disagree) ----
   { ingredientId: 'dried-chickpeas', method: 'boiled', nutrient: 'iron', reason: 'Chickpeas\' iron retention (FDC 173756 raw vs 173757 cooked, an exact lineage pair) implies a much higher concentration factor than red lentils in the same legume-boiled bucket; no single legume iron factor fits both.' },
-  { ingredientId: 'red-lentils', method: 'boiled', nutrient: 'kcal', reason: 'Red lentils\' protein-anchored yield (2.65x, used for consistency across every case in this suite) disagrees with a kcal- or carbs-anchored yield (~3.1x) for this specific FDC pair (174284 raw vs 172421 cooked, itself a generic-lentil proxy) — the same differential-leaching pattern as soybean below, just milder.' },
-  { ingredientId: 'red-lentils', method: 'boiled', nutrient: 'carbs', reason: 'Same protein-vs-carbs yield-anchor disagreement as red-lentils kcal above: no single mass-yield number can satisfy both macros for this legume at once.' },
   { ingredientId: 'red-lentils', method: 'boiled', nutrient: 'iron', reason: 'Same legume iron-retention variance as dried-chickpeas above; red lentils and chickpeas need very different iron factors from the same shared bucket.' },
   { ingredientId: 'soybean', method: 'boiled', nutrient: 'carbs', reason: 'Documented in ingredients.ts: soybean\'s protein- (2.0x), carbs- (3.6x) and fibre- (1.55x) anchored implied yields disagree sharply with each other for this exact-lineage FDC pair (174270/174299), meaning soy protein and soluble carbohydrate leach into the cooking water at genuinely different rates. No single mass-yield number can satisfy both a protein-anchored yield (used consistently across this suite) and this food\'s carbs figure at once.' },
   { ingredientId: 'peanuts', method: 'boiled', nutrient: 'carbs', reason: 'Boiled peanuts (FDC 2515376 raw vs 174260 cooked) show the same protein-vs-carbs anchor disagreement as soybean above, though milder.' },
@@ -342,15 +337,12 @@ const CASES: GoldenCase[] = [
   {
     // Raw reference (FDC 169705, plain "Oats") and cooked reference (FDC
     // 173905, "regular and quick" oats) are different SR Legacy records for
-    // the same food rather than one strict raw/cooked pair; see
-    // KNOWN_DIVERGENCES.
+    // the same food rather than one strict raw/cooked pair. With the yield
+    // anchored on dry matter (5.60) every asserted nutrient fits; the earlier
+    // protein-anchored 6.65 had needed kcal/carbs/potassium excluded.
     ingredientId: 'rolled-oats',
     method: 'boiled',
     usdaCookedRef: 'FDC 173905 (SR Legacy) — Cereals, oats, regular and quick, unenriched, cooked with water (includes boiling and microwaving), without salt',
-    // magnesium is NOT excluded via KNOWN_DIVERGENCES (kcal/carbs/potassium
-    // are) — it passes on the current data and is what keeps this case
-    // live: reverting the 6.65x yield to the old 2.6 would move it out of
-    // band (verified — see task-9-report.md).
     expectedPer100gCooked: { kcal: 71.0, carbs: 12.0, potassium: 70.0, magnesium: 27.0 },
   },
   {
@@ -380,8 +372,8 @@ const CASES: GoldenCase[] = [
     ingredientId: 'red-lentils',
     method: 'boiled',
     usdaCookedRef: 'FDC 172421 (SR Legacy) — Lentils, mature seeds, cooked, boiled, without salt',
-    // zinc is NOT excluded via KNOWN_DIVERGENCES (kcal/carbs/iron are) — it
-    // passes on the current data and is what keeps this case live.
+    // Only iron is excluded via KNOWN_DIVERGENCES; kcal and carbs fit once
+    // the yield is anchored on dry matter (3.04) rather than protein (2.65).
     expectedPer100gCooked: { kcal: 116.0, carbs: 20.13, iron: 3.33, zinc: 1.27 },
   },
   {
