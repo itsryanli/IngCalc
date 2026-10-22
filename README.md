@@ -62,7 +62,11 @@ About 1,500 foods are bundled: 66 hand-checked ones with local names and publish
 cooking yields, and roughly 1,400 raw and as-sold foods (vegetables, fruit, meat,
 fish, grains, beans, nuts, dairy, oils, herbs and spices) taken straight from USDA's
 SR Legacy dataset by `scripts/build-usda-foods.mjs`. Each cites its FDC id, and a
-nutrient USDA did not measure is shown as "not known" rather than zero. To rebuild,
+nutrient USDA did not measure is shown as "not known" rather than zero. Where USDA
+also lists the food cooked, its cooking yield comes from that pair: protein-anchored
+for meat, fish and eggs, dry-matter-anchored for grains and dried beans (100 g raw
+white rice boils to 280 g). Vegetables and fruit keep a category estimate, shown as
+such; weighing a cook in the Kitchen replaces any estimate with your own figure. To rebuild,
 download the SR Legacy CSV from [FoodData Central](https://fdc.nal.usda.gov/download-datasets)
 and run `node scripts/build-usda-foods.mjs <folder>`.
 
