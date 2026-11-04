@@ -53,7 +53,7 @@ describe('WeekCard', () => {
     expect(dots[0]!.getAttribute('aria-label')).toMatch(/nothing logged/);
   });
 
-  it('says plainly when nothing was logged, with no streak to break', () => {
+  it('says plainly when nothing was logged, with no streak to scold about', () => {
     renderWeek([]);
     expect(screen.getByText('Nothing logged in these seven days yet.')).toBeInTheDocument();
     expect(screen.queryByText(/streak/i)).not.toBeInTheDocument();
@@ -72,4 +72,29 @@ describe('WeekCard', () => {
     renderWeek([]);
     expect(await screen.findByText('First backup made')).toBeInTheDocument();
   });
+
+  it('shows a weekly streak that a missed day does not break', () => {
+    // endDate Tue 6 Oct. Weeks of 21 and 28 Sep had 4 days each; this week has 1 so far.
+    const days = ['2026-09-21', '2026-09-22', '2026-09-24', '2026-09-26', '2026-09-28', '2026-09-29', '2026-10-01', '2026-10-03', '2026-10-05'];
+    renderWeek(days.map((d) => quick(d, 100)));
+    expect(screen.getByTestId('week-streak')).toHaveTextContent(
+      '2 weeks in a row with 4 or more days logged. Log 3 more days this week to make it 3.');
+  });
+
+  it('stays quiet about the streak when the week can no longer count', () => {
+    render(<WeekCard profileId="p" endDate="2026-10-10" entries={[quick('2026-10-05', 100)]} batches={[]} samples={[]} ctx={ctx} version={0} />);
+    expect(screen.queryByTestId('week-streak')).not.toBeInTheDocument();
+  });
+
+  it('shows food variety, and savings against your usual price', () => {
+    const older: Batch = { ...batch, id: 'old', purchase: { ...batch.purchase, pricePaidMYR: myr(10), date: '2026-09-01' } };
+    const eat: MealEntry = { id: 'e', profileId: 'p', date: '2026-10-05', label: 'lunch', createdAt: 1, kind: 'ingredient', ingredientId: 'tempeh', method: 'asIs', cookedG: g(100) };
+    const withKcal = { ...tempeh, per100gRaw: { ...tempeh.per100gRaw, kcal: 190 } };
+    render(<WeekCard profileId="p" endDate="2026-10-06" entries={[eat]} batches={[older, batch]} samples={[]}
+      ctx={{ ...ctx, batches: [older, batch], ingredientById: (id) => (id === 'tempeh' ? withKcal : undefined) }} version={0} />);
+    expect(screen.getByTestId('week-variety')).toHaveTextContent('You ate 1 different food, 1 of them plants');
+    expect(screen.getByTestId('week-saved')).toHaveTextContent(
+      'You paid RM2.00 less than your usual prices for the same foods. Best find: Tempeh at Pasar Seri, 20% under your usual.');
+  });
 });
+

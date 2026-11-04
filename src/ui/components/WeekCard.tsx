@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { MealContext } from '../../core/meals';
 import { NOT_COOKED, type Batch, type DayLog, type IsoDate, type MealEntry, type YieldSample } from '../../core/types';
 import { formatMYR, myr } from '../../core/units';
 import {
-  bestValueBetween, milestones, spentBetween, summariseWeek, weekDays, yieldsLearned,
+  bestValueBetween, milestones, savingsBetween, spentBetween, STREAK_DAYS, summariseWeek,
+  varietyBetween, weekDays, weeklyStreak, yieldsLearned, type WeeklyStreak,
 } from '../../core/week';
 import { loadDayLogs } from '../../storage/meals';
 import { getSettings } from '../../storage/settings';
@@ -15,6 +16,41 @@ const WEEKDAY = (iso: IsoDate): string => {
 };
 
 const round = (n: number) => Math.round(n).toLocaleString('en-MY');
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** "A", "A and B", "A, B and C", or "A, B, C and 2 more". */
+function listNames(names: readonly string[], max = 3): string {
+  if (names.length <= max) {
+    return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`;
+  }
+  return `${names.slice(0, max).join(', ')} and ${names.length - max} more`;
+}
+
+/**
+ * Only ever encouraging. Quiet when the week cannot reach the target any more,
+ * rather than announcing that a streak is about to end.
+ */
+function StreakLine({ streak }: { streak: WeeklyStreak }) {
+  const goal = `${STREAK_DAYS} or more days logged`;
+  const line = (body: ReactNode) => <p className="week__line week__streak" data-testid="week-streak">{body}</p>;
+  if (streak.thisWeekCounts) {
+    return streak.weeks === 1
+      ? line(<><strong>This week</strong> has {goal}. Do it again next week to start a streak.</>)
+      : line(<><strong>{streak.weeks} weeks</strong> in a row with {goal}.</>);
+  }
+  if (!streak.reachable) return null;
+  const more = plural(streak.needed, 'more day', 'more days');
+  if (streak.weeks === 1) {
+    return line(<>Last week had {goal}. Log {more} this week to make it <strong>2 in a row</strong>.</>);
+  }
+  if (streak.weeks > 1) {
+    return line(<><strong>{streak.weeks} weeks</strong> in a row with {goal}. Log {more} this week
+      to make it {streak.weeks + 1}.</>);
+  }
+  if (streak.thisWeekLogged === 0) return null;
+  return line(<>Log {more} this week to reach {STREAK_DAYS} days and start a weekly streak.</>);
+}
 
 interface Props {
   profileId: string;
@@ -32,7 +68,8 @@ interface Props {
 /**
  * The last seven days at a glance, with a few honest signs of progress. Nothing
  * here rewards eating less or resets after a missed day: an unlogged day is a
- * grey dot, not a broken streak.
+ * grey dot. The weekly streak only asks for a few logged days a week, and says
+ * nothing at all rather than scold when a week falls short.
  */
 export function WeekCard({ profileId, endDate, entries, batches, samples, ctx, version }: Props) {
   const dates = useMemo(() => Array.from({ length: 7 }, (_, i) => shiftIso(endDate, i - 6)), [endDate]);
@@ -60,6 +97,9 @@ export function WeekCard({ profileId, endDate, entries, batches, samples, ctx, v
   const spent = spentBetween(batches, dates[0]!, endDate);
   const best = bestValueBetween(batches, ctx.ingredientById, shiftIso(endDate, -29), endDate);
   const yields = yieldsLearned(batches, samples);
+  const streak = useMemo(() => weeklyStreak(mine.map((e) => e.date), endDate), [mine, endDate]);
+  const variety = useMemo(() => varietyBetween(mine, ctx, dates[0]!, endDate), [mine, ctx, dates, endDate]);
+  const savings = savingsBetween(batches, ctx.ingredientById, dates[0]!, endDate);
   const reached = milestones({
     loggedDays: new Set(mine.map((e) => e.date)).size,
     weighedCooks: ctx.sessions.filter((s) => s.method !== NOT_COOKED).length,
@@ -98,8 +138,35 @@ export function WeekCard({ profileId, endDate, entries, batches, samples, ctx, v
         </>
       )}
 
+      <StreakLine streak={streak} />
+
+      {variety.foods > 0 && (
+        <p className="week__line" data-testid="week-variety">
+          You ate <strong>{plural(variety.foods, 'different food')}</strong>
+          {variety.plants > 0 && <>, {variety.plants} of them plants (vegetables, fruit, grains, beans and nuts)</>}.
+        </p>
+      )}
+
+      {variety.newFoods.length > 0 && (
+        <p className="week__line" data-testid="week-new">
+          New to your plate: {listNames(variety.newFoods)}
+          <span className="week__tag">{variety.newFoods.length === 1 ? 'new' : `${variety.newFoods.length} new`}</span>
+        </p>
+      )}
+
       {spent > 0 && (
         <p className="week__line" data-testid="week-spent">Spent on shopping: {formatMYR(myr(spent))}</p>
+      )}
+
+      {savings !== null && savings.savedMYR >= 0.5 && (
+        <p className="week__line week__find" data-testid="week-saved">
+          You paid <strong>{formatMYR(myr(savings.savedMYR))}</strong> less than your usual prices for the same foods.
+          {savings.bestDeal !== null && (
+            <> Best find: <strong>{savings.bestDeal.name}</strong>
+              {savings.bestDeal.location !== '' && <> at {savings.bestDeal.location}</>},{' '}
+              {Math.round(savings.bestDeal.fractionBelow * 100)}% under your usual.</>
+          )}
+        </p>
       )}
 
       {best !== null && (
