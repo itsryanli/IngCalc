@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { MealContext } from '../../core/meals';
 import { NOT_COOKED, type Batch, type DayLog, type IsoDate, type MealEntry, type YieldSample } from '../../core/types';
 import { formatMYR, myr } from '../../core/units';
@@ -19,37 +19,28 @@ const round = (n: number) => Math.round(n).toLocaleString('en-MY');
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-/** "A", "A and B", "A, B and C", or "A, B, C and 2 more". */
+/**
+ * "A · B · C", or "A · B · C · 2 more". A dot, not commas, because food names
+ * often carry their own ("Chicken egg, whole, raw").
+ */
 function listNames(names: readonly string[], max = 3): string {
-  if (names.length <= max) {
-    return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`;
-  }
-  return `${names.slice(0, max).join(', ')} and ${names.length - max} more`;
+  const shown = names.slice(0, max);
+  return names.length > max ? [...shown, `${names.length - max} more`].join(' · ') : shown.join(' · ');
 }
 
 /**
- * Only ever encouraging. Quiet when the week cannot reach the target any more,
- * rather than announcing that a streak is about to end.
+ * A nudge only while this week can still count, and only once something has
+ * been logged: never a message that a streak is about to end.
  */
-function StreakLine({ streak }: { streak: WeeklyStreak }) {
-  const goal = `${STREAK_DAYS} or more days logged`;
-  const line = (body: ReactNode) => <p className="week__line week__streak" data-testid="week-streak">{body}</p>;
-  if (streak.thisWeekCounts) {
-    return streak.weeks === 1
-      ? line(<><strong>This week</strong> has {goal}. Do it again next week to start a streak.</>)
-      : line(<><strong>{streak.weeks} weeks</strong> in a row with {goal}.</>);
-  }
-  if (!streak.reachable) return null;
+function StreakNudge({ streak }: { streak: WeeklyStreak }) {
+  if (streak.thisWeekCounts || !streak.reachable) return null;
+  if (streak.weeks === 0 && streak.thisWeekLogged === 0) return null;
   const more = plural(streak.needed, 'more day', 'more days');
-  if (streak.weeks === 1) {
-    return line(<>Last week had {goal}. Log {more} this week to make it <strong>2 in a row</strong>.</>);
-  }
-  if (streak.weeks > 1) {
-    return line(<><strong>{streak.weeks} weeks</strong> in a row with {goal}. Log {more} this week
-      to make it {streak.weeks + 1}.</>);
-  }
-  if (streak.thisWeekLogged === 0) return null;
-  return line(<>Log {more} this week to reach {STREAK_DAYS} days and start a weekly streak.</>);
+  return (
+    <p className="week__line" data-testid="week-streak-nudge">
+      Log {more} this week to {streak.weeks > 0 ? 'keep your streak' : 'start a weekly streak'}.
+    </p>
+  );
 }
 
 interface Props {
@@ -106,9 +97,22 @@ export function WeekCard({ profileId, endDate, entries, batches, samples, ctx, v
     backedUp,
   });
 
+  const saved = savings !== null && savings.savedMYR >= 0.5 ? savings : null;
+
   return (
     <section className="card week" aria-labelledby="week-title">
-      <h3 className="card__title" id="week-title">Your last 7 days</h3>
+      <div className="week__head">
+        <h3 className="card__title week__title" id="week-title">Your last 7 days</h3>
+        {streak.weeks > 0 && (
+          <span
+            className="week__streak"
+            data-testid="week-streak"
+            title={`Weeks in a row with ${STREAK_DAYS} or more days logged`}
+          >
+            🔥 {streak.weeks}-week streak
+          </span>
+        )}
+      </div>
 
       <ol className="week__dots" aria-label="Protein target by day">
         {days.map((d) => {
@@ -126,69 +130,84 @@ export function WeekCard({ profileId, endDate, entries, batches, samples, ctx, v
       {week.loggedDays === 0 ? (
         <p className="week__line">Nothing logged in these seven days yet.</p>
       ) : (
-        <>
-          <p className="week__line" data-testid="week-protein">
-            Protein target reached on <strong>{week.proteinHits}</strong> of the{' '}
-            {week.loggedDays === 1 ? 'day' : `${week.loggedDays} days`} you logged.
-          </p>
+        <ul className="week__stats" aria-label="This week">
+          <li className="week__stat" data-testid="week-protein">
+            <strong>{week.proteinHits}/{week.loggedDays}</strong> days protein reached
+          </li>
+          {variety.foods > 0 && (
+            <li className="week__stat" data-testid="week-variety">
+              <strong>{variety.foods}</strong> {variety.foods === 1 ? 'food' : 'foods'}
+              {variety.plants > 0 && <>, <strong>{variety.plants}</strong> {variety.plants === 1 ? 'plant' : 'plants'}</>}
+            </li>
+          )}
+          {saved !== null && (
+            <li className="week__stat" data-testid="week-saved">
+              <strong>{formatMYR(myr(saved.savedMYR))}</strong> saved
+            </li>
+          )}
+        </ul>
+      )}
+
+      <StreakNudge streak={streak} />
+
+      <details className="week__more">
+        <summary>More about your week</summary>
+
+        {week.loggedDays > 0 && (
           <p className="week__line" data-testid="week-average">
             On a logged day, about {round(week.avgKcal)} of {round(week.avgKcalTarget)} kcal and{' '}
             {round(week.avgProtein)} of {round(week.avgProteinTarget)} g protein.
           </p>
-        </>
-      )}
+        )}
 
-      <StreakLine streak={streak} />
-
-      {variety.foods > 0 && (
-        <p className="week__line" data-testid="week-variety">
-          You ate <strong>{plural(variety.foods, 'different food')}</strong>
-          {variety.plants > 0 && <>, {variety.plants} of them plants (vegetables, fruit, grains, beans and nuts)</>}.
+        <p className="week__line">
+          Streak: a week counts with {STREAK_DAYS} or more days logged. A missed day never breaks it.
         </p>
-      )}
 
-      {variety.newFoods.length > 0 && (
-        <p className="week__line" data-testid="week-new">
-          New to your plate: {listNames(variety.newFoods)}
-          <span className="week__tag">{variety.newFoods.length === 1 ? 'new' : `${variety.newFoods.length} new`}</span>
-        </p>
-      )}
+        {variety.plants > 0 && (
+          <p className="week__line">Plants are vegetables, fruit, grains, beans and nuts.</p>
+        )}
 
-      {spent > 0 && (
-        <p className="week__line" data-testid="week-spent">Spent on shopping: {formatMYR(myr(spent))}</p>
-      )}
+        {variety.newFoods.length > 0 && (
+          <p className="week__line" data-testid="week-new">New to your plate: {listNames(variety.newFoods)}</p>
+        )}
 
-      {savings !== null && savings.savedMYR >= 0.5 && (
-        <p className="week__line week__find" data-testid="week-saved">
-          You paid <strong>{formatMYR(myr(savings.savedMYR))}</strong> less than your usual prices for the same foods.
-          {savings.bestDeal !== null && (
-            <> Best find: <strong>{savings.bestDeal.name}</strong>
-              {savings.bestDeal.location !== '' && <> at {savings.bestDeal.location}</>},{' '}
-              {Math.round(savings.bestDeal.fractionBelow * 100)}% under your usual.</>
-          )}
-        </p>
-      )}
+        {spent > 0 && (
+          <p className="week__line" data-testid="week-spent">Spent on shopping: {formatMYR(myr(spent))}</p>
+        )}
 
-      {best !== null && (
-        <p className="week__line week__find" data-testid="week-best">
-          Best protein for your money this month: <strong>{best.name}</strong>
-          {best.location !== '' && <> at {best.location}</>}, {best.gramsPerMYR.toFixed(1)} g per RM
-          {best.bestEver && <span className="week__tag">your best yet</span>}
-        </p>
-      )}
+        {saved !== null && (
+          <p className="week__line" data-testid="week-saved-detail">
+            You paid {formatMYR(myr(saved.savedMYR))} less than your usual prices for the same foods.
+            {saved.bestDeal !== null && (
+              <> Best find: {saved.bestDeal.name}
+                {saved.bestDeal.location !== '' && <> at {saved.bestDeal.location}</>},{' '}
+                {Math.round(saved.bestDeal.fractionBelow * 100)}% under your usual.</>
+            )}
+          </p>
+        )}
 
-      {yields.cooked > 0 && (
-        <p className="week__line" data-testid="week-yields">
-          Yields learned from your own cooking: {yields.learned} of the {yields.cooked}{' '}
-          {yields.cooked === 1 ? 'food' : 'foods'} you cook. Weigh a cook to teach the app another.
-        </p>
-      )}
+        {best !== null && (
+          <p className="week__line" data-testid="week-best">
+            Best protein for your money this month: {best.name}
+            {best.location !== '' && <> at {best.location}</>}, {best.gramsPerMYR.toFixed(1)} g per RM
+            {best.bestEver && <span className="week__tag">your best yet</span>}
+          </p>
+        )}
 
-      {reached.length > 0 && (
-        <ul className="week__milestones" aria-label="Milestones">
-          {reached.map((m) => <li key={m} className="week__milestone">{m}</li>)}
-        </ul>
-      )}
+        {yields.cooked > 0 && (
+          <p className="week__line" data-testid="week-yields">
+            Yields learned from your own cooking: {yields.learned} of the {yields.cooked}{' '}
+            {yields.cooked === 1 ? 'food' : 'foods'} you cook. Weigh a cook to teach the app another.
+          </p>
+        )}
+
+        {reached.length > 0 && (
+          <ul className="week__milestones" aria-label="Milestones">
+            {reached.map((m) => <li key={m} className="week__milestone">{m}</li>)}
+          </ul>
+        )}
+      </details>
     </section>
   );
 }

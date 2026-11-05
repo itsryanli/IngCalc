@@ -749,6 +749,31 @@ body {
   font-weight: 600;
   white-space: nowrap;
 }
+.week__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.week__streak {
+  padding: 0 var(--sp-2);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.week__stats { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0 0 var(--sp-2); padding: 0; list-style: none; }
+.week__stat {
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm);
+}
+.week__more > summary {
+  /* Kept as a list item so the browser's open/closed marker still shows. */
+  padding: var(--sp-1) 0;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.week__more[open] > summary { margin-bottom: var(--sp-2); }
 .week__milestones { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-3) 0 0; padding: 0; list-style: none; }
 .week__milestone {
   padding: var(--sp-1) var(--sp-3);
