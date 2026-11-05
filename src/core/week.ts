@@ -1,11 +1,17 @@
 import { proteinPerMYRRaw } from './cost';
+import { UNKNOWN_INGREDIENT } from './costs';
 import { dayTotals, type MealContext } from './meals';
-import { NOT_COOKED, type Batch, type DayLog, type Ingredient, type IsoDate, type MealEntry, type YieldSample } from './types';
+import {
+  NOT_COOKED,
+  type Batch, type Category, type DayLog, type Ingredient, type IsoDate, type MealEntry, type YieldSample,
+} from './types';
 
 /**
  * The week view: how the last seven days went, and a few gentle signs of
- * progress. Deliberately nothing that rewards eating less, punishes a missed
- * day, or resets: a day not logged is simply a day not logged.
+ * progress. Deliberately nothing that rewards eating less or punishes a missed
+ * day: a day not logged is simply a day not logged. The one thing that can
+ * end is the weekly streak, and only a whole week with too few logged days
+ * ends it, never a single day off.
  */
 
 export interface WeekDay {
@@ -143,4 +149,190 @@ export function milestones({ loggedDays, weighedCooks, backedUp }: MilestoneInpu
   if (weighedCooks >= 10) out.push('10 cooks weighed');
   if (backedUp) out.push('First backup made');
   return out;
+}
+
+/*
+ * Calendar-day arithmetic on the date's text, worked through UTC midnight.
+ * Both ends are UTC, so no local time zone or daylight-saving change can move
+ * a day; `core/` cannot use `ui/dates`.
+ */
+const DAY_MS = 86_400_000;
+const utcMs = (iso: IsoDate): number => {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
+  return Date.UTC(y, m - 1, d);
+};
+const addDays = (iso: IsoDate, days: number): IsoDate =>
+  new Date(utcMs(iso) + days * DAY_MS).toISOString().slice(0, 10);
+
+/** The Monday that starts the week holding this date. Weeks run Monday to Sunday. */
+export const mondayOf = (iso: IsoDate): IsoDate =>
+  addDays(iso, -((new Date(utcMs(iso)).getUTCDay() + 6) % 7));
+
+/** Logged days a week needs to count towards the streak. */
+export const STREAK_DAYS = 4;
+
+export interface WeeklyStreak {
+  /**
+   * Weeks in a row with at least `STREAK_DAYS` logged days: up to and
+   * including this week if it already counts, otherwise up to last week, since
+   * a week still in progress has not missed anything yet.
+   */
+  weeks: number;
+  thisWeekLogged: number;
+  thisWeekCounts: boolean;
+  /** Logged days still needed this week; 0 once it counts. */
+  needed: number;
+  /** Whether the days left in this week, today included, are enough to get there. */
+  reachable: boolean;
+}
+
+/**
+ * A forgiving streak: a missed day never breaks it, only a whole week with
+ * fewer than `STREAK_DAYS` days logged. `today` is the day being viewed.
+ */
+export function weeklyStreak(loggedDates: Iterable<IsoDate>, today: IsoDate): WeeklyStreak {
+  const logged = new Set(loggedDates);
+  const loggedIn = (monday: IsoDate): number =>
+    Array.from({ length: 7 }, (_, i) => addDays(monday, i)).filter((d) => logged.has(d)).length;
+
+  const monday = mondayOf(today);
+  const thisWeekLogged = loggedIn(monday);
+  const thisWeekCounts = thisWeekLogged >= STREAK_DAYS;
+  const sunday = addDays(monday, 6);
+  let open = 0;
+  for (let d = today; d <= sunday; d = addDays(d, 1)) if (!logged.has(d)) open += 1;
+  const needed = Math.max(0, STREAK_DAYS - thisWeekLogged);
+
+  let weeks = thisWeekCounts ? 1 : 0;
+  // Ends at the first week that fell short, which at the latest is the week
+  // before anything was logged.
+  for (let m = addDays(monday, -7); loggedIn(m) >= STREAK_DAYS; m = addDays(m, -7)) weeks += 1;
+
+  return { weeks, thisWeekLogged, thisWeekCounts, needed, reachable: needed <= open };
+}
+
+/** The categories that count as plants for variety: the "eat more plants" habit. */
+export const PLANT_CATEGORIES: readonly Category[] = ['vegetable', 'fruit', 'grain', 'legume', 'nut'];
+
+/** How far back a food must not have been eaten for it to count as new. */
+export const NEW_FOOD_LOOKBACK_DAYS = 28;
+
+export interface Variety {
+  /** Different foods eaten. */
+  foods: number;
+  /** How many of those are plants (`PLANT_CATEGORIES`). */
+  plants: number;
+  /**
+   * Names of foods eaten in the period but not in the `NEW_FOOD_LOOKBACK_DAYS`
+   * before it, in the order first eaten. Empty when nothing was logged before
+   * the period, or every food would be "new" on a first week.
+   */
+  newFoods: string[];
+}
+
+/** What an ingredient puts on the plate: itself, or for a dish, what went into it. */
+function foodsIn(ingredient: Ingredient, ctx: MealContext, seen: Set<string>): Ingredient[] {
+  if (ingredient.recipe === undefined) return [ingredient];
+  if (seen.has(ingredient.id)) return [];
+  seen.add(ingredient.id);
+  return ingredient.recipe.items.flatMap((item) => {
+    const inner = ctx.ingredientById(item.ingredientId);
+    return inner === undefined ? [] : foodsIn(inner, ctx, seen);
+  });
+}
+
+/**
+ * The foods one entry put on the plate. A quick add names no food. Water and
+ * salt carry no energy and are not food variety, so anything without calories
+ * is left out.
+ */
+function foodsOfEntry(entry: MealEntry, ctx: MealContext): Ingredient[] {
+  if (entry.kind === 'quick') return [];
+  let ingredient: Ingredient | undefined;
+  if (entry.kind === 'ingredient') {
+    ingredient = ctx.ingredientById(entry.ingredientId);
+  } else {
+    const session = ctx.sessions.find((s) => s.id === entry.cookSessionId);
+    const batch = session === undefined ? undefined : ctx.batches.find((b) => b.id === session.batchId);
+    ingredient = batch === undefined ? undefined : ctx.ingredientById(batch.ingredientId);
+  }
+  return ingredient === undefined ? [] : foodsIn(ingredient, ctx, new Set()).filter((i) => i.per100gRaw.kcal > 0);
+}
+
+/** How varied the eating was between two dates, inclusive. Pass one person's entries. */
+export function varietyBetween(
+  entries: readonly MealEntry[],
+  ctx: MealContext,
+  from: IsoDate,
+  to: IsoDate,
+): Variety {
+  const eaten = new Map<string, Ingredient>();
+  [...entries]
+    .filter((e) => between(e.date, from, to))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt)
+    .forEach((e) => { for (const i of foodsOfEntry(e, ctx)) if (!eaten.has(i.id)) eaten.set(i.id, i); });
+
+  const earlierEntries = entries.filter((e) =>
+    between(e.date, addDays(from, -NEW_FOOD_LOOKBACK_DAYS), addDays(from, -1)));
+  const earlier = new Set(earlierEntries.flatMap((e) => foodsOfEntry(e, ctx).map((i) => i.id)));
+  const foods = [...eaten.values()];
+
+  return {
+    foods: foods.length,
+    plants: foods.filter((i) => PLANT_CATEGORIES.includes(i.category)).length,
+    newFoods: earlierEntries.length === 0 ? [] : foods.filter((i) => !earlier.has(i.id)).map((i) => i.name),
+  };
+}
+
+/** A find worth naming: at least this far under the usual price. */
+export const DEAL_MIN_FRACTION = 0.05;
+
+export interface Savings {
+  /**
+   * What the period's purchases would have cost at the person's own usual
+   * price per kilo, minus what was paid. Negative when it cost more.
+   */
+  savedMYR: number;
+  /** Purchases that had an earlier price to compare with. */
+  compared: number;
+  /** The purchase furthest under its usual price, when at least `DEAL_MIN_FRACTION` under. */
+  bestDeal: { name: string; location: string; fractionBelow: number } | null;
+}
+
+/**
+ * Prices paid in the period against the person's own usual price for the same
+ * ingredient: everything paid for it before the period, per kilo, weighted by
+ * weight. Free or weightless purchases are left out on both sides, since a
+ * price per kilo means nothing for them. Null when no purchase in the period
+ * has an earlier one to compare with.
+ */
+export function savingsBetween(
+  batches: readonly Batch[],
+  ingredientById: (id: string) => Ingredient | undefined,
+  from: IsoDate,
+  to: IsoDate,
+): Savings | null {
+  const priced = batches.filter((b) => b.rawWeightG > 0 && b.purchase.pricePaidMYR > 0);
+  let savedMYR = 0;
+  let compared = 0;
+  let best: Savings['bestDeal'] = null;
+  for (const b of priced.filter((p) => between(p.purchase.date, from, to))) {
+    const before = priced.filter((p) => p.ingredientId === b.ingredientId && p.purchase.date < from);
+    if (before.length === 0) continue;
+    const usualPerG = before.reduce((s, p) => s + p.purchase.pricePaidMYR, 0)
+      / before.reduce((s, p) => s + p.rawWeightG, 0);
+    const usual = usualPerG * b.rawWeightG;
+    const saved = usual - b.purchase.pricePaidMYR;
+    savedMYR += saved;
+    compared += 1;
+    const fractionBelow = saved / usual;
+    if (fractionBelow >= DEAL_MIN_FRACTION && (best === null || fractionBelow > best.fractionBelow)) {
+      best = {
+        name: ingredientById(b.ingredientId)?.name ?? UNKNOWN_INGREDIENT,
+        location: b.purchase.location.trim(),
+        fractionBelow,
+      };
+    }
+  }
+  return compared === 0 ? null : { savedMYR, compared, bestDeal: best };
 }

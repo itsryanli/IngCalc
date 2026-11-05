@@ -45,7 +45,7 @@ describe('WeekCard', () => {
       await db.dayLogs.put({ id: dayLogId('p', date), profileId: 'p', date, targets });
     }
     renderWeek([quick('2026-10-05', 120), quick('2026-10-06', 60), quick('2026-10-06', 999, 'someone-else')]);
-    expect(await screen.findByTestId('week-protein')).toHaveTextContent('Protein target reached on 1 of the 2 days you logged.');
+    expect(await screen.findByTestId('week-protein')).toHaveTextContent('1/2 days protein reached');
     const dots = screen.getAllByRole('img');
     expect(dots).toHaveLength(7);
     expect(dots[5]!.getAttribute('aria-label')).toMatch(/protein target reached/);
@@ -53,10 +53,12 @@ describe('WeekCard', () => {
     expect(dots[0]!.getAttribute('aria-label')).toMatch(/nothing logged/);
   });
 
-  it('says plainly when nothing was logged, with no streak to break', () => {
+  it('says plainly when nothing was logged, with no streak to scold about', () => {
     renderWeek([]);
     expect(screen.getByText('Nothing logged in these seven days yet.')).toBeInTheDocument();
-    expect(screen.queryByText(/streak/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('week-streak')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('week-streak-nudge')).not.toBeInTheDocument();
+    expect(screen.queryByText(/broke|lost|missed your/i)).not.toBeInTheDocument();
   });
 
   it('shows spending and the best protein for the money', () => {
@@ -72,4 +74,32 @@ describe('WeekCard', () => {
     renderWeek([]);
     expect(await screen.findByText('First backup made')).toBeInTheDocument();
   });
+
+  it('shows a weekly streak that a missed day does not break', () => {
+    // endDate Tue 6 Oct. Weeks of 21 and 28 Sep had 4 days each; this week has 1 so far.
+    const days = ['2026-09-21', '2026-09-22', '2026-09-24', '2026-09-26', '2026-09-28', '2026-09-29', '2026-10-01', '2026-10-03', '2026-10-05'];
+    renderWeek(days.map((d) => quick(d, 100)));
+    expect(screen.getByTestId('week-streak')).toHaveTextContent('2-week streak');
+    expect(screen.getByTestId('week-streak-nudge')).toHaveTextContent('Log 3 more days this week to keep your streak.');
+  });
+
+  it('stays quiet about the streak when the week can no longer count', () => {
+    render(<WeekCard profileId="p" endDate="2026-10-10" entries={[quick('2026-10-05', 100)]} batches={[]} samples={[]} ctx={ctx} version={0} />);
+    expect(screen.queryByTestId('week-streak')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('week-streak-nudge')).not.toBeInTheDocument();
+  });
+
+  it('shows food variety, and savings against your usual price', async () => {
+    await db.dayLogs.put({ id: dayLogId('p', '2026-10-05'), profileId: 'p', date: '2026-10-05', targets });
+    const older: Batch = { ...batch, id: 'old', purchase: { ...batch.purchase, pricePaidMYR: myr(10), date: '2026-09-01' } };
+    const eat: MealEntry = { id: 'e', profileId: 'p', date: '2026-10-05', label: 'lunch', createdAt: 1, kind: 'ingredient', ingredientId: 'tempeh', method: 'asIs', cookedG: g(100) };
+    const withKcal = { ...tempeh, per100gRaw: { ...tempeh.per100gRaw, kcal: 190 } };
+    render(<WeekCard profileId="p" endDate="2026-10-06" entries={[eat]} batches={[older, batch]} samples={[]}
+      ctx={{ ...ctx, batches: [older, batch], ingredientById: (id) => (id === 'tempeh' ? withKcal : undefined) }} version={0} />);
+    expect(await screen.findByTestId('week-variety')).toHaveTextContent('1 food, 1 plant');
+    expect(screen.getByTestId('week-saved')).toHaveTextContent('RM2.00 saved');
+    expect(screen.getByTestId('week-saved-detail')).toHaveTextContent(
+      'You paid RM2.00 less than your usual prices for the same foods. Best find: Tempeh at Pasar Seri, 20% under your usual.');
+  });
 });
+

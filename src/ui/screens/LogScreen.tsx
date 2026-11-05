@@ -201,6 +201,16 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
         </p>
       )}
 
+      {on('week') && <WeekCard
+        profileId={profile.id}
+        endDate={date}
+        entries={kitchen.entries}
+        batches={kitchen.batches}
+        samples={kitchen.samples}
+        ctx={ctx}
+        version={version}
+      />}
+
       {MEAL_LABEL_KEYS.map((label) => {
         const before = previousMeal(kitchen.entries, profile.id, label, date);
         return (
@@ -220,16 +230,6 @@ export function LogScreen({ profile, profiles = [], today = new Date() }: {
         />
         );
       })}
-
-      {on('week') && <WeekCard
-        profileId={profile.id}
-        endDate={date}
-        entries={kitchen.entries}
-        batches={kitchen.batches}
-        samples={kitchen.samples}
-        ctx={ctx}
-        version={version}
-      />}
 
       {myGroups.map((g) => (
         <GroupDay key={g.id} group={g} profiles={profiles} date={date} ctx={ctx} today={today} version={version} />
